@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: preventiva_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: preventiva_db
+      POSTGRES_USER: preventiva_user
+      POSTGRES_PASSWORD: preventiva_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
