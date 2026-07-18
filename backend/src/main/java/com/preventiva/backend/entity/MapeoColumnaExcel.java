@@ -1,6 +1,7 @@
 package com.preventiva.backend.entity;
 
 import com.preventiva.backend.enums.CampoDestino;
+import com.preventiva.backend.enums.PoliticaCampoFaltante;
 import com.preventiva.backend.enums.TipoDatoExcel;
 import jakarta.persistence.*;
 import lombok.*;
@@ -36,6 +37,10 @@ public class MapeoColumnaExcel {
     @Column(nullable = false)
     @Builder.Default
     private Boolean obligatoria = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "politica_campo_faltante", length = 30)
+    private PoliticaCampoFaltante politicaCampoFaltante;
 
     @Column(nullable = false)
     @Builder.Default

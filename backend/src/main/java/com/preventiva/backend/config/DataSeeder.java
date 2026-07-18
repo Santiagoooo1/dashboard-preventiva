@@ -2,6 +2,7 @@ package com.preventiva.backend.config;
 
 import com.preventiva.backend.entity.*;
 import com.preventiva.backend.enums.CampoDestino;
+import com.preventiva.backend.enums.PoliticaCampoFaltante;
 import com.preventiva.backend.enums.TipoDatoExcel;
 import com.preventiva.backend.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -233,6 +234,7 @@ public class DataSeeder {
                 .ifPresent(mapeo -> {
                     if (Boolean.TRUE.equals(mapeo.getObligatoria())) {
                         mapeo.setObligatoria(false);
+                        mapeo.setPoliticaCampoFaltante(PoliticaCampoFaltante.porDefecto(false));
                         mapeoColumnaExcelRepository.save(mapeo);
                     }
                 });
@@ -250,6 +252,7 @@ public class DataSeeder {
                 .campoDestino(campoDestino)
                 .tipoDato(tipoDato)
                 .obligatoria(obligatoria)
+                .politicaCampoFaltante(PoliticaCampoFaltante.porDefecto(obligatoria))
                 .activa(true)
                 .build();
 
@@ -274,6 +277,7 @@ public class DataSeeder {
                     .campoDestino(campoDestino)
                     .tipoDato(tipoDato)
                     .obligatoria(obligatoria)
+                    .politicaCampoFaltante(PoliticaCampoFaltante.porDefecto(obligatoria))
                     .activa(true)
                     .build();
 

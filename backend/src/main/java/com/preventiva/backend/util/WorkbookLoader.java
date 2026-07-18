@@ -9,6 +9,7 @@ import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 public class WorkbookLoader {
@@ -194,6 +195,96 @@ public class WorkbookLoader {
         }
 
         return contador;
+    }
+
+    public static LinkedHashMap<Integer, String> leerCabecerasConIndice(
+            MultipartFile archivo, Integer indiceHoja, Integer filaCabecera) {
+        try {
+            if (filaCabecera == null) {
+                filaCabecera = 0;
+            }
+
+            if (esCsv(archivo)) {
+                return leerCabecerasConIndiceCsv(archivo, filaCabecera);
+            }
+
+            return leerCabecerasConIndiceExcel(archivo, indiceHoja, filaCabecera);
+
+        } catch (Exception e) {
+            throw new RuntimeException("Error al leer las cabeceras del archivo: " + e.getMessage(), e);
+        }
+    }
+
+    private static LinkedHashMap<Integer, String> leerCabecerasConIndiceCsv(
+            MultipartFile archivo, Integer filaCabecera) throws Exception {
+        LinkedHashMap<Integer, String> resultado = new LinkedHashMap<>();
+
+        try (BufferedReader reader = abrirReaderCsv(archivo)) {
+            String linea;
+            int numeroFila = 0;
+            Character separador = null;
+
+            while ((linea = reader.readLine()) != null) {
+                if (linea.isBlank()) {
+                    numeroFila++;
+                    continue;
+                }
+
+                if (separador == null) {
+                    separador = detectarSeparador(linea);
+                }
+
+                if (numeroFila == filaCabecera) {
+                    List<String> valores = parsearLineaCsv(linea, separador);
+
+                    for (int i = 0; i < valores.size(); i++) {
+                        String valor = valores.get(i);
+
+                        if (valor != null && !valor.isBlank()) {
+                            resultado.put(i, valor.trim());
+                        }
+                    }
+
+                    return resultado;
+                }
+
+                numeroFila++;
+            }
+        }
+
+        throw new IllegalArgumentException("El CSV no contiene fila de cabeceras en la fila indicada.");
+    }
+
+    private static LinkedHashMap<Integer, String> leerCabecerasConIndiceExcel(
+            MultipartFile archivo, Integer indiceHoja, Integer filaCabecera) throws Exception {
+        LinkedHashMap<Integer, String> resultado = new LinkedHashMap<>();
+
+        try (Workbook workbook = abrirWorkbook(archivo)) {
+            int hoja = indiceHoja == null ? 0 : indiceHoja;
+
+            if (hoja < 0 || hoja >= workbook.getNumberOfSheets()) {
+                throw new IllegalArgumentException("El índice de hoja no es válido.");
+            }
+
+            Sheet sheet = workbook.getSheetAt(hoja);
+            Row headerRow = sheet.getRow(filaCabecera);
+
+            if (headerRow == null) {
+                throw new IllegalArgumentException("El Excel no contiene fila de cabeceras en la fila indicada.");
+            }
+
+            DataFormatter dataFormatter = new DataFormatter();
+
+            for (Cell cell : headerRow) {
+                String valor = dataFormatter.formatCellValue(cell);
+
+                if (valor != null && !valor.isBlank()) {
+                    resultado.put(cell.getColumnIndex(), valor.trim());
+                }
+            }
+        }
+
+        return resultado;
     }
 
     public static List<String> parsearLineaCsv(String linea, char separador) {
