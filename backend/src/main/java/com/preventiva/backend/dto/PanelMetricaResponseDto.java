@@ -20,4 +20,6 @@ public class PanelMetricaResponseDto {
     private Integer orden;
     private Integer ancho;
     private Boolean activa;
+    private String tipoResultadoWidget;
+    private ConfiguracionWidgetDto configuracionWidget;
 }

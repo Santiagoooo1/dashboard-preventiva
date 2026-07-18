@@ -1,5 +1,6 @@
 package com.preventiva.backend.service.impl;
 
+import com.preventiva.backend.dto.PanelMetricaConfiguracionWidgetRequestDto;
 import com.preventiva.backend.dto.PanelMetricaRequestDto;
 import com.preventiva.backend.dto.PanelMetricaResponseDto;
 import com.preventiva.backend.entity.MetricaClinica;
@@ -84,6 +85,18 @@ public class PanelMetricaServiceImpl implements PanelMetricaService {
         panelMetricaRepository.save(panelMetrica);
     }
 
+    @Override
+    public PanelMetricaResponseDto actualizarConfiguracionWidget(
+            Long panelId, Long panelMetricaId, PanelMetricaConfiguracionWidgetRequestDto request) {
+        obtenerPanelActivoOLanzar(panelId);
+        PanelMetrica panelMetrica = obtenerPanelMetricaOLanzar(panelId, panelMetricaId);
+
+        panelMetrica.setTipoResultadoWidget(request.getTipoResultado());
+        panelMetrica.setConfiguracionWidget(request.getConfiguracionWidget());
+
+        return mapToDto(panelMetricaRepository.save(panelMetrica));
+    }
+
     private void validarSinDuplicado(Long panelId, Long metricaId, Long panelMetricaIdExcluido) {
         boolean duplicado = panelMetricaRepository.findByPanelIdAndMetricaIdAndActivaTrue(panelId, metricaId)
                 .filter(pm -> panelMetricaIdExcluido == null || !pm.getId().equals(panelMetricaIdExcluido))
@@ -158,6 +171,11 @@ public class PanelMetricaServiceImpl implements PanelMetricaService {
                 .orden(panelMetrica.getOrden())
                 .ancho(panelMetrica.getAncho())
                 .activa(panelMetrica.getActiva())
+                .tipoResultadoWidget(
+                        panelMetrica.getTipoResultadoWidget() != null
+                                ? panelMetrica.getTipoResultadoWidget().name()
+                                : null)
+                .configuracionWidget(panelMetrica.getConfiguracionWidget())
                 .build();
     }
 }

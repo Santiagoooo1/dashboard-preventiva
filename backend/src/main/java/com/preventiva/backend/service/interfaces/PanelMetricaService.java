@@ -1,5 +1,6 @@
 package com.preventiva.backend.service.interfaces;
 
+import com.preventiva.backend.dto.PanelMetricaConfiguracionWidgetRequestDto;
 import com.preventiva.backend.dto.PanelMetricaRequestDto;
 import com.preventiva.backend.dto.PanelMetricaResponseDto;
 
@@ -14,4 +15,7 @@ public interface PanelMetricaService {
     PanelMetricaResponseDto actualizar(Long panelId, Long panelMetricaId, PanelMetricaRequestDto request);
 
     void desactivar(Long panelId, Long panelMetricaId);
+
+    PanelMetricaResponseDto actualizarConfiguracionWidget(
+            Long panelId, Long panelMetricaId, PanelMetricaConfiguracionWidgetRequestDto request);
 }

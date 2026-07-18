@@ -1,8 +1,12 @@
 package com.preventiva.backend.entity;
 
+import com.preventiva.backend.dto.ConfiguracionWidgetDto;
+import com.preventiva.backend.enums.TipoResultadoWidget;
 import com.preventiva.backend.enums.TipoVisualizacion;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "panel_metricas")
@@ -46,4 +50,12 @@ public class PanelMetrica {
     @Column(nullable = false)
     @Builder.Default
     private Boolean activa = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tipo_resultado_widget", length = 30)
+    private TipoResultadoWidget tipoResultadoWidget;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "configuracion_widget", columnDefinition = "jsonb")
+    private ConfiguracionWidgetDto configuracionWidget;
 }
