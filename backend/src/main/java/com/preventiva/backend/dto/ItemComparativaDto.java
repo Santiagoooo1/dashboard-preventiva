@@ -1,0 +1,16 @@
+package com.preventiva.backend.dto;
+
+import lombok.Builder;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@Builder
+public class ItemComparativaDto {
+
+    private String etiqueta;
+    private Double valor;
+    private Long totalNumerador;
+    private Long totalDenominador;
+}
