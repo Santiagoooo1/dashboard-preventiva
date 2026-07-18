@@ -12,6 +12,7 @@ import com.preventiva.backend.enums.TipoErrorImportacion;
 import com.preventiva.backend.repository.*;
 import com.preventiva.backend.service.interfaces.ExcelImportService;
 import com.preventiva.backend.service.interfaces.ExcelValidationService;
+import com.preventiva.backend.util.ClinicalValueNormalizer;
 import com.preventiva.backend.util.TextNormalizer;
 import com.preventiva.backend.util.WorkbookLoader;
 
@@ -555,6 +556,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             return null;
         }
 
+        if (ClinicalValueNormalizer.esValorAusenteClinico(valor, campoDestino)) {
+            return null;
+        }
+
         return valor.trim();
     }
 
@@ -602,7 +607,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
 
         if (campoDestino == CampoDestino.CIRUGIA_FECHA_ALTA
-                && TextNormalizer.normalize(valor).startsWith("SIGUE INGRESADO")) {
+                && ClinicalValueNormalizer.esPacienteSigueIngresado(valor)) {
             return null;
         }
 
@@ -979,6 +984,10 @@ public class ExcelImportServiceImpl implements ExcelImportService {
             return null;
         }
 
+        if (ClinicalValueNormalizer.esValorAusenteClinico(valor, campoDestino)) {
+            return null;
+        }
+
         return valor.trim();
     }
 
@@ -1036,7 +1045,7 @@ public class ExcelImportServiceImpl implements ExcelImportService {
         }
 
         if (campoDestino == CampoDestino.CIRUGIA_FECHA_ALTA
-                && TextNormalizer.normalize(valor).startsWith("SIGUE INGRESADO")) {
+                && ClinicalValueNormalizer.esPacienteSigueIngresado(valor)) {
             return null;
         }
 

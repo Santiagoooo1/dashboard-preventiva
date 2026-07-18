@@ -12,6 +12,7 @@ import com.preventiva.backend.enums.TipoDatoExcel;
 import com.preventiva.backend.repository.MapeoColumnaExcelRepository;
 import com.preventiva.backend.repository.PlantillaExcelRepository;
 import com.preventiva.backend.service.interfaces.ExcelValidationService;
+import com.preventiva.backend.util.ClinicalValueNormalizer;
 import com.preventiva.backend.util.TextNormalizer;
 import com.preventiva.backend.util.WorkbookLoader;
 
@@ -694,6 +695,33 @@ public class ExcelValidationServiceImpl implements ExcelValidationService {
                 continue;
             }
 
+            if (mapeo.getCampoDestino() == CampoDestino.CIRUGIA_FECHA_ALTA
+                    && ClinicalValueNormalizer.esPacienteSigueIngresado(valor)) {
+                errores.add(ErrorFilaExcelDto.builder()
+                        .numeroFila(indiceFila + 1)
+                        .nombreColumna(mapeo.getNombreColumnaExcel())
+                        .valorOriginal(valor)
+                        .tipoError("PACIENTE_SIGUE_INGRESADO")
+                        .mensaje("El paciente sigue ingresado; no se registra fecha de alta.")
+                        .severidad(SeveridadError.ADVERTENCIA.name())
+                        .build());
+
+                continue;
+            }
+
+            if (ClinicalValueNormalizer.esValorAusenteClinico(valor, mapeo.getCampoDestino())) {
+                errores.add(ErrorFilaExcelDto.builder()
+                        .numeroFila(indiceFila + 1)
+                        .nombreColumna(mapeo.getNombreColumnaExcel())
+                        .valorOriginal(valor)
+                        .tipoError("VALOR_AUSENTE_CLINICO")
+                        .mensaje("El valor indica ausencia de registro clínico; se importará como vacío.")
+                        .severidad(SeveridadError.ADVERTENCIA.name())
+                        .build());
+
+                continue;
+            }
+
             validarTipoDatoCsv(valor, indiceFila, mapeo, errores);
         }
     }
@@ -901,6 +929,33 @@ public class ExcelValidationServiceImpl implements ExcelValidationService {
             }
 
             if (valorVacio) {
+                continue;
+            }
+
+            if (mapeo.getCampoDestino() == CampoDestino.CIRUGIA_FECHA_ALTA
+                    && ClinicalValueNormalizer.esPacienteSigueIngresado(valor)) {
+                errores.add(ErrorFilaExcelDto.builder()
+                        .numeroFila(indiceFila + 1)
+                        .nombreColumna(mapeo.getNombreColumnaExcel())
+                        .valorOriginal(valor)
+                        .tipoError("PACIENTE_SIGUE_INGRESADO")
+                        .mensaje("El paciente sigue ingresado; no se registra fecha de alta.")
+                        .severidad(SeveridadError.ADVERTENCIA.name())
+                        .build());
+
+                continue;
+            }
+
+            if (ClinicalValueNormalizer.esValorAusenteClinico(valor, mapeo.getCampoDestino())) {
+                errores.add(ErrorFilaExcelDto.builder()
+                        .numeroFila(indiceFila + 1)
+                        .nombreColumna(mapeo.getNombreColumnaExcel())
+                        .valorOriginal(valor)
+                        .tipoError("VALOR_AUSENTE_CLINICO")
+                        .mensaje("El valor indica ausencia de registro clínico; se importará como vacío.")
+                        .severidad(SeveridadError.ADVERTENCIA.name())
+                        .build());
+
                 continue;
             }
 
