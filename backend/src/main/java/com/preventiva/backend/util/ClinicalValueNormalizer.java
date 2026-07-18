@@ -49,6 +49,14 @@ public class ClinicalValueNormalizer {
         return esValorAusenteGeneral(valor);
     }
 
+    public static boolean esValorAusenteClinico(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return false;
+        }
+
+        return esValorAusenteGeneral(valor);
+    }
+
     public static boolean esPacienteSigueIngresado(String valor) {
         if (valor == null || valor.isBlank()) {
             return false;
