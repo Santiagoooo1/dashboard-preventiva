@@ -12,6 +12,12 @@
   gap: var(--spacing-sm);
 }
 
+.botonesCabecera {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
 .nuevo {
   background-color: var(--color-primary);
   color: #fff;
@@ -20,10 +26,32 @@
   text-decoration: none;
 }
 
+.recomendados {
+  background: none;
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  font: inherit;
+}
+
+.recomendados:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .bannerError {
   background-color: #fef2f2;
   border: 1px solid var(--color-error);
   border-radius: var(--radius-sm);
   color: var(--color-error);
   padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.vacio {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  align-items: flex-start;
 }

@@ -85,6 +85,38 @@ export interface DatasetClinicoResponseDto {
   activo: boolean
 }
 
+export type TipoDato = 'TEXTO' | 'ENTERO' | 'DECIMAL' | 'FECHA' | 'BOOLEANO'
+
+// --- Fase 6.3: CRUD de datasets y campos ---
+
+export interface DatasetClinicoRequestDto {
+  codigo: string
+  nombre: string
+  descripcion?: string | null
+  hospitalId?: number | null
+}
+
+export interface CampoClinicoRequestDto {
+  codigo: string
+  etiqueta: string
+  tipoDato: TipoDato
+  esComun: boolean
+  obligatorio: boolean
+  orden?: number | null
+}
+
+export interface CampoClinicoResponseDto {
+  id: number
+  datasetId: number
+  codigo: string
+  etiqueta: string
+  tipoDato: string
+  esComun: boolean
+  obligatorio: boolean
+  orden: number | null
+  activo: boolean
+}
+
 export interface CampoRolesDto {
   filtrable: boolean
   agrupable: boolean

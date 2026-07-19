@@ -37,6 +37,21 @@ export function DatasetDetailPage() {
             <p className={styles.codigo}>{data.dataset.codigo}</p>
             {data.dataset.descripcion && <p>{data.dataset.descripcion}</p>}
 
+            <div className={styles.accionesDataset}>
+              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/campos`}>
+                Gestionar campos
+              </Link>
+              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/metricas`}>
+                Gestionar métricas
+              </Link>
+              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/metricas/nueva`}>
+                Nueva métrica
+              </Link>
+              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/editar`}>
+                Editar dataset
+              </Link>
+            </div>
+
             <Card title="Resumen de configuración">
               <ul className={styles.resumenList}>
                 <li>Campos: {data.resumenConfiguracion.totalCampos}</li>
