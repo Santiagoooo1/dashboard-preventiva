@@ -1,0 +1,44 @@
+.builder {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.row {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.row select,
+.row input {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.quitar {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-error);
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.anadir {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary);
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-sm);
+}
+
+.vacio {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}

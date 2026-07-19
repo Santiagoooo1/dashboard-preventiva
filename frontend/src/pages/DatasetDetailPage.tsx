@@ -1,17 +1,32 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router'
+import type { MetricaClinicaResponseDto, ResultadoMetricaResponseDto } from '../api/types'
 import { useApiResource } from '../hooks/useApiResource'
 import { obtenerFrontendMetadata } from '../api/datasetApi'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
+import { MetricaRowActions } from '../components/metrics/MetricaRowActions'
+import { WidgetActual } from '../components/widgets/WidgetActual'
 import styles from './DatasetDetailPage.module.css'
 
 export function DatasetDetailPage() {
   const { datasetId } = useParams<{ datasetId: string }>()
-  const { data, loading, error } = useApiResource(
+  const { data, loading, error, reload } = useApiResource(
     (signal) => obtenerFrontendMetadata(datasetId ?? '', signal),
     [datasetId],
   )
+
+  const [ultimoResultado, setUltimoResultado] = useState<{
+    metrica: MetricaClinicaResponseDto
+    resultado: ResultadoMetricaResponseDto
+  } | null>(null)
+  const [errorAccion, setErrorAccion] = useState<string | null>(null)
+
+  const onResultado = (metrica: MetricaClinicaResponseDto, resultado: ResultadoMetricaResponseDto) => {
+    setErrorAccion(null)
+    setUltimoResultado({ metrica, resultado })
+  }
 
   return (
     <div className={styles.page}>
@@ -62,6 +77,17 @@ export function DatasetDetailPage() {
             </Card>
 
             <Card title="Métricas">
+              <div className={styles.metricasAcciones}>
+                <Link className={styles.botonNueva} to={`/datasets/${datasetId}/metricas/nueva`}>
+                  + Nueva métrica
+                </Link>
+                <Link to={`/datasets/${datasetId}/metricas`}>Ver todas las métricas →</Link>
+              </div>
+              {errorAccion && (
+                <p className="stateError" role="alert">
+                  {errorAccion}
+                </p>
+              )}
               {data.metricas.length === 0 ? (
                 <p>No hay métricas configuradas.</p>
               ) : (
@@ -71,10 +97,30 @@ export function DatasetDetailPage() {
                     { key: 'nombre', header: 'Nombre' },
                     { key: 'tipoMetrica', header: 'Tipo' },
                     { key: 'unidad', header: 'Unidad', render: (m) => m.unidad ?? '—' },
+                    {
+                      key: 'acciones',
+                      header: 'Acciones',
+                      render: (m) => (
+                        <MetricaRowActions
+                          metrica={m}
+                          onResultado={onResultado}
+                          onError={setErrorAccion}
+                          onDesactivada={reload}
+                        />
+                      ),
+                    },
                   ]}
                   rows={data.metricas}
                   getRowKey={(m) => m.id}
                 />
+              )}
+              {ultimoResultado && (
+                <Card
+                  title={`Resultado: ${ultimoResultado.metrica.nombre}`}
+                  subtitle={ultimoResultado.metrica.tipoMetrica}
+                >
+                  <WidgetActual resultado={ultimoResultado.resultado} />
+                </Card>
               )}
             </Card>
 

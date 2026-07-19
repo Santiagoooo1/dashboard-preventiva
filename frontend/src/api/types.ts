@@ -103,6 +103,50 @@ export interface CampoClinicoMetadataDto {
   roles: CampoRolesDto
 }
 
+// --- Fase 4.1: métricas configurables ---
+
+export type TipoMetrica = 'CONTEO' | 'PORCENTAJE' | 'PROMEDIO' | 'SUMA' | 'DISTRIBUCION'
+
+export interface FiltroMetricaDto {
+  campo: string
+  operador: string
+  valor: unknown
+}
+
+export interface FiltroGrupoDto {
+  filtros: FiltroMetricaDto[]
+}
+
+export interface ConfiguracionMetricaDto {
+  filtros?: FiltroMetricaDto[] | null
+  numerador?: FiltroGrupoDto | null
+  denominador?: FiltroGrupoDto | null
+  campoValor?: string | null
+  campoAgrupacion?: string | null
+}
+
+export interface MetricaClinicaRequestDto {
+  codigo: string
+  nombre: string
+  descripcion?: string | null
+  tipoMetrica: TipoMetrica
+  configuracion: ConfiguracionMetricaDto
+  unidad?: string | null
+  decimales?: number | null
+  orden?: number | null
+}
+
+export interface PreviewMetricaRequestDto {
+  metrica: MetricaClinicaRequestDto
+  fechaDesde?: string | null
+  fechaHasta?: string | null
+}
+
+export interface EjecucionMetricaRequestDto {
+  fechaDesde?: string | null
+  fechaHasta?: string | null
+}
+
 export interface MetricaClinicaResponseDto {
   id: number
   datasetId: number
@@ -110,11 +154,29 @@ export interface MetricaClinicaResponseDto {
   nombre: string
   descripcion: string | null
   tipoMetrica: string
-  configuracion: unknown
+  configuracion: ConfiguracionMetricaDto
   unidad: string | null
   decimales: number
   orden: number
   activa: boolean
+}
+
+// --- Fase 5.2: metadata para construir métricas ---
+
+export interface CampoMetricaMetadataDto {
+  codigo: string
+  etiqueta: string
+  tipoDato: string
+  esComun: boolean
+  operadoresCompatibles: string[]
+  utilizableComoCampoValor: boolean
+  utilizableComoCampoAgrupacion: boolean
+  utilizableComoCampoFecha: boolean
+}
+
+export interface MetadataMetricasResponseDto {
+  dataset: DatasetClinicoResponseDto
+  campos: CampoMetricaMetadataDto[]
 }
 
 export interface PanelClinicoResponseDto {

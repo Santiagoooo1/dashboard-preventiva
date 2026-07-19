@@ -1,0 +1,20 @@
+.acciones {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.accion {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary);
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 0.85rem;
+  text-decoration: none;
+}
+
+.peligro {
+  color: var(--color-error);
+}
