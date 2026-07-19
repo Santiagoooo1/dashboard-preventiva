@@ -257,6 +257,76 @@ export interface DatasetFrontendMetadataResponseDto {
 export type TipoResultado = 'ACTUAL' | 'SERIE_TEMPORAL' | 'COMPARATIVA'
 export type EstadoWidget = 'OK' | 'ERROR'
 
+// --- Fase 6.4: CRUD de paneles y widgets ---
+
+export type TipoVisualizacion = 'KPI' | 'TARJETA' | 'TABLA' | 'BARRAS' | 'LINEAS' | 'DONUT' | 'PIE'
+export type Granularidad = 'MES' | 'TRIMESTRE' | 'ANIO'
+
+export interface PanelClinicoRequestDto {
+  codigo: string
+  nombre: string
+  descripcion?: string | null
+  orden?: number | null
+}
+
+export interface PanelMetricaRequestDto {
+  metricaId: number
+  tituloPersonalizado?: string | null
+  descripcionPersonalizada?: string | null
+  tipoVisualizacion: TipoVisualizacion
+  orden?: number | null
+  ancho?: number | null
+}
+
+export interface ConfiguracionWidgetDto {
+  granularidad?: Granularidad | null
+  campoFecha?: string | null
+  campoSegmentacion?: string | null
+  campoAgrupacion?: string | null
+}
+
+export interface PanelMetricaResponseDto {
+  id: number
+  panelId: number
+  metricaId: number
+  metricaCodigo: string
+  metricaNombre: string
+  tituloPersonalizado: string | null
+  descripcionPersonalizada: string | null
+  tipoVisualizacion: string
+  orden: number
+  ancho: number
+  activa: boolean
+  tipoResultadoWidget: string | null
+  configuracionWidget: ConfiguracionWidgetDto | null
+}
+
+export interface PanelMetricaConfiguracionWidgetRequestDto {
+  tipoResultado: TipoResultado | null
+  configuracionWidget: ConfiguracionWidgetDto | null
+}
+
+export interface WidgetMetadataDto {
+  panelMetricaId: number
+  metricaId: number
+  codigo: string
+  nombre: string
+  tipoMetrica: string
+  tipoVisualizacion: string
+  tipoResultadoWidgetConfigurado: string | null
+  tipoResultadoActual: string
+  tipoResultadosPermitidos: string[]
+  configuracionWidgetActual: ConfiguracionWidgetDto | null
+}
+
+export interface DashboardPanelMetadataResponseDto {
+  panel: PanelClinicoResponseDto
+  dataset: DatasetClinicoResponseDto
+  camposFechaPermitidos: string[]
+  camposAgrupacionPermitidos: string[]
+  widgets: WidgetMetadataDto[]
+}
+
 export interface ItemDistribucionDto {
   etiqueta: string
   valor: number

@@ -1,0 +1,48 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  max-width: 640px;
+}
+
+.form input,
+.form textarea {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  width: 100%;
+}
+
+.botones {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: var(--spacing-sm);
+}
+
+.primario {
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font: inherit;
+}
+
+.primario:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.secundario {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font: inherit;
+  color: var(--color-text);
+  text-decoration: none;
+}

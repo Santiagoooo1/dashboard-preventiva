@@ -7,6 +7,7 @@ import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
 import { MetricaRowActions } from '../components/metrics/MetricaRowActions'
+import { PanelRowActions } from '../components/paneles/PanelRowActions'
 import { WidgetActual } from '../components/widgets/WidgetActual'
 import styles from './DatasetDetailPage.module.css'
 
@@ -46,6 +47,9 @@ export function DatasetDetailPage() {
               </Link>
               <Link className={styles.accionDataset} to={`/datasets/${datasetId}/metricas/nueva`}>
                 Nueva métrica
+              </Link>
+              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/paneles`}>
+                Gestionar paneles
               </Link>
               <Link className={styles.accionDataset} to={`/datasets/${datasetId}/editar`}>
                 Editar dataset
@@ -140,18 +144,36 @@ export function DatasetDetailPage() {
             </Card>
 
             <Card title="Paneles">
+              <div className={styles.metricasAcciones}>
+                <Link className={styles.botonNueva} to={`/datasets/${datasetId}/paneles/nuevo`}>
+                  + Nuevo panel
+                </Link>
+                <Link to={`/datasets/${datasetId}/paneles`}>Ver todos los paneles →</Link>
+              </div>
               {data.paneles.length === 0 ? (
                 <p>No hay paneles configurados.</p>
               ) : (
-                <ul className={styles.panelList}>
-                  {data.paneles.map((panel) => (
-                    <li key={panel.id}>
-                      <Link to={`/paneles/${panel.id}/dashboard`}>
-                        {panel.nombre} ({panel.codigo}) →
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <DataTable
+                  columns={[
+                    { key: 'codigo', header: 'Código' },
+                    { key: 'nombre', header: 'Nombre' },
+                    { key: 'orden', header: 'Orden' },
+                    {
+                      key: 'acciones',
+                      header: 'Acciones',
+                      render: (p) => (
+                        <PanelRowActions
+                          datasetId={datasetId ?? ''}
+                          panel={p}
+                          onError={setErrorAccion}
+                          onEliminado={reload}
+                        />
+                      ),
+                    },
+                  ]}
+                  rows={data.paneles}
+                  getRowKey={(p) => p.id}
+                />
               )}
             </Card>
 

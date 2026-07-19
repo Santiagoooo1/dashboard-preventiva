@@ -8,6 +8,9 @@ import { DatasetCamposPage } from '../pages/DatasetCamposPage'
 import { CampoFormPage } from '../pages/CampoFormPage'
 import { DatasetMetricasPage } from '../pages/DatasetMetricasPage'
 import { MetricaFormPage } from '../pages/MetricaFormPage'
+import { PanelesPage } from '../pages/PanelesPage'
+import { PanelFormPage } from '../pages/PanelFormPage'
+import { PanelWidgetsPage } from '../pages/PanelWidgetsPage'
 import { CatalogoPage } from '../pages/CatalogoPage'
 import { PanelDashboardPage } from '../pages/PanelDashboardPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -27,6 +30,10 @@ export function AppRoutes() {
         <Route path="/datasets/:datasetId/metricas" element={<DatasetMetricasPage />} />
         <Route path="/datasets/:datasetId/metricas/nueva" element={<MetricaFormPage />} />
         <Route path="/datasets/:datasetId/metricas/:metricaId/editar" element={<MetricaFormPage />} />
+        <Route path="/datasets/:datasetId/paneles" element={<PanelesPage />} />
+        <Route path="/datasets/:datasetId/paneles/nuevo" element={<PanelFormPage />} />
+        <Route path="/datasets/:datasetId/paneles/:panelId/editar" element={<PanelFormPage />} />
+        <Route path="/datasets/:datasetId/paneles/:panelId/widgets" element={<PanelWidgetsPage />} />
         <Route path="/catalogo" element={<CatalogoPage />} />
         <Route path="/paneles/:panelId/dashboard" element={<PanelDashboardPage />} />
         <Route path="*" element={<NotFoundPage />} />

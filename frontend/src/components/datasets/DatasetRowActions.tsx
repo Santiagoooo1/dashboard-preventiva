@@ -39,6 +39,9 @@ export function DatasetRowActions({ dataset, onError, onEliminado }: DatasetRowA
       <Link className={styles.accion} to={`/datasets/${dataset.id}/metricas`}>
         Métricas
       </Link>
+      <Link className={styles.accion} to={`/datasets/${dataset.id}/paneles`}>
+        Paneles
+      </Link>
       <Link className={styles.accion} to={`/datasets/${dataset.id}/editar`}>
         Editar
       </Link>
