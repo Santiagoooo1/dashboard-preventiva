@@ -1,0 +1,19 @@
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table tbody tr:nth-child(even) {
+  background-color: var(--color-bg);
+}

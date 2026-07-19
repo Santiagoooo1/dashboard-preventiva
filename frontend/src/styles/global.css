@@ -1,0 +1,57 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.bigValue {
+  font-size: 2rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.subValue {
+  color: var(--color-text-muted);
+  margin: var(--spacing-xs) 0 0 0;
+}
+
+.stateLoading,
+.stateEmpty {
+  color: var(--color-text-muted);
+}
+
+.stateError {
+  color: var(--color-error);
+}
