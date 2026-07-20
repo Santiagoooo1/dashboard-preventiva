@@ -12,18 +12,17 @@ interface Paso {
 
 const PASOS: Paso[] = [
   {
-    titulo: 'Crear dataset clínico',
-    descripcion: 'Define la fuente de datos de tu especialidad: caídas, infecciones, cirugías, urgencias…',
-    enlace: { to: '/datasets/nuevo', texto: 'Crear dataset' },
+    titulo: 'Sube tu archivo Excel/CSV',
+    descripcion: 'La aplicación detecta las columnas, crea el dataset e importa los registros por ti.',
+    enlace: { to: '/crear-dashboard', texto: 'Crear dashboard' },
   },
   {
-    titulo: 'Definir campos',
-    descripcion: 'Estructura los datos del dataset: fechas, servicios, valores numéricos, categorías.',
+    titulo: 'Revisa las columnas',
+    descripcion: 'Ajusta nombres visibles, tipos de dato y rol clínico de cada columna detectada.',
   },
   {
-    titulo: 'Importar datos',
-    descripcion:
-      'Sube archivos Excel/CSV desde el dataset, valida columnas y filas, e importa los registros clínicos.',
+    titulo: 'Importa los registros',
+    descripcion: 'La aplicación valida columnas y filas e incorpora los datos al dataset.',
   },
   {
     titulo: 'Crear métricas',
@@ -56,7 +55,19 @@ export function HomePage() {
         Preventiva, Cirugía, Oncología, Digestivo, Ginecología o Pediatría.
       </p>
 
-      <Card title="Datasets clínicos">
+      <Card title="Empieza aquí">
+        <p>
+          Sube un archivo Excel o CSV con tus datos clínicos y la aplicación creará el dashboard por ti: detecta las
+          columnas, importa los registros y te lleva a los indicadores.
+        </p>
+        <div className={styles.cta}>
+          <Link className="btn btnPrimary" to="/crear-dashboard">
+            Crear dashboard desde Excel/CSV
+          </Link>
+        </div>
+      </Card>
+
+      <Card title="Configuración avanzada">
         {loading ? (
           <p className="stateLoading" role="status">
             Cargando…
@@ -65,26 +76,20 @@ export function HomePage() {
           <p className="stateError" role="alert">
             Error: {error}
           </p>
-        ) : hayDatasets ? (
+        ) : (
           <>
-            <p className={styles.resumenValor}>
-              {totalDatasets} {totalDatasets === 1 ? 'dataset activo' : 'datasets activos'}
+            <p>
+              Gestiona manualmente datasets, campos, indicadores y paneles.{' '}
+              {hayDatasets
+                ? `Actualmente hay ${totalDatasets} ${totalDatasets === 1 ? 'dataset activo' : 'datasets activos'}.`
+                : 'Todavía no hay datasets.'}
             </p>
             <div className={styles.cta}>
-              <Link className="btn btnPrimary" to="/datasets">
+              <Link className="btn btnSecondary" to="/datasets">
                 Ver datasets
               </Link>
               <Link className="btn btnSecondary" to="/datasets/nuevo">
-                Crear nuevo dataset
-              </Link>
-            </div>
-          </>
-        ) : (
-          <>
-            <p>Aún no hay datasets. Empieza creando uno.</p>
-            <div className={styles.cta}>
-              <Link className="btn btnPrimary" to="/datasets/nuevo">
-                Crear primer dataset
+                Crear dataset manualmente
               </Link>
             </div>
           </>

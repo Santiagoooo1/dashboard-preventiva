@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router'
 import { MainLayout } from '../layout/MainLayout'
 import { HomePage } from '../pages/HomePage'
+import { CrearDashboardPage } from '../pages/CrearDashboardPage'
 import { DatasetsPage } from '../pages/DatasetsPage'
 import { DatasetFormPage } from '../pages/DatasetFormPage'
 import { DatasetDetailPage } from '../pages/DatasetDetailPage'
@@ -24,6 +25,7 @@ export function AppRoutes() {
     <Routes>
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/crear-dashboard" element={<CrearDashboardPage />} />
         <Route path="/datasets" element={<DatasetsPage />} />
         <Route path="/datasets/nuevo" element={<DatasetFormPage />} />
         <Route path="/datasets/:datasetId" element={<DatasetDetailPage />} />

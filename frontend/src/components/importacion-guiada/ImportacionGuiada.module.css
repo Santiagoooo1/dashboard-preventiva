@@ -1,0 +1,202 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.intro {
+  max-width: 720px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Indicador de pasos */
+.pasos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.paso {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+}
+
+.pasoActivo {
+  color: var(--color-text);
+  font-weight: 600;
+  background-color: var(--color-bg);
+}
+
+.pasoCompletado {
+  color: var(--color-success);
+}
+
+.pasoNumero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 0.72rem;
+}
+
+/* Subir archivo */
+.avanzadas summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--color-primary);
+}
+
+.avanzadasGrid {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-sm);
+}
+
+.avanzadasGrid label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: 0.85rem;
+}
+
+.avanzadasGrid input {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+
+/* Tabla de columnas */
+.tablaColumnas input[type='text'],
+.tablaColumnas select {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  width: 100%;
+  min-width: 110px;
+}
+
+.filaIgnorada {
+  opacity: 0.5;
+}
+
+/* Progreso */
+.listaProgreso {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.itemProgreso {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.iconoProgreso {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.iconoPendiente {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.iconoEnCurso {
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+}
+
+.iconoCorrecto {
+  background-color: var(--color-success);
+  color: #fff;
+}
+
+.iconoError {
+  background-color: var(--color-error);
+  color: #fff;
+}
+
+.mensajePaso {
+  color: var(--color-error);
+  font-size: 0.85rem;
+}
+
+/* Resultado */
+.resumen {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--spacing-md) 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+}
+
+.estadoOk {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.estadoAviso {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
+.estadoError {
+  color: var(--color-error);
+  font-weight: 600;
+}
+
+.ctas {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-md);
+}
+
+.acciones {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--spacing-md);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+}
+
+.form input,
+.form textarea {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  width: 100%;
+}

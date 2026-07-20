@@ -10,6 +10,9 @@ export function Navbar() {
         <NavLink to="/" end className={({ isActive }) => (isActive ? styles.active : undefined)}>
           Inicio
         </NavLink>
+        <NavLink to="/crear-dashboard" className={({ isActive }) => (isActive ? styles.active : undefined)}>
+          Crear dashboard
+        </NavLink>
         <NavLink to="/datasets" className={({ isActive }) => (isActive ? styles.active : undefined)}>
           Datasets
         </NavLink>
