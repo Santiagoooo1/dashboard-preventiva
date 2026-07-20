@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import type { CampoClinicoResponseDto } from '../../api/types'
 import { eliminarCampo } from '../../api/datasetApi'
-import styles from './RowActions.module.css'
 
 interface CampoRowActionsProps {
   datasetId: string | number
@@ -30,11 +29,11 @@ export function CampoRowActions({ datasetId, campo, onError, onEliminado }: Camp
   }
 
   return (
-    <div className={styles.acciones}>
-      <Link className={styles.accion} to={`/datasets/${datasetId}/campos/${campo.id}/editar`}>
+    <div className="rowActions">
+      <Link className="btn btnAction" to={`/datasets/${datasetId}/campos/${campo.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className={`${styles.accion} ${styles.peligro}`} disabled={ocupado} onClick={desactivar}>
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
         Desactivar
       </button>
     </div>

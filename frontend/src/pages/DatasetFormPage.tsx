@@ -5,9 +5,12 @@ import { actualizarDataset, crearDataset, obtenerDataset } from '../api/datasetA
 import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
+import { Breadcrumbs } from '../components/Breadcrumbs'
+import { ErrorBanner } from '../components/ErrorBanner'
 import { DatasetForm } from '../components/datasets/DatasetForm'
 import type { DatasetFormValores } from '../components/datasets/DatasetForm'
 import styles from './DatasetFormPage.module.css'
+import type { Crumb } from '../components/Breadcrumbs'
 
 export function DatasetFormPage() {
   const { datasetId } = useParams<{ datasetId?: string }>()
@@ -49,17 +52,22 @@ export function DatasetFormPage() {
     }
   }
 
+  const breadcrumbs: Crumb[] = esEdicion
+    ? [
+        { label: 'Datasets', to: '/datasets' },
+        { label: data?.codigo ?? '…', to: `/datasets/${datasetId}` },
+        { label: 'Editar' },
+      ]
+    : [{ label: 'Datasets', to: '/datasets' }, { label: 'Nuevo dataset' }]
+
   return (
     <div className={styles.page}>
-      <h1>{esEdicion ? 'Editar dataset' : 'Nuevo dataset'}</h1>
       <StateContainer loading={loading} error={error} empty={data === null}>
         {data && (
           <>
-            {errorBackend && (
-              <div className={styles.bannerError} role="alert">
-                {errorBackend}
-              </div>
-            )}
+            <Breadcrumbs items={breadcrumbs} />
+            <h1>{esEdicion ? 'Editar dataset' : 'Nuevo dataset'}</h1>
+            <ErrorBanner mensaje={errorBackend} />
             <Card title="Datos del dataset">
               <DatasetForm
                 valorInicial={data}

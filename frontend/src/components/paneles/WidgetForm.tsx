@@ -72,7 +72,11 @@ export function WidgetForm({
   return (
     <div className={styles.form}>
       <div className={styles.grid}>
-        <FormField label="Métrica" error={errores.metricaId}>
+        <FormField
+          label="Métrica"
+          help="Selecciona la métrica que alimentará este widget."
+          error={errores.metricaId}
+        >
           <select value={metricaId} disabled={esEdicion} onChange={(e) => setMetricaId(e.target.value)}>
             <option value="">— seleccionar métrica —</option>
             {metricasDisponibles.map((m) => (
@@ -82,7 +86,11 @@ export function WidgetForm({
             ))}
           </select>
         </FormField>
-        <FormField label="Tipo de visualización" error={errores.tipoVisualizacion}>
+        <FormField
+          label="Tipo de visualización"
+          help="Define cómo se presentará la métrica. En esta fase se renderiza en tarjetas/tablas; los gráficos llegarán más adelante."
+          error={errores.tipoVisualizacion}
+        >
           <select value={tipoVisualizacion} onChange={(e) => setTipoVisualizacion(e.target.value)}>
             <option value="">— seleccionar visualización —</option>
             {tipoVisualizaciones.map((v) => (
@@ -101,16 +109,19 @@ export function WidgetForm({
         <FormField label="Orden">
           <input type="number" step={1} value={orden} onChange={(e) => setOrden(e.target.value)} />
         </FormField>
-        <FormField label="Ancho" error={errores.ancho}>
+        <FormField
+          label="Ancho"
+          help="Ancho del widget en una cuadrícula de 12 columnas. Recomendados: 3, 4, 6 o 12."
+          error={errores.ancho}
+        >
           <input type="number" step={1} min={1} max={12} value={ancho} onChange={(e) => setAncho(e.target.value)} />
         </FormField>
       </div>
-      <p className={styles.ayuda}>Ancho en columnas de una rejilla de 12. Valores recomendados: 3, 4, 6 o 12.</p>
       <div className={styles.botones}>
-        <button type="button" className={styles.primario} disabled={guardando} onClick={enviar}>
+        <button type="button" className="btn btnPrimary" disabled={guardando} onClick={enviar}>
           {esEdicion ? 'Guardar cambios' : 'Añadir widget'}
         </button>
-        <button type="button" className={styles.secundario} onClick={onCancelar}>
+        <button type="button" className="btn btnSecondary" onClick={onCancelar}>
           Cancelar
         </button>
       </div>

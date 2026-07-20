@@ -10,6 +10,18 @@
   font-weight: 600;
 }
 
+.help {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.aviso {
+  color: var(--color-warning);
+  font-size: 0.8rem;
+  margin: 0;
+}
+
 .error {
   color: var(--color-error);
   font-size: 0.8rem;

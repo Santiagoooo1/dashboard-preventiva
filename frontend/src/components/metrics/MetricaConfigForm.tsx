@@ -28,7 +28,11 @@ export function MetricaConfigForm({
   const setFiltros = (filtros: FiltroMetricaDto[]) => onChange({ ...configuracion, filtros })
 
   const filtrosGenerales = (
-    <FormField label="Filtros" error={errores['configuracion.filtros']}>
+    <FormField
+      label="Filtros"
+      help="Los filtros limitan qué registros entran en el cálculo."
+      error={errores['configuracion.filtros']}
+    >
       <FiltroBuilder
         filtros={configuracion.filtros ?? []}
         onChange={setFiltros}

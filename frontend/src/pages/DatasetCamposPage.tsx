@@ -6,6 +6,8 @@ import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
+import { Breadcrumbs } from '../components/Breadcrumbs'
+import { ErrorBanner } from '../components/ErrorBanner'
 import { CampoRowActions } from '../components/datasets/CampoRowActions'
 import styles from './DatasetCamposPage.module.css'
 
@@ -52,35 +54,40 @@ export function DatasetCamposPage() {
       <StateContainer loading={loading} error={error} empty={data === null}>
         {data && (
           <>
+            <Breadcrumbs
+              items={[
+                { label: 'Datasets', to: '/datasets' },
+                { label: data.dataset.codigo, to: `/datasets/${datasetId}` },
+                { label: 'Campos' },
+              ]}
+            />
             <div className={styles.cabecera}>
               <h1>Campos de {data.dataset.nombre}</h1>
-              <div className={styles.botonesCabecera}>
-                <Link className={styles.nuevo} to={`/datasets/${datasetId}/campos/nuevo`}>
-                  + Nuevo campo
-                </Link>
-              </div>
+              <Link className="btn btnPrimary" to={`/datasets/${datasetId}/campos/nuevo`}>
+                + Nuevo campo
+              </Link>
             </div>
-            <p>
-              <Link to={`/datasets/${datasetId}`}>← Volver al dataset</Link>
-            </p>
 
-            {errorAccion && (
-              <div className={styles.bannerError} role="alert">
-                {errorAccion}
-              </div>
-            )}
+            <ErrorBanner mensaje={errorAccion} />
 
             {data.campos.length === 0 ? (
               <div className={styles.vacio}>
-                <p>Este dataset no tiene campos activos.</p>
-                <button
-                  type="button"
-                  className={styles.recomendados}
-                  disabled={creandoBasicos}
-                  onClick={crearBasicos}
-                >
-                  Crear campos básicos recomendados
-                </button>
+                <p className="stateEmpty">
+                  Este dataset no tiene campos activos. Crea los campos básicos recomendados o añade un campo manualmente.
+                </p>
+                <div className="rowActions">
+                  <button
+                    type="button"
+                    className="btn btnPrimary"
+                    disabled={creandoBasicos}
+                    onClick={crearBasicos}
+                  >
+                    Crear campos básicos recomendados
+                  </button>
+                  <Link className="btn btnSecondary" to={`/datasets/${datasetId}/campos/nuevo`}>
+                    Nuevo campo
+                  </Link>
+                </div>
               </div>
             ) : (
               <Card title="Campos clínicos">

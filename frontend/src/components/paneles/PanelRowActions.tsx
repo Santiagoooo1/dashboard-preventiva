@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import type { PanelClinicoResponseDto } from '../../api/types'
 import { desactivarPanel } from '../../api/panelesApi'
-import styles from './RowActions.module.css'
 
 interface PanelRowActionsProps {
   datasetId: string | number
@@ -30,17 +29,17 @@ export function PanelRowActions({ datasetId, panel, onError, onEliminado }: Pane
   }
 
   return (
-    <div className={styles.acciones}>
-      <Link className={styles.accion} to={`/paneles/${panel.id}/dashboard`}>
+    <div className="rowActions">
+      <Link className="btn btnAction" to={`/paneles/${panel.id}/dashboard`}>
         Ver dashboard
       </Link>
-      <Link className={styles.accion} to={`/datasets/${datasetId}/paneles/${panel.id}/widgets`}>
+      <Link className="btn btnAction" to={`/datasets/${datasetId}/paneles/${panel.id}/widgets`}>
         Widgets
       </Link>
-      <Link className={styles.accion} to={`/datasets/${datasetId}/paneles/${panel.id}/editar`}>
+      <Link className="btn btnAction" to={`/datasets/${datasetId}/paneles/${panel.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className={`${styles.accion} ${styles.peligro}`} disabled={ocupado} onClick={desactivar}>
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
         Desactivar
       </button>
     </div>

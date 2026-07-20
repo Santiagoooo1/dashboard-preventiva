@@ -5,7 +5,7 @@ import styles from './Navbar.module.css'
 export function Navbar() {
   return (
     <header className={styles.navbar}>
-      <span className={styles.brand}>Dashboard Preventiva</span>
+      <span className={styles.brand}>Dashboard Clínico</span>
       <nav className={styles.links}>
         <NavLink to="/" end className={({ isActive }) => (isActive ? styles.active : undefined)}>
           Inicio

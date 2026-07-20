@@ -18,6 +18,8 @@ import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
+import { Breadcrumbs } from '../components/Breadcrumbs'
+import { ErrorBanner } from '../components/ErrorBanner'
 import { WidgetForm } from '../components/paneles/WidgetForm'
 import type { WidgetFormValores } from '../components/paneles/WidgetForm'
 import { WidgetConfigForm } from '../components/paneles/WidgetConfigForm'
@@ -117,17 +119,25 @@ export function PanelWidgetsPage() {
       <StateContainer loading={loading} error={error} empty={data === null}>
         {data && (
           <>
+            <Breadcrumbs
+              items={[
+                { label: 'Datasets', to: '/datasets' },
+                { label: data.metadata.dataset.codigo, to: `/datasets/${datasetId}` },
+                { label: 'Paneles', to: `/datasets/${datasetId}/paneles` },
+                { label: `Widgets de ${data.metadata.panel.codigo}` },
+              ]}
+            />
             <div className={styles.cabecera}>
               <h1>Widgets de {data.metadata.panel.nombre}</h1>
               <div className={styles.botonesCabecera}>
                 <button
                   type="button"
-                  className={styles.nuevo}
+                  className="btn btnPrimary"
                   onClick={() => setFormAbierto({ tipo: 'nuevo' })}
                 >
                   + Añadir widget
                 </button>
-                <Link className={styles.enlace} to={`/paneles/${panelId}/dashboard`}>
+                <Link className="btn btnSecondary" to={`/paneles/${panelId}/dashboard`}>
                   Ver dashboard
                 </Link>
               </div>
@@ -135,15 +145,8 @@ export function PanelWidgetsPage() {
             <p className={styles.subtitulo}>
               Dataset: {data.metadata.dataset.nombre} ({data.metadata.dataset.codigo})
             </p>
-            <p>
-              <Link to={`/datasets/${datasetId}/paneles`}>← Volver a paneles</Link>
-            </p>
 
-            {errorAccion && (
-              <div className={styles.bannerError} role="alert">
-                {errorAccion}
-              </div>
-            )}
+            <ErrorBanner mensaje={errorAccion} />
 
             {formAbierto?.tipo === 'nuevo' && (
               <Card title="Añadir widget">
@@ -160,7 +163,16 @@ export function PanelWidgetsPage() {
             )}
 
             {data.widgets.length === 0 ? (
-              <p>Este panel no tiene widgets. Añade el primero con “Añadir widget”.</p>
+              <div>
+                <p className="stateEmpty">
+                  Este panel no tiene widgets. Añade el primero para que el dashboard muestre resultados.
+                </p>
+                {formAbierto?.tipo !== 'nuevo' && (
+                  <button type="button" className="btn btnPrimary" onClick={() => setFormAbierto({ tipo: 'nuevo' })}>
+                    Añadir widget
+                  </button>
+                )}
+              </div>
             ) : (
               <Card title="Widgets del panel">
                 <DataTable

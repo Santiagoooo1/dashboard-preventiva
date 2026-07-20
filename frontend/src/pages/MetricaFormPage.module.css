@@ -32,39 +32,10 @@
   flex-wrap: wrap;
 }
 
-.primario {
-  background-color: var(--color-primary);
-  color: #fff;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  padding: var(--spacing-sm) var(--spacing-md);
-  font: inherit;
-}
-
-.secundario {
-  background: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  padding: var(--spacing-sm) var(--spacing-md);
-  font: inherit;
-  color: var(--color-text);
-  text-decoration: none;
-}
-
-.primario:disabled,
-.secundario:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
-.bannerError {
-  background-color: #fef2f2;
-  border: 1px solid var(--color-error);
-  border-radius: var(--radius-sm);
-  color: var(--color-error);
-  padding: var(--spacing-sm) var(--spacing-md);
+.ayudaPreview {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin: 0;
 }
 
 .fechasPreview {

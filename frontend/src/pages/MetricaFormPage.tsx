@@ -18,6 +18,9 @@ import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { FormField } from '../components/FormField'
+import { Breadcrumbs } from '../components/Breadcrumbs'
+import { ErrorBanner } from '../components/ErrorBanner'
+import { avisoCodigo } from '../utils/validacion'
 import { MetricaConfigForm } from '../components/metrics/MetricaConfigForm'
 import { WidgetActual } from '../components/widgets/WidgetActual'
 import styles from './MetricaFormPage.module.css'
@@ -274,31 +277,42 @@ export function MetricaFormPage() {
     }
   }
 
+  const ayudaTipoMetrica = data?.catalogo.tipoMetricas.find((t) => t.codigo === form.tipoMetrica)?.descripcion
+
   return (
     <div className={styles.page}>
-      <h1>{esEdicion ? 'Editar métrica' : 'Nueva métrica'}</h1>
       <StateContainer loading={loading} error={error} empty={data === null}>
         {data && (
           <>
+            <Breadcrumbs
+              items={[
+                { label: 'Datasets', to: '/datasets' },
+                { label: data.metadata.dataset.codigo, to: `/datasets/${datasetId}` },
+                { label: 'Métricas', to: `/datasets/${datasetId}/metricas` },
+                { label: esEdicion ? 'Editar métrica' : 'Nueva métrica' },
+              ]}
+            />
+            <h1>{esEdicion ? 'Editar métrica' : 'Nueva métrica'}</h1>
             <p>
               Dataset: <strong>{data.metadata.dataset.nombre}</strong> ({data.metadata.dataset.codigo})
             </p>
 
-            {errorBackend && (
-              <div className={styles.bannerError} role="alert">
-                {errorBackend}
-              </div>
-            )}
+            <ErrorBanner mensaje={errorBackend} />
 
             <Card title="Datos generales">
               <div className={styles.formGrid}>
-                <FormField label="Código" error={erroresForm.codigo}>
+                <FormField
+                  label="Código interno de la métrica"
+                  help="Identificador técnico único dentro del dataset. Ejemplos: total_ilq, tasa_ilq, estancia_media."
+                  aviso={avisoCodigo(form.codigo)}
+                  error={erroresForm.codigo}
+                >
                   <input value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} />
                 </FormField>
                 <FormField label="Nombre" error={erroresForm.nombre}>
                   <input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
                 </FormField>
-                <FormField label="Tipo de métrica">
+                <FormField label="Tipo de métrica" help={ayudaTipoMetrica ?? undefined}>
                   <select value={form.tipoMetrica} onChange={(e) => cambiarTipo(e.target.value as TipoMetrica)}>
                     {data.catalogo.tipoMetricas.map((t) => (
                       <option key={t.codigo} value={t.codigo}>
@@ -350,6 +364,7 @@ export function MetricaFormPage() {
               />
             </Card>
 
+            <p className={styles.ayudaPreview}>Previsualiza el resultado antes de guardar la métrica.</p>
             <div className={styles.fechasPreview}>
               <span>Rango para previsualizar (opcional):</span>
               <input type="date" value={fechaDesde} onChange={(e) => setFechaDesde(e.target.value)} />
@@ -358,13 +373,13 @@ export function MetricaFormPage() {
             </div>
 
             <div className={styles.botones}>
-              <button type="button" className={styles.secundario} onClick={previsualizar}>
+              <button type="button" className="btn btnSecondary" onClick={previsualizar}>
                 Previsualizar
               </button>
-              <button type="button" className={styles.primario} disabled={guardando} onClick={guardar}>
+              <button type="button" className="btn btnPrimary" disabled={guardando} onClick={guardar}>
                 {esEdicion ? 'Guardar cambios' : 'Crear métrica'}
               </button>
-              <Link className={styles.secundario} to={`/datasets/${datasetId}/metricas`}>
+              <Link className="btn btnSecondary" to={`/datasets/${datasetId}/metricas`}>
                 Cancelar
               </Link>
             </div>

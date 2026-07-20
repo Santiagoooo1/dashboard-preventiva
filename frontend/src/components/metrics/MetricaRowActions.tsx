@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import type { MetricaClinicaResponseDto, ResultadoMetricaResponseDto } from '../../api/types'
 import { desactivarMetrica, ejecutarMetrica } from '../../api/metricasApi'
-import styles from './MetricaRowActions.module.css'
 
 interface MetricaRowActionsProps {
   metrica: MetricaClinicaResponseDto
@@ -42,14 +41,14 @@ export function MetricaRowActions({ metrica, onResultado, onError, onDesactivada
   }
 
   return (
-    <div className={styles.acciones}>
-      <Link className={styles.accion} to={`/datasets/${metrica.datasetId}/metricas/${metrica.id}/editar`}>
+    <div className="rowActions">
+      <Link className="btn btnAction" to={`/datasets/${metrica.datasetId}/metricas/${metrica.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className={styles.accion} disabled={ocupado} onClick={ejecutar}>
+      <button type="button" className="btn btnAction" disabled={ocupado} onClick={ejecutar}>
         Ejecutar
       </button>
-      <button type="button" className={`${styles.accion} ${styles.peligro}`} disabled={ocupado} onClick={desactivar}>
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
         Desactivar
       </button>
     </div>

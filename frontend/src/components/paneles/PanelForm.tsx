@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import type { PanelClinicoRequestDto } from '../../api/types'
 import { FormField } from '../FormField'
+import { avisoCodigo } from '../../utils/validacion'
 import styles from './PanelForm.module.css'
 
 export interface PanelFormValores {
@@ -43,23 +44,28 @@ export function PanelForm({ valorInicial, onSubmit, guardando, textoBoton, cance
 
   return (
     <div className={styles.form}>
-      <FormField label="Código" error={errores.codigo}>
+      <FormField
+        label="Código interno del panel"
+        help="Identificador técnico único dentro del dataset. Ejemplo: panel_ilq_general."
+        aviso={avisoCodigo(codigo)}
+        error={errores.codigo}
+      >
         <input value={codigo} onChange={(e) => setCodigo(e.target.value)} />
       </FormField>
-      <FormField label="Nombre" error={errores.nombre}>
+      <FormField label="Nombre" help="Nombre visible del panel." error={errores.nombre}>
         <input value={nombre} onChange={(e) => setNombre(e.target.value)} />
       </FormField>
       <FormField label="Descripción">
         <textarea rows={2} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
       </FormField>
-      <FormField label="Orden">
+      <FormField label="Orden" help="Número opcional para ordenar paneles.">
         <input type="number" step={1} value={orden} onChange={(e) => setOrden(e.target.value)} />
       </FormField>
       <div className={styles.botones}>
-        <button type="button" className={styles.primario} disabled={guardando} onClick={enviar}>
+        <button type="button" className="btn btnPrimary" disabled={guardando} onClick={enviar}>
           {textoBoton}
         </button>
-        <Link className={styles.secundario} to={cancelarHref}>
+        <Link className="btn btnSecondary" to={cancelarHref}>
           Cancelar
         </Link>
       </div>

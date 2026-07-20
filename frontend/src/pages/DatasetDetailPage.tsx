@@ -1,15 +1,62 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
-import type { MetricaClinicaResponseDto, ResultadoMetricaResponseDto } from '../api/types'
+import type {
+  MetricaClinicaResponseDto,
+  ResultadoMetricaResponseDto,
+  ResumenConfiguracionDatasetDto,
+} from '../api/types'
 import { useApiResource } from '../hooks/useApiResource'
 import { obtenerFrontendMetadata } from '../api/datasetApi'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
+import { Breadcrumbs } from '../components/Breadcrumbs'
+import { ErrorBanner } from '../components/ErrorBanner'
 import { MetricaRowActions } from '../components/metrics/MetricaRowActions'
 import { PanelRowActions } from '../components/paneles/PanelRowActions'
 import { WidgetActual } from '../components/widgets/WidgetActual'
 import styles from './DatasetDetailPage.module.css'
+
+interface Recomendacion {
+  titulo: string
+  descripcion: string
+  to: string
+  textoBoton: string
+}
+
+function siguientePaso(datasetId: string, resumen: ResumenConfiguracionDatasetDto): Recomendacion {
+  if (resumen.totalCampos === 0) {
+    return {
+      titulo: 'Define los campos del dataset',
+      descripcion:
+        'Este dataset aún no tiene campos. Créalos manualmente o usa los campos básicos recomendados (paciente, fecha y servicio).',
+      to: `/datasets/${datasetId}/campos`,
+      textoBoton: 'Crear campos',
+    }
+  }
+  if (resumen.totalMetricas === 0) {
+    return {
+      titulo: 'Crea la primera métrica',
+      descripcion: 'Ya hay campos definidos. El siguiente paso es crear un indicador clínico: conteo, tasa, promedio…',
+      to: `/datasets/${datasetId}/metricas/nueva`,
+      textoBoton: 'Nueva métrica',
+    }
+  }
+  if (resumen.totalPaneles === 0) {
+    return {
+      titulo: 'Crea el primer panel',
+      descripcion: 'Ya hay métricas. Agrúpalas en un panel clínico para construir el dashboard.',
+      to: `/datasets/${datasetId}/paneles/nuevo`,
+      textoBoton: 'Nuevo panel',
+    }
+  }
+  return {
+    titulo: 'Configura widgets y consulta el dashboard',
+    descripcion: 'El dataset ya tiene campos, métricas y paneles. Añade o ajusta widgets y revisa el dashboard.',
+    to: `/datasets/${datasetId}/paneles`,
+    textoBoton: 'Gestionar paneles',
+  }
+}
 
 export function DatasetDetailPage() {
   const { datasetId } = useParams<{ datasetId: string }>()
@@ -29,32 +76,53 @@ export function DatasetDetailPage() {
     setUltimoResultado({ metrica, resultado })
   }
 
+  const recomendacion = data ? siguientePaso(datasetId ?? '', data.resumenConfiguracion) : null
+
   return (
     <div className={styles.page}>
       <StateContainer loading={loading} error={error} empty={data === null}>
-        {data && (
+        {data && recomendacion && (
           <>
+            <Breadcrumbs
+              items={[{ label: 'Datasets', to: '/datasets' }, { label: data.dataset.codigo }]}
+            />
             <h1>{data.dataset.nombre}</h1>
             <p className={styles.codigo}>{data.dataset.codigo}</p>
             {data.dataset.descripcion && <p>{data.dataset.descripcion}</p>}
 
-            <div className={styles.accionesDataset}>
-              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/campos`}>
-                Gestionar campos
+            <Card title="Siguiente paso recomendado" className={styles.recomendacion}>
+              <p className={styles.recomendacionTitulo}>{recomendacion.titulo}</p>
+              <p>{recomendacion.descripcion}</p>
+              <Link className="btn btnPrimary" to={recomendacion.to}>
+                {recomendacion.textoBoton}
               </Link>
-              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/metricas`}>
-                Gestionar métricas
-              </Link>
-              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/metricas/nueva`}>
-                Nueva métrica
-              </Link>
-              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/paneles`}>
-                Gestionar paneles
-              </Link>
-              <Link className={styles.accionDataset} to={`/datasets/${datasetId}/editar`}>
-                Editar dataset
-              </Link>
-            </div>
+            </Card>
+
+            <Card title="Accesos rápidos">
+              <div className={styles.accionesDataset}>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/campos`}>
+                  Gestionar campos
+                </Link>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/metricas`}>
+                  Gestionar métricas
+                </Link>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/paneles`}>
+                  Gestionar paneles
+                </Link>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/campos/nuevo`}>
+                  Nuevo campo
+                </Link>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/metricas/nueva`}>
+                  Nueva métrica
+                </Link>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/paneles/nuevo`}>
+                  Nuevo panel
+                </Link>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/editar`}>
+                  Editar dataset
+                </Link>
+              </div>
+            </Card>
 
             <Card title="Resumen de configuración">
               <ul className={styles.resumenList}>
@@ -67,7 +135,10 @@ export function DatasetDetailPage() {
 
             <Card title="Campos clínicos">
               {data.campos.length === 0 ? (
-                <p>No hay campos clínicos configurados.</p>
+                <p>
+                  No hay campos clínicos configurados.{' '}
+                  <Link to={`/datasets/${datasetId}/campos`}>Crear campos →</Link>
+                </p>
               ) : (
                 <DataTable
                   columns={[
@@ -97,18 +168,17 @@ export function DatasetDetailPage() {
 
             <Card title="Métricas">
               <div className={styles.metricasAcciones}>
-                <Link className={styles.botonNueva} to={`/datasets/${datasetId}/metricas/nueva`}>
+                <Link className="btn btnPrimary" to={`/datasets/${datasetId}/metricas/nueva`}>
                   + Nueva métrica
                 </Link>
                 <Link to={`/datasets/${datasetId}/metricas`}>Ver todas las métricas →</Link>
               </div>
-              {errorAccion && (
-                <p className="stateError" role="alert">
-                  {errorAccion}
-                </p>
-              )}
+              <ErrorBanner mensaje={errorAccion} />
               {data.metricas.length === 0 ? (
-                <p>No hay métricas configuradas.</p>
+                <p>
+                  No hay métricas configuradas.{' '}
+                  <Link to={`/datasets/${datasetId}/metricas/nueva`}>Crear la primera métrica →</Link>
+                </p>
               ) : (
                 <DataTable
                   columns={[
@@ -145,13 +215,16 @@ export function DatasetDetailPage() {
 
             <Card title="Paneles">
               <div className={styles.metricasAcciones}>
-                <Link className={styles.botonNueva} to={`/datasets/${datasetId}/paneles/nuevo`}>
+                <Link className="btn btnPrimary" to={`/datasets/${datasetId}/paneles/nuevo`}>
                   + Nuevo panel
                 </Link>
                 <Link to={`/datasets/${datasetId}/paneles`}>Ver todos los paneles →</Link>
               </div>
               {data.paneles.length === 0 ? (
-                <p>No hay paneles configurados.</p>
+                <p>
+                  No hay paneles configurados.{' '}
+                  <Link to={`/datasets/${datasetId}/paneles/nuevo`}>Crear el primer panel →</Link>
+                </p>
               ) : (
                 <DataTable
                   columns={[
@@ -179,7 +252,7 @@ export function DatasetDetailPage() {
 
             <Card title="Plantillas de importación">
               {data.plantillasImportacion.length === 0 ? (
-                <p>No hay plantillas de importación configuradas.</p>
+                <p>No hay plantillas de importación configuradas. La importación de datos llegará más adelante.</p>
               ) : (
                 <DataTable
                   columns={[

@@ -4,6 +4,14 @@
   gap: var(--spacing-md);
 }
 
+.cabecera {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
 .subtitle {
   color: var(--color-text-muted);
   margin-top: calc(var(--spacing-xs) * -1);

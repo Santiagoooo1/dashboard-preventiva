@@ -6,6 +6,8 @@ import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
+import { Breadcrumbs } from '../components/Breadcrumbs'
+import { ErrorBanner } from '../components/ErrorBanner'
 import { PanelRowActions } from '../components/paneles/PanelRowActions'
 import styles from './PanelesPage.module.css'
 
@@ -29,24 +31,31 @@ export function PanelesPage() {
       <StateContainer loading={loading} error={error} empty={data === null}>
         {data && (
           <>
+            <Breadcrumbs
+              items={[
+                { label: 'Datasets', to: '/datasets' },
+                { label: data.dataset.codigo, to: `/datasets/${datasetId}` },
+                { label: 'Paneles' },
+              ]}
+            />
             <div className={styles.cabecera}>
               <h1>Paneles de {data.dataset.nombre}</h1>
-              <Link className={styles.nuevo} to={`/datasets/${datasetId}/paneles/nuevo`}>
+              <Link className="btn btnPrimary" to={`/datasets/${datasetId}/paneles/nuevo`}>
                 + Nuevo panel
               </Link>
             </div>
-            <p>
-              <Link to={`/datasets/${datasetId}`}>← Volver al dataset</Link>
-            </p>
 
-            {errorAccion && (
-              <div className={styles.bannerError} role="alert">
-                {errorAccion}
-              </div>
-            )}
+            <ErrorBanner mensaje={errorAccion} />
 
             {data.paneles.length === 0 ? (
-              <p>Este dataset no tiene paneles activos.</p>
+              <div>
+                <p className="stateEmpty">
+                  Este dataset no tiene paneles activos. Crea el primero para agrupar métricas en un dashboard.
+                </p>
+                <Link className="btn btnPrimary" to={`/datasets/${datasetId}/paneles/nuevo`}>
+                  Nuevo panel
+                </Link>
+              </div>
             ) : (
               <Card title="Paneles">
                 <DataTable

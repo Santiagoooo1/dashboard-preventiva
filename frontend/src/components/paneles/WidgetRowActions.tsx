@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { PanelMetricaResponseDto } from '../../api/types'
 import { quitarWidget } from '../../api/panelesApi'
-import styles from './RowActions.module.css'
 
 interface WidgetRowActionsProps {
   panelId: string | number
@@ -39,14 +38,14 @@ export function WidgetRowActions({
   }
 
   return (
-    <div className={styles.acciones}>
-      <button type="button" className={styles.accion} onClick={onEditar}>
+    <div className="rowActions">
+      <button type="button" className="btn btnAction" onClick={onEditar}>
         Editar widget
       </button>
-      <button type="button" className={styles.accion} onClick={onConfigurar}>
+      <button type="button" className="btn btnAction" onClick={onConfigurar}>
         Configurar resultado
       </button>
-      <button type="button" className={`${styles.accion} ${styles.peligro}`} disabled={ocupado} onClick={quitar}>
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={quitar}>
         Quitar
       </button>
     </div>

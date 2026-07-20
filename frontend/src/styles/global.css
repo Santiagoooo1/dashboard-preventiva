@@ -55,3 +55,63 @@ table {
 .stateError {
   color: var(--color-error);
 }
+
+/* Botones comunes: aplicables a <button> y a <Link> por igual. */
+.btn {
+  display: inline-block;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: none;
+  text-align: center;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btnPrimary {
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.btnSecondary {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.btnAction {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 0.85rem;
+}
+
+.btnDanger {
+  background: none;
+  border: 1px solid var(--color-border);
+  color: var(--color-error);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 0.85rem;
+}
+
+.rowActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.bannerError {
+  background-color: #fef2f2;
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
+  color: var(--color-error);
+  padding: var(--spacing-sm) var(--spacing-md);
+}

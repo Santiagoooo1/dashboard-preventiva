@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import type { DatasetClinicoResponseDto } from '../../api/types'
 import { eliminarDataset } from '../../api/datasetApi'
-import styles from './RowActions.module.css'
 
 interface DatasetRowActionsProps {
   dataset: DatasetClinicoResponseDto
@@ -29,23 +28,23 @@ export function DatasetRowActions({ dataset, onError, onEliminado }: DatasetRowA
   }
 
   return (
-    <div className={styles.acciones}>
-      <Link className={styles.accion} to={`/datasets/${dataset.id}`}>
-        Ver detalle
+    <div className="rowActions">
+      <Link className="btn btnAction" to={`/datasets/${dataset.id}`}>
+        Detalle
       </Link>
-      <Link className={styles.accion} to={`/datasets/${dataset.id}/campos`}>
+      <Link className="btn btnAction" to={`/datasets/${dataset.id}/campos`}>
         Campos
       </Link>
-      <Link className={styles.accion} to={`/datasets/${dataset.id}/metricas`}>
+      <Link className="btn btnAction" to={`/datasets/${dataset.id}/metricas`}>
         Métricas
       </Link>
-      <Link className={styles.accion} to={`/datasets/${dataset.id}/paneles`}>
+      <Link className="btn btnAction" to={`/datasets/${dataset.id}/paneles`}>
         Paneles
       </Link>
-      <Link className={styles.accion} to={`/datasets/${dataset.id}/editar`}>
+      <Link className="btn btnAction" to={`/datasets/${dataset.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className={`${styles.accion} ${styles.peligro}`} disabled={ocupado} onClick={desactivar}>
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
         Desactivar
       </button>
     </div>

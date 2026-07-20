@@ -4,8 +4,57 @@
   gap: var(--spacing-md);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+.descripcion {
+  max-width: 720px;
+  margin: 0;
+}
+
+.especialidades {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  max-width: 720px;
+  margin: 0;
+}
+
+.resumenValor {
+  font-size: 1.6rem;
+  font-weight: 600;
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.cta {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pasos {
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-md);
+  margin: 0;
+  padding-left: var(--spacing-lg);
+}
+
+.pasos li::marker {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.pasoTitulo {
+  font-weight: 600;
+  margin: 0;
+}
+
+.pasoDescripcion {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  margin: var(--spacing-xs) 0 0 0;
+}
+
+.proximamente {
+  color: var(--color-warning);
+  font-size: 0.8rem;
+  font-weight: 600;
 }

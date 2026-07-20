@@ -7,6 +7,8 @@ import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
+import { Breadcrumbs } from '../components/Breadcrumbs'
+import { ErrorBanner } from '../components/ErrorBanner'
 import { MetricaRowActions } from '../components/metrics/MetricaRowActions'
 import { WidgetActual } from '../components/widgets/WidgetActual'
 import styles from './DatasetMetricasPage.module.css'
@@ -41,24 +43,31 @@ export function DatasetMetricasPage() {
       <StateContainer loading={loading} error={error} empty={data === null}>
         {data && (
           <>
+            <Breadcrumbs
+              items={[
+                { label: 'Datasets', to: '/datasets' },
+                { label: data.dataset.codigo, to: `/datasets/${datasetId}` },
+                { label: 'Métricas' },
+              ]}
+            />
             <div className={styles.cabecera}>
               <h1>Métricas de {data.dataset.nombre}</h1>
-              <Link className={styles.nueva} to={`/datasets/${datasetId}/metricas/nueva`}>
+              <Link className="btn btnPrimary" to={`/datasets/${datasetId}/metricas/nueva`}>
                 + Nueva métrica
               </Link>
             </div>
-            <p>
-              <Link to={`/datasets/${datasetId}`}>← Volver al dataset</Link>
-            </p>
 
-            {errorAccion && (
-              <div className={styles.bannerError} role="alert">
-                {errorAccion}
-              </div>
-            )}
+            <ErrorBanner mensaje={errorAccion} />
 
             {data.metricas.length === 0 ? (
-              <p>No hay métricas configuradas en este dataset.</p>
+              <div>
+                <p className="stateEmpty">
+                  No hay métricas configuradas en este dataset. Crea la primera para empezar a medir.
+                </p>
+                <Link className="btn btnPrimary" to={`/datasets/${datasetId}/metricas/nueva`}>
+                  Nueva métrica
+                </Link>
+              </div>
             ) : (
               <Card title="Métricas">
                 <DataTable

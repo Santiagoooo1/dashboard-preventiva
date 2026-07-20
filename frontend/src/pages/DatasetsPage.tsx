@@ -5,6 +5,7 @@ import { listarDatasets } from '../api/datasetApi'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
+import { ErrorBanner } from '../components/ErrorBanner'
 import { DatasetRowActions } from '../components/datasets/DatasetRowActions'
 import styles from './DatasetsPage.module.css'
 
@@ -16,22 +17,26 @@ export function DatasetsPage() {
     <div className={styles.page}>
       <div className={styles.cabecera}>
         <h1>Datasets clínicos</h1>
-        <Link className={styles.nuevo} to="/datasets/nuevo">
-          + Nuevo dataset
+        <Link className="btn btnPrimary" to="/datasets/nuevo">
+          Crear nuevo dataset
         </Link>
       </div>
+      <p className={styles.intro}>
+        Un dataset representa una fuente de datos clínicos sobre la que se definen campos, métricas y paneles.
+      </p>
 
-      {errorAccion && (
-        <div className={styles.bannerError} role="alert">
-          {errorAccion}
-        </div>
-      )}
+      <ErrorBanner mensaje={errorAccion} />
 
       <StateContainer
         loading={loading}
         error={error}
         empty={data !== null && data.length === 0}
-        emptyMessage="No hay datasets activos. Crea el primero con “Nuevo dataset”."
+        emptyMessage="No hay datasets todavía. Crea el primero para empezar a definir campos y métricas."
+        emptyAction={
+          <Link className="btn btnPrimary" to="/datasets/nuevo">
+            Crear nuevo dataset
+          </Link>
+        }
       >
         <Card title="Datasets">
           <DataTable

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router'
 import type { CampoClinicoRequestDto, OpcionCatalogoDto, TipoDato } from '../../api/types'
 import { FormField } from '../FormField'
+import { avisoCodigo } from '../../utils/validacion'
 import styles from './CampoForm.module.css'
 
 const CAMPOS_COMUNES_CONOCIDOS = [
@@ -71,13 +72,26 @@ export function CampoForm({
 
   return (
     <div className={styles.form}>
-      <FormField label="Código" error={errores.codigo}>
+      <FormField
+        label="Código interno del campo"
+        help="Identificador técnico del campo. Ejemplos: fechaEvento, servicio, edad, diasEstancia. Para campos personalizados usa nombres sin espacios ni acentos."
+        aviso={avisoCodigo(codigo)}
+        error={errores.codigo}
+      >
         <input value={codigo} onChange={(e) => setCodigo(e.target.value)} />
       </FormField>
-      <FormField label="Etiqueta" error={errores.etiqueta}>
+      <FormField
+        label="Etiqueta"
+        help="Texto visible para el usuario. Ejemplo: Fecha del evento."
+        error={errores.etiqueta}
+      >
         <input value={etiqueta} onChange={(e) => setEtiqueta(e.target.value)} />
       </FormField>
-      <FormField label="Tipo de dato" error={errores.tipoDato}>
+      <FormField
+        label="Tipo de dato"
+        help="El tipo de dato determina qué filtros, métricas y gráficos se podrán usar."
+        error={errores.tipoDato}
+      >
         <select value={tipoDato} onChange={(e) => setTipoDato(e.target.value)}>
           <option value="">— seleccionar tipo —</option>
           {tiposDato.map((t) => (
@@ -118,16 +132,17 @@ export function CampoForm({
         />
         <label htmlFor="obligatorio">Obligatorio</label>
       </div>
+      <p className={styles.ayuda}>Marca esta opción si el campo debe estar informado en cada registro importado.</p>
 
-      <FormField label="Orden">
+      <FormField label="Orden" help="Número opcional para ordenar los campos en la interfaz.">
         <input type="number" step={1} value={orden} onChange={(e) => setOrden(e.target.value)} />
       </FormField>
 
       <div className={styles.botones}>
-        <button type="button" className={styles.primario} disabled={guardando} onClick={enviar}>
+        <button type="button" className="btn btnPrimary" disabled={guardando} onClick={enviar}>
           {textoBoton}
         </button>
-        <Link className={styles.secundario} to={cancelarHref}>
+        <Link className="btn btnSecondary" to={cancelarHref}>
           Cancelar
         </Link>
       </div>

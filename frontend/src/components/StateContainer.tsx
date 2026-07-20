@@ -5,10 +5,18 @@ interface StateContainerProps {
   error: string | null
   empty?: boolean
   emptyMessage?: string
+  emptyAction?: ReactNode
   children: ReactNode
 }
 
-export function StateContainer({ loading, error, empty, emptyMessage, children }: StateContainerProps) {
+export function StateContainer({
+  loading,
+  error,
+  empty,
+  emptyMessage,
+  emptyAction,
+  children,
+}: StateContainerProps) {
   if (loading) {
     return (
       <p className="stateLoading" role="status">
@@ -26,7 +34,12 @@ export function StateContainer({ loading, error, empty, emptyMessage, children }
   }
 
   if (empty) {
-    return <p className="stateEmpty">{emptyMessage ?? 'No hay datos disponibles.'}</p>
+    return (
+      <div>
+        <p className="stateEmpty">{emptyMessage ?? 'No hay datos disponibles.'}</p>
+        {emptyAction}
+      </div>
+    )
   }
 
   return <>{children}</>

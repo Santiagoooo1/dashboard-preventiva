@@ -6,12 +6,15 @@ import { getCatalogo } from '../api/frontendCatalogApi'
 import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
+import { Breadcrumbs } from '../components/Breadcrumbs'
+import { ErrorBanner } from '../components/ErrorBanner'
 import { CampoForm } from '../components/datasets/CampoForm'
 import type { CampoFormValores } from '../components/datasets/CampoForm'
 import styles from './DatasetFormPage.module.css'
 
 interface DatosCampoForm {
   datasetNombre: string
+  datasetCodigo: string
   tiposDato: OpcionCatalogoDto[]
   campoExistente: CampoClinicoResponseDto | null
 }
@@ -29,7 +32,12 @@ export function CampoFormPage() {
         campoId ? listarCampos(datasetId ?? '', signal) : Promise.resolve<CampoClinicoResponseDto[]>([]),
       ])
       const campoExistente = campoId ? campos.find((c) => String(c.id) === campoId) ?? null : null
-      return { datasetNombre: dataset.nombre, tiposDato: catalogo.tiposDato, campoExistente }
+      return {
+        datasetNombre: dataset.nombre,
+        datasetCodigo: dataset.codigo,
+        tiposDato: catalogo.tiposDato,
+        campoExistente,
+      }
     },
     [datasetId, campoId],
   )
@@ -68,24 +76,28 @@ export function CampoFormPage() {
 
   return (
     <div className={styles.page}>
-      <h1>{esEdicion ? 'Editar campo' : 'Nuevo campo'}</h1>
       <StateContainer loading={loading} error={error} empty={data === null}>
         {data && (
           <>
+            <Breadcrumbs
+              items={[
+                { label: 'Datasets', to: '/datasets' },
+                { label: data.datasetCodigo, to: `/datasets/${datasetId}` },
+                { label: 'Campos', to: `/datasets/${datasetId}/campos` },
+                { label: esEdicion ? 'Editar campo' : 'Nuevo campo' },
+              ]}
+            />
+            <h1>{esEdicion ? 'Editar campo' : 'Nuevo campo'}</h1>
             <p>
               Dataset: <strong>{data.datasetNombre}</strong>
             </p>
             {campoNoEncontrado ? (
-              <div className={styles.bannerError} role="alert">
+              <div className="bannerError" role="alert">
                 No se ha encontrado el campo solicitado (puede estar desactivado o no pertenecer a este dataset).
               </div>
             ) : (
               <>
-                {errorBackend && (
-                  <div className={styles.bannerError} role="alert">
-                    {errorBackend}
-                  </div>
-                )}
+                <ErrorBanner mensaje={errorBackend} />
                 <Card title="Datos del campo">
                   <CampoForm
                     valorInicial={valorInicial}

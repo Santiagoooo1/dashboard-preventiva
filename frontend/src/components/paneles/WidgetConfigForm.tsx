@@ -67,6 +67,14 @@ export function WidgetConfigForm({
     })
   }
 
+  const ayudaTipoResultado = esAutomatico
+    ? 'Deja que el backend elija el resultado según la visualización y el tipo de métrica.'
+    : mostrarSerie
+      ? 'Muestra la evolución de la métrica en el tiempo.'
+      : mostrarComparativa
+        ? 'Agrupa el resultado por un campo, por ejemplo servicio o gravedad.'
+        : 'Muestra el resultado directo de la métrica, sin serie ni agrupación.'
+
   return (
     <div className={styles.form}>
       <p className={styles.ayuda}>
@@ -74,7 +82,7 @@ export function WidgetConfigForm({
         {widget.tipoResultadoWidgetConfigurado === null && ' (resuelto automáticamente)'}
       </p>
       <div className={styles.grid}>
-        <FormField label="Tipo de resultado">
+        <FormField label="Tipo de resultado" help={ayudaTipoResultado}>
           <select value={tipoResultado} onChange={(e) => setTipoResultado(e.target.value)}>
             <option value={AUTOMATICO}>— Automático (según visualización) —</option>
             {widget.tipoResultadosPermitidos.map((t) => (
@@ -134,10 +142,10 @@ export function WidgetConfigForm({
         )}
       </div>
       <div className={styles.botones}>
-        <button type="button" className={styles.primario} disabled={guardando} onClick={enviar}>
+        <button type="button" className="btn btnPrimary" disabled={guardando} onClick={enviar}>
           Guardar configuración
         </button>
-        <button type="button" className={styles.secundario} onClick={onCancelar}>
+        <button type="button" className="btn btnSecondary" onClick={onCancelar}>
           Cancelar
         </button>
       </div>
