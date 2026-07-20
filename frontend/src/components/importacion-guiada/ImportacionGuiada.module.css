@@ -200,3 +200,22 @@
   font: inherit;
   width: 100%;
 }
+
+/* Panel de recuperación */
+.tablaRecuperacion .selectAccion {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.detalleErrores {
+  margin-top: var(--spacing-md);
+}
+
+.detalleErrores summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}

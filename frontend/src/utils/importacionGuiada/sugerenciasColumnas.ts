@@ -112,30 +112,37 @@ export function sugerirNombreDataset(nombreArchivo: string): string {
   return palabras.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ')
 }
 
+// Palabras que, por sí solas, indican Sí/No. "reingreso" está aquí, pero solo
+// se evalúa tras descartar "fecha reingreso" (la palabra "fecha" manda).
+const PALABRAS_BOOLEANO = ['exitus', 'fallecido', 'mortalidad', 'reingreso', 'complicacion', 'infeccion', 'ilq']
+
 export function sugerirTipoDato(nombre: string): TipoDato {
   const n = normalizarTexto(nombre)
-  if (contiene(n, ['fecha', 'date', 'ingreso', 'alta', 'cirugia'])) return 'FECHA'
-  // Los términos de dinero/proporción van antes que los de conteo: "coste total"
-  // es DECIMAL (manda "coste"), no ENTERO por "total".
+  // FECHA solo si aparece claramente "fecha" o "date". Palabras como "cirugía",
+  // "alta" o "ingreso" por sí solas ya no fuerzan FECHA (causaban falsos FECHA).
+  if (contiene(n, ['fecha', 'date'])) return 'FECHA'
+  // Dinero/proporción antes que conteo: "coste total" es DECIMAL, no ENTERO.
   if (contiene(n, ['coste', 'importe', 'precio', 'porcentaje', 'tasa', 'ratio'])) return 'DECIMAL'
-  if (contiene(n, ['edad', 'dias', 'estancia', 'numero', 'cantidad', 'total'])) return 'ENTERO'
-  if (contiene(n, ['fallecido', 'reingreso', 'complicacion', 'infeccion', 'ilq', 'mortalidad'])) return 'BOOLEANO'
-  if (contiene(n, ['servicio', 'diagnostico', 'procedimiento', 'sexo', 'gravedad', 'categoria'])) return 'TEXTO'
+  // Sí/No antes que entero: "exitus … 30 días" es BOOLEANO, no ENTERO por "días".
+  if (contiene(n, PALABRAS_BOOLEANO)) return 'BOOLEANO'
+  if (contiene(n, ['edad', 'dias', 'estancia', 'minutos', 'duracion', 'numero', 'cantidad', 'total'])) return 'ENTERO'
   return 'TEXTO'
 }
 
 export function sugerirRolClinico(nombre: string): RolClinico {
   const n = normalizarTexto(nombre)
   if (n === 'nhc' || n === 'hc' || contiene(n, ['historia', 'paciente'])) return 'paciente'
-  if (contiene(n, ['fecha', 'ingreso', 'alta', 'cirugia'])) return 'fecha'
+  // Igual que en el tipo: rol fecha solo con "fecha"/"date".
+  if (contiene(n, ['fecha', 'date'])) return 'fecha'
   if (contiene(n, ['servicio'])) return 'servicio'
   if (contiene(n, ['diagnostico'])) return 'diagnostico'
   if (contiene(n, ['procedimiento'])) return 'procedimiento'
   if (contiene(n, ['edad'])) return 'edad'
   if (contiene(n, ['sexo'])) return 'sexo'
   if (contiene(n, ['gravedad', 'categoria'])) return 'categoria'
-  if (contiene(n, ['fallecido', 'reingreso', 'complicacion', 'mortalidad', 'infeccion', 'ilq'])) return 'booleano'
-  if (contiene(n, ['dias', 'estancia', 'numero', 'cantidad', 'total', 'coste', 'importe', 'tasa'])) return 'numero'
+  if (contiene(n, PALABRAS_BOOLEANO)) return 'booleano'
+  if (contiene(n, ['dias', 'estancia', 'minutos', 'duracion', 'numero', 'cantidad', 'total', 'coste', 'importe', 'tasa']))
+    return 'numero'
   return 'texto'
 }
 

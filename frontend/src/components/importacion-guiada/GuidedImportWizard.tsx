@@ -21,6 +21,8 @@ import { DatasetBasicConfigForm } from './DatasetBasicConfigForm'
 import type { ConfigDataset } from './DatasetBasicConfigForm'
 import { ImportProgressPanel } from './ImportProgressPanel'
 import { ImportResultPanel } from './ImportResultPanel'
+import { ImportErrorRecoveryPanel } from './ImportErrorRecoveryPanel'
+import type { CorreccionColumna } from './ImportErrorRecoveryPanel'
 import styles from './ImportacionGuiada.module.css'
 
 export function GuidedImportWizard() {
@@ -39,12 +41,18 @@ export function GuidedImportWizard() {
   const [progreso, setProgreso] = useState<PasoProgreso[]>(PASOS_INICIALES)
   const [resultado, setResultado] = useState<ResultadoAsistente | null>(null)
 
+  // Código base sugerido (sin sufijo) e intento actual: en cada reintento se usa
+  // un código nuevo (base_2, base_3…) para no chocar con el dataset parcial.
+  const [codigoBase, setCodigoBase] = useState('')
+  const [intentoNumero, setIntentoNumero] = useState(1)
+
   // Cambiar de archivo reinicia el asistente: cualquier análisis previo deja de
   // corresponder al fichero actual.
   const cambiarArchivo = (nuevo: File | null) => {
     setArchivo(nuevo)
     setColumnas([])
     setError(null)
+    setIntentoNumero(1)
   }
 
   const analizar = async () => {
@@ -61,11 +69,9 @@ export function GuidedImportWizard() {
         deteccion.columnas.map((c) => ({ indiceColumna: c.indiceColumna, nombreOriginal: c.nombreOriginal })),
       )
       setColumnas(cols)
-      setConfig({
-        nombre: sugerirNombreDataset(archivo.name),
-        codigo: sugerirCodigoDataset(sugerirNombreDataset(archivo.name)),
-        descripcion: '',
-      })
+      const nombreSugerido = sugerirNombreDataset(archivo.name)
+      setIntentoNumero(1)
+      setConfig({ nombre: nombreSugerido, codigo: sugerirCodigoDataset(nombreSugerido), descripcion: '' })
       setPaso('columnas')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo analizar el archivo.')
@@ -94,6 +100,9 @@ export function GuidedImportWizard() {
 
   const crearEImportar = async () => {
     if (!archivo || !validarConfig()) return
+    // El código del primer intento es la base para sufijar los reintentos
+    // (respeta lo que el usuario haya editado, p. ej. CARDIO_2026 → CARDIO_2026_2).
+    if (intentoNumero === 1) setCodigoBase(config.codigo.trim())
     setPaso('creando')
     setProgreso(PASOS_INICIALES.map((p) => ({ ...p })))
 
@@ -114,6 +123,29 @@ export function GuidedImportWizard() {
     setResultado(res)
     setPaso('resultado')
   }
+
+  // Aplica una corrección del panel de recuperación al instante sobre la columna.
+  const aplicarCorreccionColumna = (indiceColumna: number, cambios: CorreccionColumna) => {
+    setColumnas((actual) =>
+      actual.map((c) => (c.indiceColumna === indiceColumna ? { ...c, ...cambios } : c)),
+    )
+  }
+
+  // Vuelve a columnas conservando archivo y correcciones, con un código nuevo
+  // para el siguiente intento (evita colisión con el dataset parcial ya creado).
+  const volverACorregirYReintentar = () => {
+    const siguiente = intentoNumero + 1
+    setIntentoNumero(siguiente)
+    setConfig((actual) => ({ ...actual, codigo: `${codigoBase}_${siguiente}` }))
+    setError(null)
+    setPaso('columnas')
+  }
+
+  // Fallo recuperable: validar-filas devolvió errores de fila (no importable).
+  const esFalloRecuperable =
+    resultado !== null &&
+    resultado.importacion === null &&
+    (resultado.validacionFilas?.errores.length ?? 0) > 0
 
   return (
     <div className={styles.page}>
@@ -185,7 +217,18 @@ export function GuidedImportWizard() {
         </Card>
       )}
 
-      {paso === 'resultado' && resultado && <ImportResultPanel resultado={resultado} />}
+      {paso === 'resultado' &&
+        resultado &&
+        (esFalloRecuperable ? (
+          <ImportErrorRecoveryPanel
+            resultado={resultado}
+            columnas={columnas}
+            onCorregirColumna={aplicarCorreccionColumna}
+            onReintentar={volverACorregirYReintentar}
+          />
+        ) : (
+          <ImportResultPanel resultado={resultado} />
+        ))}
     </div>
   )
 }
