@@ -39,6 +39,24 @@ export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSig
   return (await response.json()) as T
 }
 
+// Envío multipart: NO se fija Content-Type a propósito. El navegador debe
+// generarlo junto con el boundary; fijarlo a mano rompe el parseo en el backend.
+export async function apiPostFormData<T>(
+  path: string,
+  formData: FormData,
+  signal?: AbortSignal,
+): Promise<T> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: 'POST',
+    body: formData,
+    signal,
+  })
+  if (!response.ok) {
+    throw new Error(await leerMensajeError(response))
+  }
+  return (await response.json()) as T
+}
+
 export async function apiPut<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
     method: 'PUT',

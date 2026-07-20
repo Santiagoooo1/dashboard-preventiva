@@ -8,6 +8,10 @@ import { DatasetCamposPage } from '../pages/DatasetCamposPage'
 import { CampoFormPage } from '../pages/CampoFormPage'
 import { DatasetMetricasPage } from '../pages/DatasetMetricasPage'
 import { MetricaFormPage } from '../pages/MetricaFormPage'
+import { DatasetImportPage } from '../pages/DatasetImportPage'
+import { PlantillasImportacionPage } from '../pages/PlantillasImportacionPage'
+import { PlantillaImportacionFormPage } from '../pages/PlantillaImportacionFormPage'
+import { PlantillaMapeosPage } from '../pages/PlantillaMapeosPage'
 import { PanelesPage } from '../pages/PanelesPage'
 import { PanelFormPage } from '../pages/PanelFormPage'
 import { PanelWidgetsPage } from '../pages/PanelWidgetsPage'
@@ -30,6 +34,11 @@ export function AppRoutes() {
         <Route path="/datasets/:datasetId/metricas" element={<DatasetMetricasPage />} />
         <Route path="/datasets/:datasetId/metricas/nueva" element={<MetricaFormPage />} />
         <Route path="/datasets/:datasetId/metricas/:metricaId/editar" element={<MetricaFormPage />} />
+        <Route path="/datasets/:datasetId/importar" element={<DatasetImportPage />} />
+        <Route path="/datasets/:datasetId/plantillas" element={<PlantillasImportacionPage />} />
+        <Route path="/datasets/:datasetId/plantillas/nueva" element={<PlantillaImportacionFormPage />} />
+        <Route path="/datasets/:datasetId/plantillas/:plantillaId/editar" element={<PlantillaImportacionFormPage />} />
+        <Route path="/datasets/:datasetId/plantillas/:plantillaId/mapeos" element={<PlantillaMapeosPage />} />
         <Route path="/datasets/:datasetId/paneles" element={<PanelesPage />} />
         <Route path="/datasets/:datasetId/paneles/nuevo" element={<PanelFormPage />} />
         <Route path="/datasets/:datasetId/paneles/:panelId/editar" element={<PanelFormPage />} />

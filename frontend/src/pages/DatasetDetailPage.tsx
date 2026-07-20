@@ -34,6 +34,15 @@ function siguientePaso(datasetId: string, resumen: ResumenConfiguracionDatasetDt
       textoBoton: 'Crear campos',
     }
   }
+  if (resumen.totalPlantillasImportacion === 0) {
+    return {
+      titulo: 'Importa datos al dataset',
+      descripcion:
+        'Ya hay campos definidos. Crea una plantilla de importación para cargar registros desde Excel o CSV.',
+      to: `/datasets/${datasetId}/importar`,
+      textoBoton: 'Importar datos',
+    }
+  }
   if (resumen.totalMetricas === 0) {
     return {
       titulo: 'Crea la primera métrica',
@@ -102,6 +111,12 @@ export function DatasetDetailPage() {
               <div className={styles.accionesDataset}>
                 <Link className="btn btnAction" to={`/datasets/${datasetId}/campos`}>
                   Gestionar campos
+                </Link>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/importar`}>
+                  Importar datos
+                </Link>
+                <Link className="btn btnAction" to={`/datasets/${datasetId}/plantillas`}>
+                  Plantillas de importación
                 </Link>
                 <Link className="btn btnAction" to={`/datasets/${datasetId}/metricas`}>
                   Gestionar métricas
@@ -251,8 +266,23 @@ export function DatasetDetailPage() {
             </Card>
 
             <Card title="Plantillas de importación">
+              <div className={styles.metricasAcciones}>
+                <Link className="btn btnPrimary" to={`/datasets/${datasetId}/plantillas/nueva`}>
+                  + Nueva plantilla
+                </Link>
+                <Link to={`/datasets/${datasetId}/plantillas`}>Ver todas las plantillas →</Link>
+                <Link to={`/datasets/${datasetId}/importar`}>Importar datos →</Link>
+              </div>
+              {data.campos.length === 0 && (
+                <p className="stateEmpty">
+                  Define primero los campos clínicos del dataset: los mapeos de una plantilla apuntan a esos campos.
+                </p>
+              )}
               {data.plantillasImportacion.length === 0 ? (
-                <p>No hay plantillas de importación configuradas. La importación de datos llegará más adelante.</p>
+                <p>
+                  No hay plantillas de importación configuradas.{' '}
+                  <Link to={`/datasets/${datasetId}/plantillas/nueva`}>Crear plantilla de importación →</Link>
+                </p>
               ) : (
                 <DataTable
                   columns={[

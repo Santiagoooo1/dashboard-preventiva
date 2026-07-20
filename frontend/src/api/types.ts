@@ -232,6 +232,129 @@ export interface PlantillaImportacionResponseDto {
   activa: boolean
 }
 
+// --- Fase 6.6: importación de datos ---
+
+export type OrigenImportacion = 'EXCEL' | 'CSV'
+
+export interface PlantillaImportacionRequestDto {
+  nombre: string
+  descripcion?: string | null
+  origen: OrigenImportacion
+  filaCabecera?: number | null
+}
+
+export interface MapeoCampoImportacionRequestDto {
+  nombreColumnaOrigen: string
+  campoClinicoId: number
+  tipoDato: TipoDato
+  obligatorio: boolean
+  politicaCampoFaltante?: string | null
+  valorPorDefecto?: string | null
+  orden?: number | null
+}
+
+export interface MapeoCampoImportacionResponseDto {
+  id: number
+  plantillaId: number
+  nombreColumnaOrigen: string
+  campoClinicoId: number
+  campoClinicoCodigo: string
+  campoClinicoEtiqueta: string
+  tipoDato: string
+  obligatorio: boolean
+  politicaCampoFaltante: string | null
+  valorPorDefecto: string | null
+  orden: number | null
+  activo: boolean
+}
+
+export interface ColumnaDetectadaResponseDto {
+  indiceColumna: number
+  nombreOriginal: string
+  nombreNormalizado: string
+}
+
+export interface DeteccionColumnasResponseDto {
+  nombreArchivo: string
+  totalColumnas: number
+  columnas: ColumnaDetectadaResponseDto[]
+}
+
+export interface ColumnaMapeadaDto {
+  indiceColumna: number
+  nombreColumna: string
+  reconocida: boolean
+  campoClinicoCodigo: string | null
+  tipoDato: string | null
+}
+
+export interface ValidacionImportacionGenericaResponseDto {
+  nombreArchivo: string
+  plantillaId: number
+  datasetId: number
+  totalColumnasDetectadas: number
+  totalColumnasReconocidas: number
+  totalColumnasNoReconocidas: number
+  columnasDetectadas: ColumnaMapeadaDto[]
+  columnasNoReconocidas: string[]
+  camposObligatoriosFaltantes: string[]
+  valida: boolean
+  importable: boolean
+  advertencias: string[] | null
+  resumen: string
+}
+
+export interface ErrorFilaImportacionGenericaDto {
+  numeroFila: number | null
+  nombreColumna: string | null
+  valorOriginal: string | null
+  tipoError: string
+  severidad: string
+  mensaje: string
+}
+
+export interface ValidacionFilasImportacionGenericaResponseDto {
+  nombreArchivo: string
+  plantillaId: number
+  datasetId: number
+  indiceHoja: number | null
+  filaCabecera: number | null
+  totalFilasLeidas: number
+  filasValidas: number
+  filasConError: number
+  filasConAdvertencia: number
+  errores: ErrorFilaImportacionGenericaDto[]
+  erroresBloqueantes: ErrorFilaImportacionGenericaDto[]
+  advertencias: ErrorFilaImportacionGenericaDto[]
+  totalAdvertencias: number
+  valida: boolean
+  importable: boolean
+  resumen: string
+}
+
+export interface ImportacionGenericaResponseDto {
+  importacionId: number
+  nombreArchivo: string
+  plantillaId: number
+  datasetId: number
+  filasLeidas: number
+  filasImportadas: number
+  filasConError: number
+  totalAdvertencias: number
+  estado: string
+  mensaje: string
+}
+
+export interface ErrorImportacionGenericaResponseDto {
+  id: number
+  numeroFila: number | null
+  nombreColumna: string | null
+  valorOriginal: string | null
+  tipoError: string
+  severidad: string
+  mensaje: string
+}
+
 export interface ResumenConfiguracionDatasetDto {
   totalCampos: number
   totalMetricas: number
