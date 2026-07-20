@@ -8,7 +8,6 @@ interface Paso {
   titulo: string
   descripcion: string
   enlace?: { to: string; texto: string }
-  proximamente?: boolean
 }
 
 const PASOS: Paso[] = [
@@ -23,8 +22,8 @@ const PASOS: Paso[] = [
   },
   {
     titulo: 'Importar datos',
-    descripcion: 'Importa datos desde Excel/CSV cuando la funcionalidad esté disponible.',
-    proximamente: true,
+    descripcion:
+      'Sube archivos Excel/CSV desde el dataset, valida columnas y filas, e importa los registros clínicos.',
   },
   {
     titulo: 'Crear métricas',
@@ -96,9 +95,7 @@ export function HomePage() {
         <ol className={styles.pasos}>
           {PASOS.map((paso) => (
             <li key={paso.titulo}>
-              <p className={styles.pasoTitulo}>
-                {paso.titulo} {paso.proximamente && <span className={styles.proximamente}>Próximamente</span>}
-              </p>
+              <p className={styles.pasoTitulo}>{paso.titulo}</p>
               <p className={styles.pasoDescripcion}>{paso.descripcion}</p>
               {paso.enlace && <Link to={paso.enlace.to}>{paso.enlace.texto} →</Link>}
             </li>

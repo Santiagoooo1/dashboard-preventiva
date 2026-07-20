@@ -52,9 +52,3 @@
   font-size: 0.9rem;
   margin: var(--spacing-xs) 0 0 0;
 }
-
-.proximamente {
-  color: var(--color-warning);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
