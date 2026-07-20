@@ -21,4 +21,24 @@
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: var(--spacing-md);
+  align-items: start;
+}
+
+.gridCargando {
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+/* Tablet: media rejilla; los anchos se recortan en el propio widget. */
+@media (max-width: 1023px) {
+  .grid {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
+
+/* Móvil: una columna. */
+@media (max-width: 639px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
 }

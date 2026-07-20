@@ -540,6 +540,13 @@ export interface DashboardDatasetInfoDto {
   nombre: string
 }
 
+export interface DashboardPanelRequestDto {
+  fechaDesde?: string | null
+  fechaHasta?: string | null
+  granularidad?: Granularidad | null
+  campoFecha?: string | null
+}
+
 export interface DashboardFiltrosAplicadosDto {
   fechaDesde: string | null
   fechaHasta: string | null

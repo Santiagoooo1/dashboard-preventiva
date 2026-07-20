@@ -1,0 +1,30 @@
+.kpi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.valor {
+  font-size: 2.75rem;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.valorCompacto {
+  font-size: 1.6rem;
+}
+
+.unidad {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-left: var(--spacing-xs);
+}
+
+.sub {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  margin: 0;
+}

@@ -1,0 +1,18 @@
+/* El span viaja como custom property (no como estilo inline de grid-column)
+   para que los media queries puedan colapsar la rejilla en pantallas pequeñas. */
+.widget {
+  grid-column: span var(--span, 3);
+  min-width: 0;
+}
+
+@media (max-width: 1023px) {
+  .widget {
+    grid-column: span min(var(--span, 3), 6);
+  }
+}
+
+@media (max-width: 639px) {
+  .widget {
+    grid-column: 1 / -1;
+  }
+}

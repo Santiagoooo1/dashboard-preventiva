@@ -1,0 +1,106 @@
+.contenedor {
+  position: relative;
+  width: 100%;
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+}
+
+.eje {
+  stroke: var(--chart-axis);
+  stroke-width: 1;
+}
+
+.textoEje {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.etiquetaDirecta {
+  fill: var(--color-text);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.marcaHover {
+  cursor: pointer;
+}
+
+.tooltip {
+  position: absolute;
+  transform: translate(-50%, -110%);
+  background-color: var(--color-text);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 0.78rem;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+}
+
+.tooltipEtiqueta {
+  display: block;
+  opacity: 0.8;
+}
+
+.tooltipValor {
+  font-weight: 600;
+}
+
+.leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm) var(--spacing-md);
+  margin-top: var(--spacing-sm);
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.leyendaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.leyendaMarca {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.vacio {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  text-align: center;
+  padding: var(--spacing-lg) var(--spacing-md);
+}
+
+.nota {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.donutTotal {
+  fill: var(--color-text);
+  font-size: 18px;
+  font-weight: 600;
+  text-anchor: middle;
+}
+
+.donutTotalEtiqueta {
+  fill: var(--color-text-muted);
+  font-size: 10px;
+  text-anchor: middle;
+}

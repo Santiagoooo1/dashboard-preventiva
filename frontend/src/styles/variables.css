@@ -22,4 +22,17 @@
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
 
   --max-width: 1200px;
+
+  /* Paleta de gráficos: orden categórico fijo, nunca ciclado.
+     Validada para superficie clara (banda de luminosidad, croma, separación
+     CVD y visión normal en todos los pares). Magenta y ámbar quedan por
+     debajo de 3:1 sobre el fondo, así que los gráficos que los usan llevan
+     siempre etiqueta directa o leyenda visible. */
+  --chart-series-1: #2a78d6;
+  --chart-series-2: #008300;
+  --chart-series-3: #e87ba4;
+  --chart-series-4: #eda100;
+  --chart-neutral: #9aa0ab;
+  --chart-grid: #e8eaee;
+  --chart-axis: #b6bcc6;
 }

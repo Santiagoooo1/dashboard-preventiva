@@ -17,7 +17,9 @@ export function Navbar() {
           Catálogo
         </NavLink>
       </nav>
-      <BackendStatusBadge />
+      <span className={styles.estado}>
+        <BackendStatusBadge />
+      </span>
     </header>
   )
 }
