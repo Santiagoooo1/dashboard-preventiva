@@ -12,8 +12,17 @@ import {
   sugerirNombreDataset,
 } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import type { ColumnaConfigurada } from '../../utils/importacionGuiada/sugerenciasColumnas'
-import { detectarRevisionesClinicas, establecerFechaPrincipal, inicializarCamposClave } from '../../utils/importacionGuiada/camposClave'
-import { construirProblemasPorColumna, esCorreccionSegura } from '../../utils/importacionGuiada/sugerenciasErrores'
+import {
+  detectarColumnasSospechosas,
+  detectarRevisionesClinicas,
+  establecerFechaPrincipal,
+  inicializarCamposClave,
+} from '../../utils/importacionGuiada/camposClave'
+import {
+  agruparErroresPorColumnaIndice,
+  construirProblemasPorColumna,
+  esCorreccionSegura,
+} from '../../utils/importacionGuiada/sugerenciasErrores'
 import { Card } from '../Card'
 import { ErrorBanner } from '../ErrorBanner'
 import { FileDropzone } from '../importacion/FileDropzone'
@@ -58,6 +67,18 @@ export function GuidedImportWizard() {
     if (!errores || errores.length === 0) return new Map()
     return construirProblemasPorColumna(errores, columnas)
   }, [resultado, columnas])
+
+  // Errores de fila sin deduplicar, para la tabla "Ver filas afectadas" de los
+  // campos críticos (identificador de paciente / fecha principal).
+  const erroresPorColumna = useMemo(() => {
+    const errores = resultado?.validacionFilas?.errores
+    if (!errores || errores.length === 0) return new Map()
+    return agruparErroresPorColumnaIndice(errores, columnas)
+  }, [resultado, columnas])
+
+  // Columnas cuyo nombre parece un valor (TRUE/FALSE/0/1/vacío): probable
+  // fila de cabecera mal elegida. Se recalcula con cada cambio de columnas.
+  const columnasSospechosas = useMemo(() => detectarColumnasSospechosas(columnas), [columnas])
 
   // Se mantiene aunque el usuario ya haya corregido localmente todas las
   // columnas señaladas: sin esto, el botón "Revalidar cambios" desaparecería
@@ -121,6 +142,11 @@ export function GuidedImportWizard() {
     const usadas = columnas.filter((c) => c.usar && c.rol !== 'ignorar')
     if (usadas.length === 0) {
       setError('Selecciona al menos una columna para continuar.')
+      return
+    }
+    const haySospechosaActiva = columnas.some((c) => c.usar && columnasSospechosas.has(c.indiceColumna))
+    if (haySospechosaActiva) {
+      setError('Hay columnas sospechosas seleccionadas. Ignóralas o cambia la fila de cabecera antes de continuar.')
       return
     }
     setError(null)
@@ -308,8 +334,11 @@ export function GuidedImportWizard() {
               columnas={columnas}
               onChange={setColumnas}
               problemasPorColumna={problemasPorColumna}
+              erroresPorColumna={erroresPorColumna}
               revisionesClinicas={revisionesClinicas}
+              columnasSospechosas={columnasSospechosas}
               onEstablecerFechaPrincipal={cambiarFechaPrincipal}
+              onVolverASubir={() => setPaso('subir')}
             />
             <div className={styles.acciones}>
               <button type="button" className="btn btnSecondary" onClick={() => setPaso('subir')}>

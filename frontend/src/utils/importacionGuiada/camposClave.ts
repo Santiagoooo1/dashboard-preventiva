@@ -174,3 +174,24 @@ export function detectarRevisionesClinicas(columnas: ColumnaConfigurada[]): Map<
 
   return revisiones
 }
+
+// Nombres de cabecera que en realidad parecen un valor de celda (probable
+// desajuste de la fila de cabecera: el archivo se leyó a partir de una fila de
+// datos en vez de la fila con los nombres de columna).
+const NOMBRES_SOSPECHOSOS = ['true', 'false', 'verdadero', 'falso', '0', '1']
+
+/**
+ * Detecta columnas cuyo nombre parece un valor (TRUE/FALSE/0/1/vacío) en vez
+ * de un nombre de columna real, típico de haber elegido mal la fila de
+ * cabecera al analizar el archivo.
+ */
+export function detectarColumnasSospechosas(columnas: ColumnaConfigurada[]): Map<number, string> {
+  const sospechosas = new Map<number, string>()
+  for (const c of columnas) {
+    const n = normalizarTexto(c.nombreOriginal)
+    if (n === '' || NOMBRES_SOSPECHOSOS.includes(n)) {
+      sospechosas.set(c.indiceColumna, 'Esta columna parece un valor, no un nombre de columna.')
+    }
+  }
+  return sospechosas
+}

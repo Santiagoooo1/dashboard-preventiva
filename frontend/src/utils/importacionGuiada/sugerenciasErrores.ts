@@ -192,6 +192,25 @@ export function construirProblemasPorColumna(
 }
 
 /**
+ * Agrupa los errores de fila por índice de columna, sin deduplicar (a
+ * diferencia de `agruparErroresPorColumna`): se usa para listar las filas
+ * afectadas una a una en "Ver filas afectadas".
+ */
+export function agruparErroresPorColumnaIndice(
+  errores: ErrorFilaImportacionGenericaDto[],
+  columnas: ColumnaConfigurada[],
+): Map<number, ErrorFilaImportacionGenericaDto[]> {
+  const mapa = new Map<number, ErrorFilaImportacionGenericaDto[]>()
+  for (const error of errores) {
+    const columna = columnas.find((c) => c.nombreOriginal.trim() === (error.nombreColumna ?? '').trim())
+    if (!columna) continue
+    if (!mapa.has(columna.indiceColumna)) mapa.set(columna.indiceColumna, [])
+    mapa.get(columna.indiceColumna)!.push(error)
+  }
+  return mapa
+}
+
+/**
  * Una corrección es "segura" para aplicarse en bloque solo si hay un cambio
  * concreto que hacer y no toca los campos clave (paciente / fecha principal),
  * ni queda en el terreno de "revisar manualmente".

@@ -134,9 +134,14 @@
   background-color: rgba(255, 193, 7, 0.12);
 }
 
+.filaSospechosa {
+  background-color: rgba(108, 117, 125, 0.12);
+}
+
 .etiquetaError,
 .etiquetaAdvertencia,
 .etiquetaRevision,
+.etiquetaSospechosa,
 .etiquetaSinErrores,
 .etiquetaIgnorada {
   display: inline-block;
@@ -160,6 +165,11 @@
 .etiquetaRevision {
   background-color: rgba(13, 110, 253, 0.15);
   color: #0d6efd;
+}
+
+.etiquetaSospechosa {
+  background-color: rgba(108, 117, 125, 0.25);
+  color: #495057;
 }
 
 .etiquetaSinErrores {
@@ -195,6 +205,37 @@
   gap: var(--spacing-xs);
   flex-wrap: wrap;
   width: 100%;
+}
+
+.tablaFilasAfectadas {
+  font-size: 0.82rem;
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: var(--spacing-xs);
+}
+
+.tablaFilasAfectadas th,
+.tablaFilasAfectadas td {
+  text-align: left;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+/* Acción secundaria (p. ej. "permitir vacío solo para esta prueba"): no debe
+   competir visualmente con las acciones principales. */
+.opcionSecundaria {
+  width: 100%;
+  font-size: 0.8rem;
+}
+
+.opcionSecundaria summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.opcionSecundaria .btn {
+  margin-top: var(--spacing-xs);
 }
 
 /* Banner/resumen de revisión en el paso Columnas */

@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import type { TipoDato } from '../../api/types'
+import type { ErrorFilaImportacionGenericaDto, TipoDato } from '../../api/types'
 import type { RevisionClinica } from '../../utils/importacionGuiada/camposClave'
 import type { ColumnaConfigurada, RolClinico } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import {
@@ -8,18 +8,22 @@ import {
   sugerirCodigoInterno,
 } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import type { ProblemaColumna } from '../../utils/importacionGuiada/sugerenciasErrores'
+import { problemaLegible } from '../../utils/importacionGuiada/sugerenciasErrores'
 import styles from './ImportacionGuiada.module.css'
 
 const TIPOS_DATO: TipoDato[] = ['TEXTO', 'ENTERO', 'DECIMAL', 'FECHA', 'BOOLEANO']
+const MAX_FILAS_AFECTADAS = 20
 
-type EstadoFila = 'sin-errores' | 'revision' | 'advertencia' | 'error' | 'ignorada'
+type EstadoFila = 'sin-errores' | 'revision' | 'advertencia' | 'error' | 'sospechosa' | 'ignorada'
 
 function estadoDe(
   columna: ColumnaConfigurada,
   problema: ProblemaColumna | undefined,
   revision: RevisionClinica | undefined,
+  sospechosa: boolean,
 ): EstadoFila {
   if (!columna.usar) return 'ignorada'
+  if (sospechosa) return 'sospechosa'
   if (problema) return problema.estado
   if (revision) return 'revision'
   return 'sin-errores'
@@ -29,6 +33,7 @@ function claseFila(estado: EstadoFila): string {
   if (estado === 'error') return styles.filaError
   if (estado === 'advertencia') return styles.filaAdvertencia
   if (estado === 'revision') return styles.filaRevision
+  if (estado === 'sospechosa') return styles.filaSospechosa
   if (estado === 'ignorada') return styles.filaIgnorada
   return ''
 }
@@ -38,20 +43,30 @@ interface DetectedColumnsTableProps {
   onChange: (columnas: ColumnaConfigurada[]) => void
   /** Problemas detectados en el último intento de validación, por índice de columna. */
   problemasPorColumna?: Map<number, ProblemaColumna>
+  /** Errores de fila (sin deduplicar) por índice de columna, para "Ver filas afectadas". */
+  erroresPorColumna?: Map<number, ErrorFilaImportacionGenericaDto[]>
   /** Revisiones clínicas no bloqueantes (heurísticas por nombre), por índice de columna. */
   revisionesClinicas?: Map<number, RevisionClinica>
+  /** Columnas cuyo nombre parece un valor (TRUE/FALSE/0/1/vacío), por índice de columna. */
+  columnasSospechosas?: Map<number, string>
   /** Convierte la columna dada en la fecha principal (usado por revisiones de fecha). */
   onEstablecerFechaPrincipal?: (indiceColumna: number) => void
+  /** Vuelve al paso de subir archivo, conservando el archivo ya elegido. */
+  onVolverASubir?: () => void
 }
 
 export function DetectedColumnsTable({
   columnas,
   onChange,
   problemasPorColumna,
+  erroresPorColumna,
   revisionesClinicas,
+  columnasSospechosas,
   onEstablecerFechaPrincipal,
+  onVolverASubir,
 }: DetectedColumnsTableProps) {
   const [valoresVisibles, setValoresVisibles] = useState<Set<number>>(new Set())
+  const [filasVisibles, setFilasVisibles] = useState<Set<number>>(new Set())
 
   const actualizar = (indice: number, cambios: Partial<ColumnaConfigurada>) => {
     onChange(columnas.map((c) => (c.indiceColumna === indice ? { ...c, ...cambios } : c)))
@@ -90,6 +105,15 @@ export function DetectedColumnsTable({
     })
   }
 
+  const alternarFilas = (indice: number) => {
+    setFilasVisibles((actual) => {
+      const siguiente = new Set(actual)
+      if (siguiente.has(indice)) siguiente.delete(indice)
+      else siguiente.add(indice)
+      return siguiente
+    })
+  }
+
   return (
     <div className={styles.tablaColumnasScroll}>
       <table className={styles.tablaColumnasNativa}>
@@ -108,10 +132,16 @@ export function DetectedColumnsTable({
         <tbody>
           {columnas.map((c) => {
             const problema = problemasPorColumna?.get(c.indiceColumna)
-            const revision = !problema ? revisionesClinicas?.get(c.indiceColumna) : undefined
-            const estado = estadoDe(c, problema, revision)
+            const sospechosa = columnasSospechosas?.get(c.indiceColumna)
+            const revision = !problema && !sospechosa ? revisionesClinicas?.get(c.indiceColumna) : undefined
+            const estado = estadoDe(c, problema, revision, Boolean(sospechosa))
             const puedeAplicarSugerencia =
               problema && (problema.correccion.tipoSugerido !== null || problema.correccion.marcarNoObligatorio)
+            // Bloque de detalle "crítico": identificador de paciente o fecha principal
+            // con valores vacíos. No debe presentar "permitir vacío" como opción principal.
+            const esBloqueCritico = Boolean(problema?.esCampoClaveCritico && problema?.esValorVacio)
+            const erroresFila = erroresPorColumna?.get(c.indiceColumna) ?? []
+            const esIdentificador = c.codigoInterno === 'pacienteCodigo'
 
             return (
               <Fragment key={c.indiceColumna}>
@@ -120,6 +150,7 @@ export function DetectedColumnsTable({
                     {estado === 'error' && <span className={styles.etiquetaError}>Error</span>}
                     {estado === 'advertencia' && <span className={styles.etiquetaAdvertencia}>Advertencia</span>}
                     {estado === 'revision' && <span className={styles.etiquetaRevision}>Revisión recomendada</span>}
+                    {estado === 'sospechosa' && <span className={styles.etiquetaSospechosa}>Columna sospechosa</span>}
                     {estado === 'ignorada' && <span className={styles.etiquetaIgnorada}>Ignorada</span>}
                     {estado === 'sin-errores' && <span className={styles.etiquetaSinErrores}>Sin errores</span>}
                   </td>
@@ -131,7 +162,7 @@ export function DetectedColumnsTable({
                       aria-label={`Usar la columna ${c.nombreOriginal}`}
                     />
                   </td>
-                  <td>{c.nombreOriginal}</td>
+                  <td>{c.nombreOriginal || '(sin nombre)'}</td>
                   <td>
                     <input
                       type="text"
@@ -183,7 +214,110 @@ export function DetectedColumnsTable({
                   </td>
                 </tr>
 
-                {problema && (
+                {sospechosa && c.usar && (
+                  <tr className={styles.filaDetalleProblema}>
+                    <td colSpan={8}>
+                      <div className={styles.detalleProblema}>
+                        <span>{sospechosa}</span>
+                        <div className={styles.accionesInline}>
+                          <button
+                            type="button"
+                            className="btn btnDanger"
+                            onClick={() => actualizar(c.indiceColumna, { usar: false })}
+                          >
+                            Ignorar columna
+                          </button>
+                          <button type="button" className="btn btnSecondary" onClick={onVolverASubir}>
+                            Cambiar fila de cabecera
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!sospechosa && problema && esBloqueCritico && (
+                  <tr className={styles.filaDetalleProblema}>
+                    <td colSpan={8}>
+                      <div className={styles.detalleProblema}>
+                        <span>{problema.problemaLegible}</span>
+                        <div className={styles.accionesInline}>
+                          {erroresFila.length > 0 && (
+                            <button type="button" className="btn btnSecondary" onClick={() => alternarFilas(c.indiceColumna)}>
+                              {filasVisibles.has(c.indiceColumna) ? 'Ocultar filas afectadas' : 'Ver filas afectadas'}
+                            </button>
+                          )}
+                          <button type="button" className="btn btnSecondary" onClick={onVolverASubir}>
+                            Corregir el archivo y volver a subirlo
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btnSecondary"
+                            disabled
+                            title="Disponible próximamente: excluir estas filas automáticamente."
+                          >
+                            Excluir filas sin {esIdentificador ? 'identificador' : 'fecha principal'}
+                          </button>
+                        </div>
+                        <p className={styles.campoClaveAyuda}>
+                          Disponible próximamente: excluir estas filas automáticamente.
+                        </p>
+                        <p className={styles.campoClaveAyuda}>
+                          {esIdentificador
+                            ? 'Puedes elegir otra columna como identificador en «Campos clave del dashboard», arriba.'
+                            : 'Puedes elegir otra fecha principal en «Campos clave del dashboard», arriba.'}
+                        </p>
+
+                        {filasVisibles.has(c.indiceColumna) && (
+                          <div className={styles.tablaColumnasScroll}>
+                            <table className={styles.tablaFilasAfectadas}>
+                              <thead>
+                                <tr>
+                                  <th>Fila</th>
+                                  <th>Columna</th>
+                                  <th>Valor</th>
+                                  <th>Problema</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {erroresFila.slice(0, MAX_FILAS_AFECTADAS).map((error, i) => (
+                                  <tr key={i}>
+                                    <td>{error.numeroFila ?? '—'}</td>
+                                    <td>{error.nombreColumna ?? c.nombreOriginal}</td>
+                                    <td>{error.valorOriginal || '(vacío)'}</td>
+                                    <td>{problemaLegible(error.tipoError)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                            {erroresFila.length > MAX_FILAS_AFECTADAS && (
+                              <p className={styles.campoClaveAyuda}>
+                                y {erroresFila.length - MAX_FILAS_AFECTADAS} más
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        <details className={styles.opcionSecundaria}>
+                          <summary>
+                            Opción para pruebas: permitir {esIdentificador ? 'identificador' : 'fecha principal'} vacío
+                            solo para esta prueba
+                          </summary>
+                          <button
+                            type="button"
+                            className="btn btnSecondary"
+                            onClick={() => actualizar(c.indiceColumna, { obligatorio: false })}
+                          >
+                            Permitir {esIdentificador ? 'identificador' : 'fecha principal'} vacío solo para esta
+                            prueba
+                          </button>
+                        </details>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!sospechosa && problema && !esBloqueCritico && (
                   <tr className={styles.filaDetalleProblema}>
                     <td colSpan={8}>
                       <div className={styles.detalleProblema}>
@@ -238,7 +372,7 @@ export function DetectedColumnsTable({
                   </tr>
                 )}
 
-                {!problema && revision && (
+                {!sospechosa && !problema && revision && (
                   <tr className={styles.filaDetalleProblema}>
                     <td colSpan={8}>
                       <div className={styles.detalleProblema}>
