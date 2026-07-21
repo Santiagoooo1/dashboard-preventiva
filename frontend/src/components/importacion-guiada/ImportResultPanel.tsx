@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import type { ErrorImportacionGenericaResponseDto } from '../../api/types'
 import type { ResultadoAsistente } from '../../utils/importacionGuiada/orquestador'
 import { obtenerErroresImportacionGenerica } from '../../api/importacionesApi'
+import { mensajeAmableFallo } from '../../utils/importacionGuiada/sugerenciasErrores'
 import { Card } from '../Card'
 import { ErrorBanner } from '../ErrorBanner'
 import { ImportErrorsTable } from '../importacion/ImportErrorsTable'
@@ -10,6 +11,8 @@ import styles from './ImportacionGuiada.module.css'
 
 interface ImportResultPanelProps {
   resultado: ResultadoAsistente
+  /** Vuelve al paso Columnas conservando archivo y configuración (dataset parcial). */
+  onVolverAColumnas?: () => void
 }
 
 // Mensaje propio y en lenguaje claro: el mensaje del backend puede incluir
@@ -22,9 +25,10 @@ function mensajeAmable(estado: string): string {
   return 'La importación no se ha completado.'
 }
 
-export function ImportResultPanel({ resultado }: ImportResultPanelProps) {
-  const { importacion, validacionFilas, datasetId, error } = resultado
+export function ImportResultPanel({ resultado, onVolverAColumnas }: ImportResultPanelProps) {
+  const { importacion, validacionFilas, datasetId, error, pasoFallido } = resultado
   const huboExito = importacion !== null && importacion.estado !== 'RECHAZADA'
+  const { mensaje: mensajeFallo, detalleTecnico } = mensajeAmableFallo(pasoFallido, error)
 
   const [advertencias, setAdvertencias] = useState<ErrorImportacionGenericaResponseDto[] | null>(null)
   const [cargandoAdv, setCargandoAdv] = useState(false)
@@ -82,13 +86,14 @@ export function ImportResultPanel({ resultado }: ImportResultPanelProps) {
         </Card>
       ) : (
         <Card title="No se pudo completar la importación">
-          <ErrorBanner mensaje={error} />
-          {datasetId !== null && (
-            <p>
-              El dashboard se creó parcialmente. Puedes continuar en modo avanzado desde{' '}
-              <Link to={`/datasets/${datasetId}`}>el dataset creado</Link>.
-            </p>
+          <ErrorBanner mensaje={mensajeFallo} />
+          {detalleTecnico && (
+            <details className={styles.opcionSecundaria}>
+              <summary>Detalle técnico para soporte</summary>
+              <p>{detalleTecnico}</p>
+            </details>
           )}
+          {datasetId !== null && <p>Se creó un dashboard parcial, pero no se importaron registros.</p>}
           {validacionFilas && validacionFilas.errores.length > 0 && (
             <>
               <h4>Errores en las filas</h4>
@@ -99,7 +104,7 @@ export function ImportResultPanel({ resultado }: ImportResultPanelProps) {
       )}
 
       <div className={styles.ctas}>
-        {datasetId !== null && (
+        {huboExito && datasetId !== null && (
           <>
             <Link className="btn btnPrimary" to={`/datasets/${datasetId}`}>
               Ver dataset
@@ -113,6 +118,19 @@ export function ImportResultPanel({ resultado }: ImportResultPanelProps) {
             <Link className="btn btnSecondary" to={`/datasets/${datasetId}`}>
               Configuración avanzada
             </Link>
+          </>
+        )}
+        {!huboExito && datasetId !== null && (
+          <>
+            <Link className="btn btnPrimary" to={`/datasets/${datasetId}`}>
+              Ver dataset parcial
+            </Link>
+            <Link className="btn btnSecondary" to={`/datasets/${datasetId}`}>
+              Archivar desde modo avanzado
+            </Link>
+            <button type="button" className="btn btnSecondary" onClick={onVolverAColumnas}>
+              Continuar con una nueva importación corregida
+            </button>
           </>
         )}
         {datasetId === null && (

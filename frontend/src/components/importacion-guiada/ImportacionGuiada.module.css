@@ -138,10 +138,15 @@
   background-color: rgba(108, 117, 125, 0.12);
 }
 
+.filaDuplicada {
+  background-color: rgba(111, 66, 193, 0.08);
+}
+
 .etiquetaError,
 .etiquetaAdvertencia,
 .etiquetaRevision,
 .etiquetaSospechosa,
+.etiquetaDuplicada,
 .etiquetaSinErrores,
 .etiquetaIgnorada {
   display: inline-block;
@@ -170,6 +175,11 @@
 .etiquetaSospechosa {
   background-color: rgba(108, 117, 125, 0.25);
   color: #495057;
+}
+
+.etiquetaDuplicada {
+  background-color: rgba(111, 66, 193, 0.18);
+  color: #6f42c1;
 }
 
 .etiquetaSinErrores {

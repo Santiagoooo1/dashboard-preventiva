@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import type { ErrorFilaImportacionGenericaDto, TipoDato } from '../../api/types'
-import type { RevisionClinica } from '../../utils/importacionGuiada/camposClave'
+import type { GrupoDuplicado, RevisionClinica } from '../../utils/importacionGuiada/camposClave'
 import type { ColumnaConfigurada, RolClinico } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import {
   ROLES_CLINICOS,
@@ -14,16 +14,20 @@ import styles from './ImportacionGuiada.module.css'
 const TIPOS_DATO: TipoDato[] = ['TEXTO', 'ENTERO', 'DECIMAL', 'FECHA', 'BOOLEANO']
 const MAX_FILAS_AFECTADAS = 20
 
-type EstadoFila = 'sin-errores' | 'revision' | 'advertencia' | 'error' | 'sospechosa' | 'ignorada'
+type EstadoFila = 'sin-errores' | 'revision' | 'advertencia' | 'error' | 'sospechosa' | 'duplicada' | 'ignorada'
 
 function estadoDe(
   columna: ColumnaConfigurada,
   problema: ProblemaColumna | undefined,
   revision: RevisionClinica | undefined,
   sospechosa: boolean,
+  duplicada: boolean,
 ): EstadoFila {
   if (!columna.usar) return 'ignorada'
+  // Sospechosa (nombre que parece un valor) manda sobre duplicada: una columna
+  // "FALSE" repetida dos veces necesita corregirse por sospechosa primero.
   if (sospechosa) return 'sospechosa'
+  if (duplicada) return 'duplicada'
   if (problema) return problema.estado
   if (revision) return 'revision'
   return 'sin-errores'
@@ -34,6 +38,7 @@ function claseFila(estado: EstadoFila): string {
   if (estado === 'advertencia') return styles.filaAdvertencia
   if (estado === 'revision') return styles.filaRevision
   if (estado === 'sospechosa') return styles.filaSospechosa
+  if (estado === 'duplicada') return styles.filaDuplicada
   if (estado === 'ignorada') return styles.filaIgnorada
   return ''
 }
@@ -49,6 +54,8 @@ interface DetectedColumnsTableProps {
   revisionesClinicas?: Map<number, RevisionClinica>
   /** Columnas cuyo nombre parece un valor (TRUE/FALSE/0/1/vacío), por índice de columna. */
   columnasSospechosas?: Map<number, string>
+  /** Columnas con el mismo nombre (exacto o normalizado) entre sí, por índice de columna. */
+  columnasDuplicadas?: Map<number, GrupoDuplicado>
   /** Convierte la columna dada en la fecha principal (usado por revisiones de fecha). */
   onEstablecerFechaPrincipal?: (indiceColumna: number) => void
   /** Vuelve al paso de subir archivo, conservando el archivo ya elegido. */
@@ -62,6 +69,7 @@ export function DetectedColumnsTable({
   erroresPorColumna,
   revisionesClinicas,
   columnasSospechosas,
+  columnasDuplicadas,
   onEstablecerFechaPrincipal,
   onVolverASubir,
 }: DetectedColumnsTableProps) {
@@ -133,8 +141,9 @@ export function DetectedColumnsTable({
           {columnas.map((c) => {
             const problema = problemasPorColumna?.get(c.indiceColumna)
             const sospechosa = columnasSospechosas?.get(c.indiceColumna)
+            const duplicado = columnasDuplicadas?.get(c.indiceColumna)
             const revision = !problema && !sospechosa ? revisionesClinicas?.get(c.indiceColumna) : undefined
-            const estado = estadoDe(c, problema, revision, Boolean(sospechosa))
+            const estado = estadoDe(c, problema, revision, Boolean(sospechosa), Boolean(duplicado))
             const puedeAplicarSugerencia =
               problema && (problema.correccion.tipoSugerido !== null || problema.correccion.marcarNoObligatorio)
             // Bloque de detalle "crítico": identificador de paciente o fecha principal
@@ -151,6 +160,7 @@ export function DetectedColumnsTable({
                     {estado === 'advertencia' && <span className={styles.etiquetaAdvertencia}>Advertencia</span>}
                     {estado === 'revision' && <span className={styles.etiquetaRevision}>Revisión recomendada</span>}
                     {estado === 'sospechosa' && <span className={styles.etiquetaSospechosa}>Columna sospechosa</span>}
+                    {estado === 'duplicada' && <span className={styles.etiquetaDuplicada}>Duplicada</span>}
                     {estado === 'ignorada' && <span className={styles.etiquetaIgnorada}>Ignorada</span>}
                     {estado === 'sin-errores' && <span className={styles.etiquetaSinErrores}>Sin errores</span>}
                   </td>
@@ -236,7 +246,7 @@ export function DetectedColumnsTable({
                   </tr>
                 )}
 
-                {!sospechosa && problema && esBloqueCritico && (
+                {!sospechosa && !duplicado && problema && esBloqueCritico && (
                   <tr className={styles.filaDetalleProblema}>
                     <td colSpan={8}>
                       <div className={styles.detalleProblema}>
@@ -317,7 +327,7 @@ export function DetectedColumnsTable({
                   </tr>
                 )}
 
-                {!sospechosa && problema && !esBloqueCritico && (
+                {!sospechosa && !duplicado && problema && !esBloqueCritico && (
                   <tr className={styles.filaDetalleProblema}>
                     <td colSpan={8}>
                       <div className={styles.detalleProblema}>
@@ -372,7 +382,20 @@ export function DetectedColumnsTable({
                   </tr>
                 )}
 
-                {!sospechosa && !problema && revision && (
+                {!sospechosa && duplicado && (
+                  <tr className={styles.filaDetalleProblema}>
+                    <td colSpan={8}>
+                      <div className={styles.detalleProblema}>
+                        <span>
+                          Esta columna está repetida ({duplicado.veces} veces). Revisa el bloque «Columnas repetidas
+                          detectadas», arriba.
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+
+                {!sospechosa && !duplicado && !problema && revision && (
                   <tr className={styles.filaDetalleProblema}>
                     <td colSpan={8}>
                       <div className={styles.detalleProblema}>

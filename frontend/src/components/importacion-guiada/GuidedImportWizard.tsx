@@ -13,10 +13,13 @@ import {
 } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import type { ColumnaConfigurada } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import {
+  detectarColumnasDuplicadas,
   detectarColumnasSospechosas,
   detectarRevisionesClinicas,
+  desmarcarDuplicadasAutomaticamente,
   establecerFechaPrincipal,
   inicializarCamposClave,
+  validarColumnasParaCrear,
 } from '../../utils/importacionGuiada/camposClave'
 import {
   agruparErroresPorColumnaIndice,
@@ -76,9 +79,29 @@ export function GuidedImportWizard() {
     return agruparErroresPorColumnaIndice(errores, columnas)
   }, [resultado, columnas])
 
-  // Columnas cuyo nombre parece un valor (TRUE/FALSE/0/1/vacío): probable
+  // Columnas cuyo nombre parece un valor (TRUE/FALSE/SÍ/NO/0/1/vacío): probable
   // fila de cabecera mal elegida. Se recalcula con cada cambio de columnas.
   const columnasSospechosas = useMemo(() => detectarColumnasSospechosas(columnas), [columnas])
+
+  // Columnas con el mismo nombre (exacto o normalizado) entre sí.
+  const columnasDuplicadas = useMemo(() => detectarColumnasDuplicadas(columnas), [columnas])
+  const gruposDuplicados = useMemo(() => {
+    const vistos = new Set<string>()
+    const grupos: { indice: number; veces: number; columnasAfectadas: string[] }[] = []
+    for (const [indice, grupo] of columnasDuplicadas) {
+      const clave = grupo.columnasAfectadas.join('|')
+      if (vistos.has(clave)) continue
+      vistos.add(clave)
+      grupos.push({ indice, veces: grupo.veces, columnasAfectadas: grupo.columnasAfectadas })
+    }
+    return grupos
+  }, [columnasDuplicadas])
+  const hayDuplicadasActivas = columnas.some((c) => c.usar && columnasDuplicadas.has(c.indiceColumna))
+
+  // Abre "Opciones avanzadas" automáticamente cuando el último análisis dejó
+  // columnas sospechosas o duplicadas: el usuario probablemente necesita
+  // cambiar la fila de cabecera sin tener que desplegar la sección a mano.
+  const sugerirRevisarCabecera = columnasSospechosas.size > 0 || columnasDuplicadas.size > 0
 
   // Se mantiene aunque el usuario ya haya corregido localmente todas las
   // columnas señaladas: sin esto, el botón "Revalidar cambios" desaparecería
@@ -149,6 +172,10 @@ export function GuidedImportWizard() {
       setError('Hay columnas sospechosas seleccionadas. Ignóralas o cambia la fila de cabecera antes de continuar.')
       return
     }
+    if (hayDuplicadasActivas) {
+      setError('Hay columnas repetidas en el archivo. Cambia la fila de cabecera o desmarca columnas duplicadas antes de continuar.')
+      return
+    }
     setError(null)
     setPaso('configuracion')
   }
@@ -192,6 +219,15 @@ export function GuidedImportWizard() {
 
   const crearEImportar = async () => {
     if (!archivo || !validarConfig()) return
+    // Última comprobación antes de crear nada: repite aquí porque esta no es
+    // la única puerta de entrada al orquestador (revalidarCambios es la otra,
+    // y no pasa por irAConfiguracion).
+    const mensajeInvalido = validarColumnasParaCrear(columnas)
+    if (mensajeInvalido) {
+      setError(mensajeInvalido)
+      setPaso('columnas')
+      return
+    }
     // El código del primer intento es la base para sufijar las revalidaciones
     // (respeta lo que el usuario haya editado, p. ej. CARDIO_2026 → CARDIO_2026_2).
     if (intentoNumero === 1) setCodigoBase(config.codigo.trim())
@@ -202,12 +238,21 @@ export function GuidedImportWizard() {
   // el siguiente sufijo (no se reutiliza el dataset parcial del intento previo).
   const revalidarCambios = async () => {
     if (!archivo) return
+    const mensajeInvalido = validarColumnasParaCrear(columnas)
+    if (mensajeInvalido) {
+      setError(mensajeInvalido)
+      return
+    }
     const siguiente = intentoNumero + 1
     setIntentoNumero(siguiente)
     const nuevoCodigo = `${codigoBase}_${siguiente}`
     const configSiguiente = { ...config, codigo: nuevoCodigo }
     setConfig(configSiguiente)
     await ejecutarImportacionConConfig(configSiguiente)
+  }
+
+  const desmarcarDuplicadas = () => {
+    setColumnas((actual) => desmarcarDuplicadasAutomaticamente(actual))
   }
 
   const aplicarTodasSugerenciasSeguras = () => {
@@ -248,7 +293,11 @@ export function GuidedImportWizard() {
             Sube un archivo clínico y la aplicación detectará sus columnas para crear un dashboard automáticamente.
           </p>
           <FileDropzone archivo={archivo} onArchivoSeleccionado={cambiarArchivo} />
-          <details className={styles.avanzadas} style={{ marginTop: 'var(--spacing-md)' }}>
+          <details
+            className={styles.avanzadas}
+            style={{ marginTop: 'var(--spacing-md)' }}
+            open={sugerirRevisarCabecera || undefined}
+          >
             <summary>Opciones avanzadas</summary>
             <div className={styles.avanzadasGrid}>
               <label>
@@ -260,6 +309,13 @@ export function GuidedImportWizard() {
                 <input type="number" min={0} value={filaCabecera} onChange={(e) => setFilaCabecera(e.target.value)} />
               </label>
             </div>
+            <p className={styles.campoClaveAyuda}>
+              Indica qué fila contiene los nombres de las columnas. La primera fila es 0.
+            </p>
+            <p className={styles.campoClaveAyuda}>
+              Si la aplicación detecta columnas como TRUE, FALSE, SÍ, NO, 0, 1 o nombres repetidos, probablemente la
+              fila de cabecera no es correcta.
+            </p>
           </details>
           <div className={styles.acciones}>
             <button type="button" className="btn btnPrimary" disabled={!archivo || analizando} onClick={analizar}>
@@ -321,6 +377,30 @@ export function GuidedImportWizard() {
             </Card>
           )}
 
+          {hayDuplicadasActivas && (
+            <Card title="Columnas repetidas detectadas">
+              <p className={styles.intro}>
+                Hay columnas con el mismo nombre o nombres equivalentes. Puedes desmarcar una de ellas o cambiar la
+                fila de cabecera.
+              </p>
+              <ul className={styles.listaProgreso}>
+                {gruposDuplicados.map((g) => (
+                  <li key={g.indice}>
+                    <strong>{g.columnasAfectadas[0]}</strong> ({g.veces} veces): {g.columnasAfectadas.join(', ')}
+                  </li>
+                ))}
+              </ul>
+              <div className={styles.acciones}>
+                <button type="button" className="btn btnSecondary" onClick={desmarcarDuplicadas}>
+                  Desmarcar duplicadas automáticamente
+                </button>
+                <button type="button" className="btn btnSecondary" onClick={() => setPaso('subir')}>
+                  Cambiar fila de cabecera
+                </button>
+              </div>
+            </Card>
+          )}
+
           <CamposClavePanel columnas={columnas} onChange={setColumnas} problemasPorColumna={problemasPorColumna} />
 
           <Card title="Columnas detectadas">
@@ -337,6 +417,7 @@ export function GuidedImportWizard() {
               erroresPorColumna={erroresPorColumna}
               revisionesClinicas={revisionesClinicas}
               columnasSospechosas={columnasSospechosas}
+              columnasDuplicadas={columnasDuplicadas}
               onEstablecerFechaPrincipal={cambiarFechaPrincipal}
               onVolverASubir={() => setPaso('subir')}
             />
@@ -381,7 +462,9 @@ export function GuidedImportWizard() {
         </Card>
       )}
 
-      {paso === 'resultado' && resultado && <ImportResultPanel resultado={resultado} />}
+      {paso === 'resultado' && resultado && (
+        <ImportResultPanel resultado={resultado} onVolverAColumnas={() => setPaso('columnas')} />
+      )}
     </div>
   )
 }

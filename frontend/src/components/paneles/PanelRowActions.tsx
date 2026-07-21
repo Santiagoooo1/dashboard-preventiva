@@ -13,8 +13,12 @@ interface PanelRowActionsProps {
 export function PanelRowActions({ datasetId, panel, onError, onEliminado }: PanelRowActionsProps) {
   const [ocupado, setOcupado] = useState(false)
 
-  const desactivar = async () => {
-    if (!window.confirm(`¿Desactivar el panel '${panel.nombre}'?`)) {
+  const archivar = async () => {
+    if (
+      !window.confirm(
+        `¿Archivar el panel '${panel.nombre}'? Se ocultará de los listados principales, pero no se eliminará definitivamente de la base de datos.`,
+      )
+    ) {
       return
     }
     setOcupado(true)
@@ -22,7 +26,7 @@ export function PanelRowActions({ datasetId, panel, onError, onEliminado }: Pane
       await desactivarPanel(panel.id)
       onEliminado()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Error al desactivar el panel.')
+      onError(err instanceof Error ? err.message : 'Error al archivar el panel.')
     } finally {
       setOcupado(false)
     }
@@ -39,8 +43,8 @@ export function PanelRowActions({ datasetId, panel, onError, onEliminado }: Pane
       <Link className="btn btnAction" to={`/datasets/${datasetId}/paneles/${panel.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
-        Desactivar
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={archivar}>
+        Archivar
       </button>
     </div>
   )

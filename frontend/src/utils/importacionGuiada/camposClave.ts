@@ -177,12 +177,13 @@ export function detectarRevisionesClinicas(columnas: ColumnaConfigurada[]): Map<
 
 // Nombres de cabecera que en realidad parecen un valor de celda (probable
 // desajuste de la fila de cabecera: el archivo se leyó a partir de una fila de
-// datos en vez de la fila con los nombres de columna).
-const NOMBRES_SOSPECHOSOS = ['true', 'false', 'verdadero', 'falso', '0', '1']
+// datos en vez de la fila con los nombres de columna). "si"/"no" cubren
+// también "SÍ" y "NO", ya que normalizarTexto() quita los acentos.
+const NOMBRES_SOSPECHOSOS = ['true', 'false', 'verdadero', 'falso', 'si', 'no', '0', '1']
 
 /**
- * Detecta columnas cuyo nombre parece un valor (TRUE/FALSE/0/1/vacío) en vez
- * de un nombre de columna real, típico de haber elegido mal la fila de
+ * Detecta columnas cuyo nombre parece un valor (TRUE/FALSE/SÍ/NO/0/1/vacío) en
+ * vez de un nombre de columna real, típico de haber elegido mal la fila de
  * cabecera al analizar el archivo.
  */
 export function detectarColumnasSospechosas(columnas: ColumnaConfigurada[]): Map<number, string> {
@@ -194,4 +195,78 @@ export function detectarColumnasSospechosas(columnas: ColumnaConfigurada[]): Map
     }
   }
   return sospechosas
+}
+
+export interface GrupoDuplicado {
+  veces: number
+  columnasAfectadas: string[]
+}
+
+/**
+ * Detecta columnas duplicadas (nombre exacto o normalizado) entre las
+ * columnas usadas. Ignora `usar=false`: una columna ya descartada no cuenta
+ * como duplicado activo.
+ */
+export function detectarColumnasDuplicadas(columnas: ColumnaConfigurada[]): Map<number, GrupoDuplicado> {
+  const grupos = new Map<string, ColumnaConfigurada[]>()
+  for (const c of columnas) {
+    if (!c.usar) continue
+    const clave = normalizarTexto(c.nombreOriginal)
+    if (!grupos.has(clave)) grupos.set(clave, [])
+    grupos.get(clave)!.push(c)
+  }
+
+  const resultado = new Map<number, GrupoDuplicado>()
+  for (const miembros of grupos.values()) {
+    if (miembros.length < 2) continue
+    const columnasAfectadas = miembros.map((m) => m.nombreOriginal)
+    for (const miembro of miembros) {
+      resultado.set(miembro.indiceColumna, { veces: miembros.length, columnasAfectadas })
+    }
+  }
+  return resultado
+}
+
+/**
+ * Deja solo la primera aparición de cada nombre (exacto o normalizado) como
+ * `usar=true`; el resto de apariciones duplicadas pasan a `usar=false`. Las
+ * columnas sin duplicar no se tocan.
+ */
+export function desmarcarDuplicadasAutomaticamente(columnas: ColumnaConfigurada[]): ColumnaConfigurada[] {
+  const vistos = new Set<string>()
+  return columnas.map((c) => {
+    if (!c.usar) return c
+    const clave = normalizarTexto(c.nombreOriginal)
+    if (vistos.has(clave)) return { ...c, usar: false }
+    vistos.add(clave)
+    return c
+  })
+}
+
+/**
+ * Última validación antes de invocar al orquestador (crear dataset, campos,
+ * plantilla, mapeos, validar e importar). Se ejecuta tanto en el primer
+ * intento como en cada revalidación, para que ninguna de las dos rutas pueda
+ * saltarse las mismas comprobaciones.
+ */
+export function validarColumnasParaCrear(columnas: ColumnaConfigurada[]): string | null {
+  const usadas = columnas.filter((c) => c.usar && c.rol !== 'ignorar')
+  if (usadas.length === 0) {
+    return 'Selecciona al menos una columna para continuar.'
+  }
+  const sospechosas = detectarColumnasSospechosas(columnas)
+  if (columnas.some((c) => c.usar && sospechosas.has(c.indiceColumna))) {
+    return 'Hay columnas sospechosas seleccionadas. Ignóralas o cambia la fila de cabecera antes de continuar.'
+  }
+  const duplicadas = detectarColumnasDuplicadas(columnas)
+  if (columnas.some((c) => c.usar && duplicadas.has(c.indiceColumna))) {
+    return 'Hay columnas repetidas en el archivo. Cambia la fila de cabecera o desmarca columnas duplicadas antes de continuar.'
+  }
+  if (!usadas.some((c) => c.codigoInterno === 'pacienteCodigo')) {
+    return 'Falta el identificador del paciente. Selecciónalo en «Campos clave del dashboard».'
+  }
+  if (!usadas.some((c) => c.codigoInterno === 'fechaEvento')) {
+    return 'Falta la fecha principal del dashboard. Selecciónala en «Campos clave del dashboard».'
+  }
+  return null
 }

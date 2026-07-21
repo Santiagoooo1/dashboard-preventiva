@@ -1,5 +1,6 @@
 import type { ErrorFilaImportacionGenericaDto, TipoDato } from '../../api/types'
 import type { ColumnaConfigurada } from './sugerenciasColumnas'
+import type { ClavePaso } from './orquestador'
 
 export interface ProblemaColumna {
   estado: 'error' | 'advertencia'
@@ -219,4 +220,32 @@ export function esCorreccionSegura(columna: ColumnaConfigurada, correccion: Corr
   if (columna.rol === 'paciente' || columna.codigoInterno === 'fechaEvento') return false
   if (correccion.texto.toLowerCase().includes('revisar manualmente')) return false
   return correccion.tipoSugerido !== null || correccion.marcarNoObligatorio
+}
+
+export interface MensajeFallo {
+  mensaje: string
+  /** Mensaje real del backend, para mostrar solo en un bloque colapsable. */
+  detalleTecnico: string | null
+}
+
+// Pasos cuyo fallo puede filtrar vocabulario técnico del backend (mapeo,
+// plantilla, columna de origen ya mapeada...). En estos pasos se sustituye
+// el mensaje por uno genérico y se guarda el original como detalle técnico.
+const PASOS_TECNICOS: ClavePaso[] = ['plantilla', 'mapeos', 'validar-columnas']
+
+/**
+ * Traduce el fallo del orquestador a un mensaje que un usuario no técnico
+ * pueda entender. Para los pasos de preparación de la importación (donde el
+ * backend puede mencionar "mapeo"/"plantilla"), sustituye el mensaje por uno
+ * genérico y conserva el original como detalle técnico aparte.
+ */
+export function mensajeAmableFallo(pasoFallido: ClavePaso | null, error: string | null): MensajeFallo {
+  if (pasoFallido && PASOS_TECNICOS.includes(pasoFallido)) {
+    return {
+      mensaje:
+        'No se pudo preparar la importación porque hay columnas repetidas o inválidas. Revisa la fila de cabecera y las columnas detectadas.',
+      detalleTecnico: error,
+    }
+  }
+  return { mensaje: error ?? 'No se pudo completar la importación.', detalleTecnico: null }
 }

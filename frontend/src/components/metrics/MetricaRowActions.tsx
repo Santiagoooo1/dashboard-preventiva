@@ -25,8 +25,12 @@ export function MetricaRowActions({ metrica, onResultado, onError, onDesactivada
     }
   }
 
-  const desactivar = async () => {
-    if (!window.confirm(`¿Desactivar la métrica '${metrica.nombre}'?`)) {
+  const archivar = async () => {
+    if (
+      !window.confirm(
+        `¿Archivar la métrica '${metrica.nombre}'? Se ocultará de los listados principales, pero no se eliminará definitivamente de la base de datos.`,
+      )
+    ) {
       return
     }
     setOcupado(true)
@@ -34,7 +38,7 @@ export function MetricaRowActions({ metrica, onResultado, onError, onDesactivada
       await desactivarMetrica(metrica.id)
       onDesactivada()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Error al desactivar la métrica.')
+      onError(err instanceof Error ? err.message : 'Error al archivar la métrica.')
     } finally {
       setOcupado(false)
     }
@@ -48,8 +52,8 @@ export function MetricaRowActions({ metrica, onResultado, onError, onDesactivada
       <button type="button" className="btn btnAction" disabled={ocupado} onClick={ejecutar}>
         Ejecutar
       </button>
-      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
-        Desactivar
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={archivar}>
+        Archivar
       </button>
     </div>
   )

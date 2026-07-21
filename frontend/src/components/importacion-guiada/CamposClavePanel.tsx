@@ -80,6 +80,11 @@ export function CamposClavePanel({ columnas, onChange, problemasPorColumna }: Ca
               <span>{campo.etiqueta}</span>
               <select value={seleccionActual?.indiceColumna ?? ''} onChange={(e) => cambiarCampo(campo, e.target.value)}>
                 {!campo.requerido && <option value="">(ninguna)</option>}
+                {campo.requerido && !seleccionActual && opciones.length > 0 && (
+                  <option value="" disabled>
+                    (sin seleccionar)
+                  </option>
+                )}
                 {opciones.length === 0 && <option value="">No hay columnas disponibles</option>}
                 {opciones.map((c) => (
                   <option key={c.indiceColumna} value={c.indiceColumna}>

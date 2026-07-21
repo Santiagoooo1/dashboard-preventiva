@@ -12,8 +12,12 @@ interface DatasetRowActionsProps {
 export function DatasetRowActions({ dataset, onError, onEliminado }: DatasetRowActionsProps) {
   const [ocupado, setOcupado] = useState(false)
 
-  const desactivar = async () => {
-    if (!window.confirm(`¿Desactivar el dataset '${dataset.nombre}'?`)) {
+  const archivar = async () => {
+    if (
+      !window.confirm(
+        `¿Archivar el dataset '${dataset.nombre}'? El dataset se ocultará de los listados principales, pero no se eliminará definitivamente de la base de datos.`,
+      )
+    ) {
       return
     }
     setOcupado(true)
@@ -21,7 +25,7 @@ export function DatasetRowActions({ dataset, onError, onEliminado }: DatasetRowA
       await eliminarDataset(dataset.id)
       onEliminado()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Error al desactivar el dataset.')
+      onError(err instanceof Error ? err.message : 'Error al archivar el dataset.')
     } finally {
       setOcupado(false)
     }
@@ -44,8 +48,8 @@ export function DatasetRowActions({ dataset, onError, onEliminado }: DatasetRowA
       <Link className="btn btnAction" to={`/datasets/${dataset.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
-        Desactivar
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={archivar}>
+        Archivar
       </button>
     </div>
   )

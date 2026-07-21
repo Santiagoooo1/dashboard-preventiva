@@ -13,8 +13,12 @@ interface CampoRowActionsProps {
 export function CampoRowActions({ datasetId, campo, onError, onEliminado }: CampoRowActionsProps) {
   const [ocupado, setOcupado] = useState(false)
 
-  const desactivar = async () => {
-    if (!window.confirm(`¿Desactivar el campo '${campo.etiqueta}'?`)) {
+  const archivar = async () => {
+    if (
+      !window.confirm(
+        `¿Archivar el campo '${campo.etiqueta}'? Se ocultará de los listados principales, pero no se eliminará definitivamente de la base de datos.`,
+      )
+    ) {
       return
     }
     setOcupado(true)
@@ -22,7 +26,7 @@ export function CampoRowActions({ datasetId, campo, onError, onEliminado }: Camp
       await eliminarCampo(datasetId, campo.id)
       onEliminado()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Error al desactivar el campo.')
+      onError(err instanceof Error ? err.message : 'Error al archivar el campo.')
     } finally {
       setOcupado(false)
     }
@@ -33,8 +37,8 @@ export function CampoRowActions({ datasetId, campo, onError, onEliminado }: Camp
       <Link className="btn btnAction" to={`/datasets/${datasetId}/campos/${campo.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
-        Desactivar
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={archivar}>
+        Archivar
       </button>
     </div>
   )

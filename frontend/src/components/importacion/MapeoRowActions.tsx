@@ -19,8 +19,12 @@ export function MapeoRowActions({
 }: MapeoRowActionsProps) {
   const [ocupado, setOcupado] = useState(false)
 
-  const desactivar = async () => {
-    if (!window.confirm(`¿Desactivar el mapeo de la columna '${mapeo.nombreColumnaOrigen}'?`)) {
+  const archivar = async () => {
+    if (
+      !window.confirm(
+        `¿Archivar el mapeo de la columna '${mapeo.nombreColumnaOrigen}'? Se ocultará de los listados principales, pero no se eliminará definitivamente de la base de datos.`,
+      )
+    ) {
       return
     }
     setOcupado(true)
@@ -28,7 +32,7 @@ export function MapeoRowActions({
       await eliminarMapeoPlantilla(plantillaId, mapeo.id)
       onEliminado()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Error al desactivar el mapeo.')
+      onError(err instanceof Error ? err.message : 'Error al archivar el mapeo.')
     } finally {
       setOcupado(false)
     }
@@ -39,8 +43,8 @@ export function MapeoRowActions({
       <button type="button" className="btn btnAction" onClick={onEditar}>
         Editar
       </button>
-      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
-        Desactivar
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={archivar}>
+        Archivar
       </button>
     </div>
   )

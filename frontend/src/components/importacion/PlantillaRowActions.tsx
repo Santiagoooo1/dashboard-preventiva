@@ -18,8 +18,12 @@ export function PlantillaRowActions({
 }: PlantillaRowActionsProps) {
   const [ocupado, setOcupado] = useState(false)
 
-  const desactivar = async () => {
-    if (!window.confirm(`¿Desactivar la plantilla '${plantilla.nombre}'?`)) {
+  const archivar = async () => {
+    if (
+      !window.confirm(
+        `¿Archivar la plantilla '${plantilla.nombre}'? Se ocultará de los listados principales, pero no se eliminará definitivamente de la base de datos.`,
+      )
+    ) {
       return
     }
     setOcupado(true)
@@ -27,7 +31,7 @@ export function PlantillaRowActions({
       await eliminarPlantillaImportacion(plantilla.id)
       onEliminada()
     } catch (err) {
-      onError(err instanceof Error ? err.message : 'Error al desactivar la plantilla.')
+      onError(err instanceof Error ? err.message : 'Error al archivar la plantilla.')
     } finally {
       setOcupado(false)
     }
@@ -41,8 +45,8 @@ export function PlantillaRowActions({
       <Link className="btn btnAction" to={`/datasets/${datasetId}/plantillas/${plantilla.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={desactivar}>
-        Desactivar
+      <button type="button" className="btn btnDanger" disabled={ocupado} onClick={archivar}>
+        Archivar
       </button>
     </div>
   )
