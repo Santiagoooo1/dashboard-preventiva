@@ -7,6 +7,7 @@ import { mensajeAmableFallo } from '../../utils/importacionGuiada/sugerenciasErr
 import { Card } from '../Card'
 import { ErrorBanner } from '../ErrorBanner'
 import { ImportErrorsTable } from '../importacion/ImportErrorsTable'
+import { DashboardInicialCta } from './DashboardInicialCta'
 import styles from './ImportacionGuiada.module.css'
 
 interface ImportResultPanelProps {
@@ -106,14 +107,9 @@ export function ImportResultPanel({ resultado, onVolverAColumnas }: ImportResult
       <div className={styles.ctas}>
         {huboExito && datasetId !== null && (
           <>
-            <Link className="btn btnPrimary" to={`/datasets/${datasetId}`}>
+            <DashboardInicialCta datasetId={datasetId} />
+            <Link className="btn btnSecondary" to={`/datasets/${datasetId}`}>
               Ver dataset
-            </Link>
-            <Link className="btn btnSecondary" to={`/datasets/${datasetId}/metricas/nueva`}>
-              Crear indicadores
-            </Link>
-            <Link className="btn btnSecondary" to={`/datasets/${datasetId}/paneles/nuevo`}>
-              Crear panel
             </Link>
             <Link className="btn btnSecondary" to={`/datasets/${datasetId}`}>
               Configuración avanzada
