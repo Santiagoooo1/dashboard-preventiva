@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { detectarColumnasPlantilla } from '../../api/plantillasImportacionApi'
 import {
   ejecutarAsistente,
@@ -11,18 +12,20 @@ import {
   sugerirNombreDataset,
 } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import type { ColumnaConfigurada } from '../../utils/importacionGuiada/sugerenciasColumnas'
+import { detectarRevisionesClinicas, establecerFechaPrincipal, inicializarCamposClave } from '../../utils/importacionGuiada/camposClave'
+import { construirProblemasPorColumna, esCorreccionSegura } from '../../utils/importacionGuiada/sugerenciasErrores'
 import { Card } from '../Card'
 import { ErrorBanner } from '../ErrorBanner'
 import { FileDropzone } from '../importacion/FileDropzone'
+import { ImportErrorsTable } from '../importacion/ImportErrorsTable'
 import { WizardStepIndicator } from './WizardStepIndicator'
 import type { ClaveWizard } from './WizardStepIndicator'
+import { CamposClavePanel } from './CamposClavePanel'
 import { DetectedColumnsTable } from './DetectedColumnsTable'
 import { DatasetBasicConfigForm } from './DatasetBasicConfigForm'
 import type { ConfigDataset } from './DatasetBasicConfigForm'
 import { ImportProgressPanel } from './ImportProgressPanel'
 import { ImportResultPanel } from './ImportResultPanel'
-import { ImportErrorRecoveryPanel } from './ImportErrorRecoveryPanel'
-import type { CorreccionColumna } from './ImportErrorRecoveryPanel'
 import styles from './ImportacionGuiada.module.css'
 
 export function GuidedImportWizard() {
@@ -40,19 +43,49 @@ export function GuidedImportWizard() {
 
   const [progreso, setProgreso] = useState<PasoProgreso[]>(PASOS_INICIALES)
   const [resultado, setResultado] = useState<ResultadoAsistente | null>(null)
+  const [mostrarErroresTecnicos, setMostrarErroresTecnicos] = useState(false)
 
-  // Código base sugerido (sin sufijo) e intento actual: en cada reintento se usa
-  // un código nuevo (base_2, base_3…) para no chocar con el dataset parcial.
+  // Código base sugerido (sin sufijo) e intento actual: en cada revalidación se
+  // usa un código nuevo (base_2, base_3…) para no chocar con el dataset parcial.
   const [codigoBase, setCodigoBase] = useState('')
   const [intentoNumero, setIntentoNumero] = useState(1)
 
-  // Cambiar de archivo reinicia el asistente: cualquier análisis previo deja de
-  // corresponder al fichero actual.
+  // Problemas del último intento de validación, agrupados por columna. Se
+  // recalculan en cada render: cuando el usuario aplica una corrección, la
+  // columna deja de aparecer como problema aunque no se haya revalidado aún.
+  const problemasPorColumna = useMemo(() => {
+    const errores = resultado?.validacionFilas?.errores
+    if (!errores || errores.length === 0) return new Map()
+    return construirProblemasPorColumna(errores, columnas)
+  }, [resultado, columnas])
+
+  // Se mantiene aunque el usuario ya haya corregido localmente todas las
+  // columnas señaladas: sin esto, el botón "Revalidar cambios" desaparecería
+  // en cuanto se resuelve el último problema visible, dejando al usuario sin
+  // forma de reintentar la importación.
+  const huboFalloRecuperable =
+    resultado !== null && resultado.importacion === null && (resultado.validacionFilas?.errores.length ?? 0) > 0
+  // Revisiones clínicas no bloqueantes (heurísticas por nombre), recalculadas
+  // cada vez que cambian las columnas para reflejar ediciones al instante.
+  const revisionesClinicas = useMemo(() => detectarRevisionesClinicas(columnas), [columnas])
+
+  const modoCorreccion = problemasPorColumna.size > 0
+  const listaProblemas = [...problemasPorColumna.values()]
+  const totalConErrores = listaProblemas.filter((p) => p.estado === 'error').length
+  const totalConAdvertencias = listaProblemas.filter((p) => p.estado === 'advertencia').length
+  const totalConSugerencias = listaProblemas.filter(
+    (p) => p.correccion.tipoSugerido !== null || p.correccion.marcarNoObligatorio,
+  ).length
+
+  // Cambiar de archivo reinicia el asistente: cualquier análisis o resultado
+  // previo deja de corresponder al fichero actual.
   const cambiarArchivo = (nuevo: File | null) => {
     setArchivo(nuevo)
     setColumnas([])
     setError(null)
     setIntentoNumero(1)
+    setResultado(null)
+    setMostrarErroresTecnicos(false)
   }
 
   const analizar = async () => {
@@ -65,10 +98,14 @@ export function GuidedImportWizard() {
         indiceHoja: Number(indiceHoja) || 0,
         filaCabecera: Number(filaCabecera) || 0,
       })
-      const cols = sugerirColumnas(
-        deteccion.columnas.map((c) => ({ indiceColumna: c.indiceColumna, nombreOriginal: c.nombreOriginal })),
+      const cols = inicializarCamposClave(
+        sugerirColumnas(
+          deteccion.columnas.map((c) => ({ indiceColumna: c.indiceColumna, nombreOriginal: c.nombreOriginal })),
+        ),
       )
       setColumnas(cols)
+      setResultado(null)
+      setMostrarErroresTecnicos(false)
       const nombreSugerido = sugerirNombreDataset(archivo.name)
       setIntentoNumero(1)
       setConfig({ nombre: nombreSugerido, codigo: sugerirCodigoDataset(nombreSugerido), descripcion: '' })
@@ -98,11 +135,11 @@ export function GuidedImportWizard() {
     return Object.keys(errores).length === 0
   }
 
-  const crearEImportar = async () => {
-    if (!archivo || !validarConfig()) return
-    // El código del primer intento es la base para sufijar los reintentos
-    // (respeta lo que el usuario haya editado, p. ej. CARDIO_2026 → CARDIO_2026_2).
-    if (intentoNumero === 1) setCodigoBase(config.codigo.trim())
+  // Ejecuta la cadena completa (crear dataset/campos/plantilla/mapeos, validar
+  // e importar) con la configuración dada. Si el fallo es recuperable (errores
+  // de fila), vuelve al paso Columnas en vez de a una pantalla de resultado.
+  const ejecutarImportacionConConfig = async (configEjecucion: ConfigDataset) => {
+    if (!archivo) return
     setPaso('creando')
     setProgreso(PASOS_INICIALES.map((p) => ({ ...p })))
 
@@ -111,41 +148,68 @@ export function GuidedImportWizard() {
         archivo,
         indiceHoja: Number(indiceHoja) || 0,
         filaCabecera: Number(filaCabecera) || 0,
-        dataset: { nombre: config.nombre.trim(), codigo: config.codigo.trim(), descripcion: config.descripcion.trim() },
+        dataset: {
+          nombre: configEjecucion.nombre.trim(),
+          codigo: configEjecucion.codigo.trim(),
+          descripcion: configEjecucion.descripcion.trim(),
+        },
         columnas,
       },
       (clave, estado, mensaje) => {
-        setProgreso((actual) =>
-          actual.map((p) => (p.clave === clave ? { ...p, estado, mensaje } : p)),
-        )
+        setProgreso((actual) => actual.map((p) => (p.clave === clave ? { ...p, estado, mensaje } : p)))
       },
     )
     setResultado(res)
-    setPaso('resultado')
+    const fueRecuperable = res.importacion === null && (res.validacionFilas?.errores.length ?? 0) > 0
+    setPaso(fueRecuperable ? 'columnas' : 'resultado')
   }
 
-  // Aplica una corrección del panel de recuperación al instante sobre la columna.
-  const aplicarCorreccionColumna = (indiceColumna: number, cambios: CorreccionColumna) => {
+  const crearEImportar = async () => {
+    if (!archivo || !validarConfig()) return
+    // El código del primer intento es la base para sufijar las revalidaciones
+    // (respeta lo que el usuario haya editado, p. ej. CARDIO_2026 → CARDIO_2026_2).
+    if (intentoNumero === 1) setCodigoBase(config.codigo.trim())
+    await ejecutarImportacionConConfig(config)
+  }
+
+  // Revalida desde Columnas: mismo archivo, columnas ya corregidas, código con
+  // el siguiente sufijo (no se reutiliza el dataset parcial del intento previo).
+  const revalidarCambios = async () => {
+    if (!archivo) return
+    const siguiente = intentoNumero + 1
+    setIntentoNumero(siguiente)
+    const nuevoCodigo = `${codigoBase}_${siguiente}`
+    const configSiguiente = { ...config, codigo: nuevoCodigo }
+    setConfig(configSiguiente)
+    await ejecutarImportacionConConfig(configSiguiente)
+  }
+
+  const aplicarTodasSugerenciasSeguras = () => {
     setColumnas((actual) =>
-      actual.map((c) => (c.indiceColumna === indiceColumna ? { ...c, ...cambios } : c)),
+      actual.map((c) => {
+        const problema = problemasPorColumna.get(c.indiceColumna)
+        if (!problema || !esCorreccionSegura(c, problema.correccion)) return c
+        const cambios: Partial<ColumnaConfigurada> = {}
+        if (problema.correccion.tipoSugerido) cambios.tipoDato = problema.correccion.tipoSugerido
+        if (problema.correccion.marcarNoObligatorio) cambios.obligatorio = false
+        return { ...c, ...cambios }
+      }),
     )
   }
 
-  // Vuelve a columnas conservando archivo y correcciones, con un código nuevo
-  // para el siguiente intento (evita colisión con el dataset parcial ya creado).
-  const volverACorregirYReintentar = () => {
-    const siguiente = intentoNumero + 1
-    setIntentoNumero(siguiente)
-    setConfig((actual) => ({ ...actual, codigo: `${codigoBase}_${siguiente}` }))
-    setError(null)
-    setPaso('columnas')
+  const marcarNoObligatoriasVacias = () => {
+    setColumnas((actual) =>
+      actual.map((c) => {
+        const problema = problemasPorColumna.get(c.indiceColumna)
+        if (!problema?.correccion.marcarNoObligatorio) return c
+        return { ...c, obligatorio: false }
+      }),
+    )
   }
 
-  // Fallo recuperable: validar-filas devolvió errores de fila (no importable).
-  const esFalloRecuperable =
-    resultado !== null &&
-    resultado.importacion === null &&
-    (resultado.validacionFilas?.errores.length ?? 0) > 0
+  const cambiarFechaPrincipal = (indiceColumna: number) => {
+    setColumnas((actual) => establecerFechaPrincipal(actual, indiceColumna))
+  }
 
   return (
     <div className={styles.page}>
@@ -180,21 +244,92 @@ export function GuidedImportWizard() {
       )}
 
       {paso === 'columnas' && (
-        <Card title="Columnas detectadas">
-          <p className={styles.intro}>
-            Revisa las columnas que ha detectado la aplicación. Puedes cambiar el nombre visible, el tipo de dato o su
-            rol, y desmarcar las que no quieras usar.
-          </p>
-          <DetectedColumnsTable columnas={columnas} onChange={setColumnas} />
-          <div className={styles.acciones}>
-            <button type="button" className="btn btnSecondary" onClick={() => setPaso('subir')}>
-              Atrás
-            </button>
-            <button type="button" className="btn btnPrimary" onClick={irAConfiguracion}>
-              Continuar
-            </button>
-          </div>
-        </Card>
+        <>
+          {huboFalloRecuperable && (
+            <Card title="Revisa las columnas detectadas">
+              <p className={styles.intro}>Hay columnas que necesitan revisión antes de importar.</p>
+              {modoCorreccion ? (
+                <>
+                  <p className={styles.resumenProblemas}>
+                    {totalConErrores} columna{totalConErrores === 1 ? '' : 's'} con errores · {totalConAdvertencias}{' '}
+                    con advertencias · {totalConSugerencias} sugerencia{totalConSugerencias === 1 ? '' : 's'}{' '}
+                    disponible{totalConSugerencias === 1 ? '' : 's'}
+                  </p>
+                  <p>
+                    Corrige los tipos de dato, marca columnas como no obligatorias o ignora las columnas que no
+                    quieras importar.
+                  </p>
+                </>
+              ) : (
+                <p>Has corregido las columnas señaladas. Pulsa «Revalidar cambios» para volver a intentarlo.</p>
+              )}
+              {resultado?.datasetId != null && (
+                <p>
+                  Se creó un dataset parcial en el intento anterior. Puedes revisarlo en{' '}
+                  <Link to={`/datasets/${resultado.datasetId}`}>modo avanzado</Link> o continuar con una nueva
+                  importación corregida.
+                </p>
+              )}
+              <div className={styles.acciones}>
+                {modoCorreccion && (
+                  <>
+                    <button type="button" className="btn btnSecondary" onClick={aplicarTodasSugerenciasSeguras}>
+                      Aplicar todas las sugerencias seguras
+                    </button>
+                    <button type="button" className="btn btnSecondary" onClick={marcarNoObligatoriasVacias}>
+                      Marcar como no obligatorias las columnas con valores vacíos
+                    </button>
+                  </>
+                )}
+                <button type="button" className="btn btnPrimary" onClick={revalidarCambios}>
+                  Revalidar cambios
+                </button>
+                <button
+                  type="button"
+                  className="btn btnSecondary"
+                  onClick={() => setMostrarErroresTecnicos((v) => !v)}
+                >
+                  Ver errores técnicos
+                </button>
+              </div>
+            </Card>
+          )}
+
+          <CamposClavePanel columnas={columnas} onChange={setColumnas} problemasPorColumna={problemasPorColumna} />
+
+          <Card title="Columnas detectadas">
+            {!modoCorreccion && (
+              <p className={styles.intro}>
+                Revisa las columnas que ha detectado la aplicación. Puedes cambiar el nombre visible, el tipo de dato
+                o su rol, y desmarcar las que no quieras usar.
+              </p>
+            )}
+            <DetectedColumnsTable
+              columnas={columnas}
+              onChange={setColumnas}
+              problemasPorColumna={problemasPorColumna}
+              revisionesClinicas={revisionesClinicas}
+              onEstablecerFechaPrincipal={cambiarFechaPrincipal}
+            />
+            <div className={styles.acciones}>
+              <button type="button" className="btn btnSecondary" onClick={() => setPaso('subir')}>
+                Atrás
+              </button>
+              <button type="button" className="btn btnPrimary" onClick={irAConfiguracion}>
+                Continuar
+              </button>
+            </div>
+          </Card>
+
+          {mostrarErroresTecnicos && resultado?.validacionFilas && (
+            <Card title="Detalle técnico de errores">
+              <p className={styles.intro}>
+                Esta información puede ayudar a revisar el archivo original, pero no es necesaria para continuar.
+              </p>
+              <ImportErrorsTable errores={resultado.validacionFilas.errores} />
+            </Card>
+          )}
+        </>
       )}
 
       {paso === 'configuracion' && (
@@ -217,18 +352,7 @@ export function GuidedImportWizard() {
         </Card>
       )}
 
-      {paso === 'resultado' &&
-        resultado &&
-        (esFalloRecuperable ? (
-          <ImportErrorRecoveryPanel
-            resultado={resultado}
-            columnas={columnas}
-            onCorregirColumna={aplicarCorreccionColumna}
-            onReintentar={volverACorregirYReintentar}
-          />
-        ) : (
-          <ImportResultPanel resultado={resultado} />
-        ))}
+      {paso === 'resultado' && resultado && <ImportResultPanel resultado={resultado} />}
     </div>
   )
 }

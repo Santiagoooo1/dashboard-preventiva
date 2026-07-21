@@ -1,6 +1,18 @@
 import type { ErrorFilaImportacionGenericaDto, TipoDato } from '../../api/types'
 import type { ColumnaConfigurada } from './sugerenciasColumnas'
 
+export interface ProblemaColumna {
+  estado: 'error' | 'advertencia'
+  totalErrores: number
+  problemaLegible: string
+  valoresEjemplo: string[]
+  correccion: CorreccionSugerida
+  /** true si la columna es el identificador de paciente o la fecha principal. */
+  esCampoClaveCritico: boolean
+  /** true si el problema predominante es de valores vacíos (VALOR_OBLIGATORIO_VACIO). */
+  esValorVacio: boolean
+}
+
 export interface GrupoErrorColumna {
   nombreColumna: string
   totalErrores: number
@@ -32,6 +44,21 @@ const PROBLEMAS: Record<string, string> = {
 
 export function problemaLegible(tipoError: string): string {
   return PROBLEMAS[tipoError] ?? 'Valores no válidos'
+}
+
+/**
+ * Igual que `problemaLegible`, pero para VALOR_OBLIGATORIO_VACIO distingue si
+ * la columna afectada es un campo clave (identificador de paciente, fecha
+ * principal) o una columna secundaria, para no mostrar siempre el mismo
+ * mensaje genérico ("Faltan valores obligatorios") sin importar la columna.
+ */
+export function problemaLegibleParaColumna(tipoError: string, columna: ColumnaConfigurada): string {
+  if (tipoError === 'VALOR_OBLIGATORIO_VACIO') {
+    if (columna.codigoInterno === 'pacienteCodigo') return 'Hay filas sin identificador de paciente.'
+    if (columna.codigoInterno === 'fechaEvento') return 'Hay filas sin fecha principal.'
+    return 'Esta columna tiene valores vacíos.'
+  }
+  return problemaLegible(tipoError)
 }
 
 /** Agrupa la lista de errores de fila por columna, con muestra de valores. */
@@ -126,4 +153,51 @@ export function sugerirCorreccion(
   }
 
   return { tipoSugerido: 'TEXTO', marcarNoObligatorio: false, texto: 'Revisar manualmente (cambiar a Texto es seguro)' }
+}
+
+/**
+ * Construye, para cada columna con errores, su problema resumido. Una columna
+ * ya corregida localmente (el usuario aplicó el cambio sugerido, aunque no se
+ * haya revalidado todavía contra el archivo) deja de listarse como problema,
+ * para que las acciones inline den sensación de efecto inmediato.
+ */
+export function construirProblemasPorColumna(
+  errores: ErrorFilaImportacionGenericaDto[],
+  columnas: ColumnaConfigurada[],
+): Map<number, ProblemaColumna> {
+  const grupos = agruparErroresPorColumna(errores)
+  const mapa = new Map<number, ProblemaColumna>()
+
+  for (const grupo of grupos) {
+    const columna = columnas.find((c) => c.nombreOriginal.trim() === grupo.nombreColumna.trim())
+    if (!columna || !columna.usar) continue
+
+    const correccion = sugerirCorreccion(grupo, columna)
+    const tipoYaCorregido = correccion.tipoSugerido !== null && columna.tipoDato === correccion.tipoSugerido
+    const obligatorioYaCorregido = correccion.marcarNoObligatorio && !columna.obligatorio
+    if (tipoYaCorregido || obligatorioYaCorregido) continue
+
+    mapa.set(columna.indiceColumna, {
+      estado: grupo.severidadMaxima === 'ERROR' ? 'error' : 'advertencia',
+      totalErrores: grupo.totalErrores,
+      problemaLegible: problemaLegibleParaColumna(grupo.tipoErrorPredominante, columna),
+      valoresEjemplo: grupo.valoresEjemplo,
+      correccion,
+      esCampoClaveCritico: columna.codigoInterno === 'pacienteCodigo' || columna.codigoInterno === 'fechaEvento',
+      esValorVacio: grupo.tipoErrorPredominante === 'VALOR_OBLIGATORIO_VACIO',
+    })
+  }
+
+  return mapa
+}
+
+/**
+ * Una corrección es "segura" para aplicarse en bloque solo si hay un cambio
+ * concreto que hacer y no toca los campos clave (paciente / fecha principal),
+ * ni queda en el terreno de "revisar manualmente".
+ */
+export function esCorreccionSegura(columna: ColumnaConfigurada, correccion: CorreccionSugerida): boolean {
+  if (columna.rol === 'paciente' || columna.codigoInterno === 'fechaEvento') return false
+  if (correccion.texto.toLowerCase().includes('revisar manualmente')) return false
+  return correccion.tipoSugerido !== null || correccion.marcarNoObligatorio
 }

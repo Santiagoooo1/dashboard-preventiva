@@ -116,11 +116,25 @@ export function sugerirNombreDataset(nombreArchivo: string): string {
 // se evalúa tras descartar "fecha reingreso" (la palabra "fecha" manda).
 const PALABRAS_BOOLEANO = ['exitus', 'fallecido', 'mortalidad', 'reingreso', 'complicacion', 'infeccion', 'ilq']
 
+// Columnas que casi siempre son texto libre no obligatorio (identificadores
+// personales, microbiología, comentarios): se resuelven antes que cualquier
+// otra heurística para que no las capture un cruce accidental de palabras.
+const PALABRAS_TEXTO_LIBRE = [
+  'nombre',
+  'microorganismo',
+  'resistencia',
+  'cultivo',
+  'muestra',
+  'comentarios',
+  'comentario',
+]
+
 export function sugerirTipoDato(nombre: string): TipoDato {
   const n = normalizarTexto(nombre)
   // FECHA solo si aparece claramente "fecha" o "date". Palabras como "cirugía",
   // "alta" o "ingreso" por sí solas ya no fuerzan FECHA (causaban falsos FECHA).
   if (contiene(n, ['fecha', 'date'])) return 'FECHA'
+  if (contiene(n, PALABRAS_TEXTO_LIBRE)) return 'TEXTO'
   // Dinero/proporción antes que conteo: "coste total" es DECIMAL, no ENTERO.
   if (contiene(n, ['coste', 'importe', 'precio', 'porcentaje', 'tasa', 'ratio'])) return 'DECIMAL'
   // Sí/No antes que entero: "exitus … 30 días" es BOOLEANO, no ENTERO por "días".
@@ -134,6 +148,8 @@ export function sugerirRolClinico(nombre: string): RolClinico {
   if (n === 'nhc' || n === 'hc' || contiene(n, ['historia', 'paciente'])) return 'paciente'
   // Igual que en el tipo: rol fecha solo con "fecha"/"date".
   if (contiene(n, ['fecha', 'date'])) return 'fecha'
+  // Nombre/microbiología/comentarios: texto libre, nunca obligatorio ni paciente.
+  if (contiene(n, PALABRAS_TEXTO_LIBRE)) return 'texto'
   if (contiene(n, ['servicio'])) return 'servicio'
   if (contiene(n, ['diagnostico'])) return 'diagnostico'
   if (contiene(n, ['procedimiento'])) return 'procedimiento'
@@ -146,7 +162,7 @@ export function sugerirRolClinico(nombre: string): RolClinico {
   return 'texto'
 }
 
-const CODIGO_CANONICO: Partial<Record<RolClinico, string>> = {
+export const CODIGO_CANONICO: Partial<Record<RolClinico, string>> = {
   paciente: 'pacienteCodigo',
   servicio: 'servicio',
   diagnostico: 'diagnostico',
@@ -161,37 +177,18 @@ export function esCampoComunDesdeRol(rol: RolClinico): boolean {
   return ROLES_COMUNES.includes(rol)
 }
 
-interface ContextoConstruccion {
-  /** Se activa cuando ya se ha asignado la primera columna con rol fecha. */
-  primeraFechaUsada: boolean
-}
-
 /**
  * Construye la configuración inicial de una columna a partir de su nombre.
- * La primera fecha del archivo recibe el código canónico `fechaEvento`
- * (facilita la serie temporal de 6.8B); las demás derivan del nombre.
+ * Ninguna fecha recibe todavía el código canónico `fechaEvento` aquí: todas
+ * arrancan con un código propio derivado de su nombre (fechaIngreso,
+ * fechaCirugia...). Cuál de ellas es la "fecha principal" se decide después de
+ * ver todas las columnas del archivo (ver `camposClave.ts`), no por ser la
+ * primera en aparecer.
  */
-export function construirColumnaConfigurada(
-  indiceColumna: number,
-  nombreOriginal: string,
-  contexto: ContextoConstruccion,
-): ColumnaConfigurada {
+export function construirColumnaConfigurada(indiceColumna: number, nombreOriginal: string): ColumnaConfigurada {
   const rol = sugerirRolClinico(nombreOriginal)
   const tipoDato = rol === 'fecha' ? 'FECHA' : sugerirTipoDato(nombreOriginal)
-
-  let codigoInterno: string
-  if (rol === 'fecha') {
-    codigoInterno = contexto.primeraFechaUsada ? sugerirCodigoInterno(nombreOriginal) : 'fechaEvento'
-    contexto.primeraFechaUsada = true
-  } else if (CODIGO_CANONICO[rol]) {
-    codigoInterno = CODIGO_CANONICO[rol] as string
-  } else {
-    codigoInterno = sugerirCodigoInterno(nombreOriginal)
-  }
-
-  // Solo la fecha principal (fechaEvento) es común; las fechas adicionales son
-  // campos normales aunque su rol siga siendo "fecha".
-  const esComun = rol === 'fecha' ? codigoInterno === 'fechaEvento' : esCampoComunDesdeRol(rol)
+  const codigoInterno = CODIGO_CANONICO[rol] ?? sugerirCodigoInterno(nombreOriginal)
 
   return {
     indiceColumna,
@@ -201,11 +198,28 @@ export function construirColumnaConfigurada(
     codigoInterno,
     tipoDato,
     rol,
-    esComun,
-    // El identificador de paciente y la fecha principal son los dos campos que
-    // conviene exigir; el resto queda opcional para no bloquear la importación.
-    obligatorio: rol === 'paciente' || codigoInterno === 'fechaEvento',
+    // Las fechas empiezan como no comunes: solo la que se promocione a
+    // fechaEvento pasará a serlo (ver establecerFechaPrincipal).
+    esComun: rol === 'fecha' ? false : esCampoComunDesdeRol(rol),
+    // Solo el identificador de paciente se exige de entrada; la fecha
+    // principal se marca obligatoria al fijarla (ver camposClave.ts).
+    obligatorio: rol === 'paciente',
   }
+}
+
+const NOMBRES_BANDERA_SEXO = ['hombre', 'mujer', 'varon']
+
+/**
+ * Si el archivo ya tiene una columna de rol "sexo", las columnas derivadas
+ * ("Hombre", "Mujer", "Varón" como banderas 0/1) sobran y se sugieren ignorar.
+ */
+function ignorarBanderasDeSexoRedundantes(columnas: ColumnaConfigurada[]): ColumnaConfigurada[] {
+  const haySexo = columnas.some((c) => c.rol === 'sexo')
+  if (!haySexo) return columnas
+  return columnas.map((c) => {
+    if (!NOMBRES_BANDERA_SEXO.includes(normalizarTexto(c.nombreOriginal))) return c
+    return { ...c, rol: 'ignorar', usar: false, esComun: false, obligatorio: false }
+  })
 }
 
 /**
@@ -213,9 +227,8 @@ export function construirColumnaConfigurada(
  * regla de "primera fecha → fechaEvento" funcione, y desambigua códigos repetidos.
  */
 export function sugerirColumnas(cabeceras: { indiceColumna: number; nombreOriginal: string }[]): ColumnaConfigurada[] {
-  const contexto: ContextoConstruccion = { primeraFechaUsada: false }
-  const columnas = cabeceras.map((c) => construirColumnaConfigurada(c.indiceColumna, c.nombreOriginal, contexto))
-  return desambiguarCodigos(columnas)
+  const columnas = cabeceras.map((c) => construirColumnaConfigurada(c.indiceColumna, c.nombreOriginal))
+  return desambiguarCodigos(ignorarBanderasDeSexoRedundantes(columnas))
 }
 
 /** Garantiza códigos únicos entre las columnas usadas (el backend los exige únicos). */
