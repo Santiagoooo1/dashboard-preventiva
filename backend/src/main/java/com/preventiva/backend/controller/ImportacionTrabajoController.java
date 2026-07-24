@@ -1,8 +1,13 @@
 package com.preventiva.backend.controller;
 
+import com.preventiva.backend.dto.ActualizarExclusionFilaTrabajoRequestDto;
+import com.preventiva.backend.dto.CorregirCeldaTrabajoRequestDto;
 import com.preventiva.backend.dto.CrearImportacionTrabajoResponseDto;
+import com.preventiva.backend.dto.DeshacerCorreccionCeldaTrabajoRequestDto;
 import com.preventiva.backend.dto.ErrorImportacionTrabajoDto;
+import com.preventiva.backend.dto.ExcluirSimilaresRequestDto;
 import com.preventiva.backend.dto.ImportacionTrabajoResponseDto;
+import com.preventiva.backend.dto.ImportarDesdeTrabajoResponseDto;
 import com.preventiva.backend.dto.PaginaFilasImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.RevalidarImportacionTrabajoResponseDto;
 import com.preventiva.backend.service.interfaces.ImportacionTrabajoService;
@@ -55,5 +60,78 @@ public class ImportacionTrabajoController {
     @DeleteMapping("/{id}")
     public void descartar(@PathVariable("id") Long id) {
         importacionTrabajoService.descartar(id);
+    }
+
+    @PutMapping("/{id}/filas/{numeroFila}/exclusion")
+    public RevalidarImportacionTrabajoResponseDto actualizarExclusion(
+            @PathVariable("id") Long id,
+            @PathVariable("numeroFila") Integer numeroFila,
+            @RequestBody ActualizarExclusionFilaTrabajoRequestDto request) {
+        return importacionTrabajoService.actualizarExclusion(id, numeroFila, request.getExcluida());
+    }
+
+    @PostMapping("/{id}/excluir-similares")
+    public RevalidarImportacionTrabajoResponseDto excluirSimilares(
+            @PathVariable("id") Long id,
+            @RequestBody ExcluirSimilaresRequestDto request) {
+        return importacionTrabajoService.excluirSimilares(id, request.getTipoError(), request.getNombreColumna());
+    }
+
+    /**
+     * Endpoint recomendado: la columna viaja en el body para admitir nombres
+     * con "/", espacios o acentos (p.ej. "Diagnóstico/CIE-10"), que no son
+     * seguros como variable de ruta.
+     */
+    @PutMapping("/{id}/filas/{numeroFila}/celda")
+    public RevalidarImportacionTrabajoResponseDto corregirCelda(
+            @PathVariable("id") Long id,
+            @PathVariable("numeroFila") Integer numeroFila,
+            @RequestBody CorregirCeldaTrabajoRequestDto request) {
+        return importacionTrabajoService.corregirCelda(id, numeroFila, request.getColumna(), request.getValor());
+    }
+
+    /**
+     * Endpoint recomendado (POST en vez de DELETE para evitar problemas de
+     * body en DELETE). La columna viaja en el body por el mismo motivo que
+     * en {@link #corregirCelda}.
+     */
+    @PostMapping("/{id}/filas/{numeroFila}/celda/deshacer")
+    public RevalidarImportacionTrabajoResponseDto deshacerCorreccionCelda(
+            @PathVariable("id") Long id,
+            @PathVariable("numeroFila") Integer numeroFila,
+            @RequestBody DeshacerCorreccionCeldaTrabajoRequestDto request) {
+        return importacionTrabajoService.deshacerCorreccionCelda(id, numeroFila, request.getColumna());
+    }
+
+    /**
+     * @deprecated legacy: la columna en la ruta es frágil si contiene "/".
+     * Usar {@link #corregirCelda} (columna en el body).
+     */
+    @Deprecated
+    @PutMapping("/{id}/filas/{numeroFila}/celdas/{columna}")
+    public RevalidarImportacionTrabajoResponseDto corregirCeldaPorRuta(
+            @PathVariable("id") Long id,
+            @PathVariable("numeroFila") Integer numeroFila,
+            @PathVariable("columna") String columna,
+            @RequestBody CorregirCeldaTrabajoRequestDto request) {
+        return importacionTrabajoService.corregirCelda(id, numeroFila, columna, request.getValor());
+    }
+
+    /**
+     * @deprecated legacy: la columna en la ruta es frágil si contiene "/".
+     * Usar {@link #deshacerCorreccionCelda} (columna en el body).
+     */
+    @Deprecated
+    @DeleteMapping("/{id}/filas/{numeroFila}/celdas/{columna}")
+    public RevalidarImportacionTrabajoResponseDto deshacerCorreccionCeldaPorRuta(
+            @PathVariable("id") Long id,
+            @PathVariable("numeroFila") Integer numeroFila,
+            @PathVariable("columna") String columna) {
+        return importacionTrabajoService.deshacerCorreccionCelda(id, numeroFila, columna);
+    }
+
+    @PostMapping("/{id}/importar")
+    public ImportarDesdeTrabajoResponseDto importarDesdeTrabajo(@PathVariable("id") Long id) {
+        return importacionTrabajoService.importarDesdeTrabajo(id);
     }
 }

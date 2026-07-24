@@ -8,7 +8,6 @@ import com.preventiva.backend.entity.ErrorImportacionGenerica;
 import com.preventiva.backend.entity.ImportacionGenerica;
 import com.preventiva.backend.entity.MapeoCampoImportacion;
 import com.preventiva.backend.entity.PlantillaImportacion;
-import com.preventiva.backend.entity.RegistroClinicoGenerico;
 import com.preventiva.backend.enums.EstadoImportacion;
 import com.preventiva.backend.enums.SeveridadError;
 import com.preventiva.backend.enums.TipoErrorImportacion;
@@ -19,7 +18,7 @@ import com.preventiva.backend.repository.PlantillaImportacionRepository;
 import com.preventiva.backend.repository.RegistroClinicoGenericoRepository;
 import com.preventiva.backend.service.interfaces.ImportacionGenericaService;
 import com.preventiva.backend.service.interfaces.ImportacionGenericaValidationService;
-import com.preventiva.backend.util.CampoClinicoValueEvaluator;
+import com.preventiva.backend.util.RegistroClinicoGenericoBuilder;
 import com.preventiva.backend.util.TextNormalizer;
 import com.preventiva.backend.util.WorkbookLoader;
 
@@ -31,23 +30,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ImportacionGenericaServiceImpl implements ImportacionGenericaService {
-
-    private static final Set<String> CAMPOS_COMUNES = Set.of(
-            "pacienteCodigo", "fechaEvento", "servicio", "tipoEvento",
-            "procedimiento", "diagnostico", "edad", "sexo");
 
     private final ImportacionGenericaValidationService validationService;
     private final PlantillaImportacionRepository plantillaImportacionRepository;
@@ -303,56 +296,15 @@ public class ImportacionGenericaServiceImpl implements ImportacionGenericaServic
             Map<Integer, MapeoCampoImportacion> mapeosPorIndiceColumna,
             Map<Integer, String> valoresPorIndice,
             ImportacionGenerica importacionGenerica) {
-        Map<String, Object> datosDinamicos = new HashMap<>();
-
-        RegistroClinicoGenerico registro = RegistroClinicoGenerico.builder()
-                .dataset(plantilla.getDataset())
-                .hospital(plantilla.getDataset().getHospital())
-                .importacion(importacionGenerica)
-                .fechaCreacion(LocalDateTime.now())
-                .build();
+        List<RegistroClinicoGenericoBuilder.CampoValor> valores = new java.util.ArrayList<>();
 
         for (Map.Entry<Integer, MapeoCampoImportacion> entry : mapeosPorIndiceColumna.entrySet()) {
-            MapeoCampoImportacion mapeo = entry.getValue();
-            String valorOriginal = valoresPorIndice.get(entry.getKey());
-
-            CampoClinicoValueEvaluator.Resultado resultado =
-                    CampoClinicoValueEvaluator.evaluar(mapeo, valorOriginal, 0);
-
-            if (!resultado.isPresente()) {
-                continue;
-            }
-
-            Object valorFinal = resultado.getValor();
-            String codigo = mapeo.getCampoClinico().getCodigo();
-
-            if (Boolean.TRUE.equals(mapeo.getCampoClinico().getEsComun()) && CAMPOS_COMUNES.contains(codigo)) {
-                asignarCampoComun(registro, codigo, valorFinal);
-            } else if (valorFinal instanceof LocalDate fecha) {
-                datosDinamicos.put(codigo, fecha.toString());
-            } else {
-                datosDinamicos.put(codigo, valorFinal);
-            }
+            valores.add(new RegistroClinicoGenericoBuilder.CampoValor(
+                    entry.getValue(), valoresPorIndice.get(entry.getKey())));
         }
 
-        registro.setDatosDinamicos(datosDinamicos);
-        registroClinicoGenericoRepository.save(registro);
-    }
-
-    private void asignarCampoComun(RegistroClinicoGenerico registro, String codigo, Object valor) {
-        switch (codigo) {
-            case "pacienteCodigo" -> registro.setPacienteCodigo(valor != null ? valor.toString() : null);
-            case "fechaEvento" -> registro.setFechaEvento(valor instanceof LocalDate fecha ? fecha : null);
-            case "servicio" -> registro.setServicio(valor != null ? valor.toString() : null);
-            case "tipoEvento" -> registro.setTipoEvento(valor != null ? valor.toString() : null);
-            case "procedimiento" -> registro.setProcedimiento(valor != null ? valor.toString() : null);
-            case "diagnostico" -> registro.setDiagnostico(valor != null ? valor.toString() : null);
-            case "edad" -> registro.setEdad(valor instanceof Integer edad ? edad : null);
-            case "sexo" -> registro.setSexo(valor != null ? valor.toString() : null);
-            default -> {
-                // No debería ocurrir: CAMPOS_COMUNES ya filtra los códigos válidos.
-            }
-        }
+        registroClinicoGenericoRepository.save(
+                RegistroClinicoGenericoBuilder.construir(plantilla, importacionGenerica, valores));
     }
 
     private void guardarErrores(ImportacionGenerica importacion, List<ErrorFilaImportacionGenericaDto> errores) {

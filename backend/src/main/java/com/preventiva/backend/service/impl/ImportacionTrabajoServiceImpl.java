@@ -4,22 +4,32 @@ import com.preventiva.backend.dto.CrearImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.ErrorFilaImportacionGenericaDto;
 import com.preventiva.backend.dto.ErrorImportacionTrabajoDto;
 import com.preventiva.backend.dto.FilaImportacionTrabajoResponseDto;
+import com.preventiva.backend.dto.ImportacionGenericaResponseDto;
 import com.preventiva.backend.dto.ImportacionTrabajoResponseDto;
+import com.preventiva.backend.dto.ImportarDesdeTrabajoResponseDto;
 import com.preventiva.backend.dto.PaginaFilasImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.RevalidarImportacionTrabajoResponseDto;
+import com.preventiva.backend.entity.ErrorImportacionGenerica;
 import com.preventiva.backend.entity.FilaImportacionTrabajo;
+import com.preventiva.backend.entity.ImportacionGenerica;
 import com.preventiva.backend.entity.ImportacionTrabajo;
 import com.preventiva.backend.entity.MapeoCampoImportacion;
 import com.preventiva.backend.entity.PlantillaImportacion;
+import com.preventiva.backend.enums.EstadoImportacion;
 import com.preventiva.backend.enums.EstadoImportacionTrabajo;
 import com.preventiva.backend.enums.OrigenImportacion;
 import com.preventiva.backend.enums.SeveridadError;
+import com.preventiva.backend.enums.TipoErrorImportacion;
+import com.preventiva.backend.repository.ErrorImportacionGenericaRepository;
 import com.preventiva.backend.repository.FilaImportacionTrabajoRepository;
+import com.preventiva.backend.repository.ImportacionGenericaRepository;
 import com.preventiva.backend.repository.ImportacionTrabajoRepository;
 import com.preventiva.backend.repository.MapeoCampoImportacionRepository;
 import com.preventiva.backend.repository.PlantillaImportacionRepository;
+import com.preventiva.backend.repository.RegistroClinicoGenericoRepository;
 import com.preventiva.backend.service.interfaces.ImportacionTrabajoService;
 import com.preventiva.backend.util.CampoClinicoValueEvaluator;
+import com.preventiva.backend.util.RegistroClinicoGenericoBuilder;
 import com.preventiva.backend.util.TextNormalizer;
 import com.preventiva.backend.util.WorkbookLoader;
 
@@ -63,6 +73,9 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
     private final FilaImportacionTrabajoRepository filaImportacionTrabajoRepository;
     private final PlantillaImportacionRepository plantillaImportacionRepository;
     private final MapeoCampoImportacionRepository mapeoCampoImportacionRepository;
+    private final ImportacionGenericaRepository importacionGenericaRepository;
+    private final ErrorImportacionGenericaRepository errorImportacionGenericaRepository;
+    private final RegistroClinicoGenericoRepository registroClinicoGenericoRepository;
 
     private final DataFormatter dataFormatter = new DataFormatter();
 
@@ -245,6 +258,300 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
 
         trabajo.setEstado(EstadoImportacionTrabajo.DESCARTADA);
         importacionTrabajoRepository.save(trabajo);
+    }
+
+    // ------------------------------------------------------------------
+    // Mutaciones (excluir/incluir, corregir, deshacer)
+    // Cada mutación revalida automáticamente y devuelve el resumen
+    // actualizado, para que el frontend no tenga que recordar revalidar.
+    // ------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto actualizarExclusion(
+            Long id, Integer numeroFila, Boolean excluida) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        if (excluida == null) {
+            throw new IllegalArgumentException("Debes indicar si la fila queda excluida o no.");
+        }
+
+        FilaImportacionTrabajo fila = obtenerFilaOLanzar(id, numeroFila);
+        fila.setExcluida(excluida);
+
+        return revalidarYResumir(trabajo);
+    }
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto excluirSimilares(
+            Long id, String tipoError, String nombreColumna) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        if (tipoError == null || tipoError.isBlank() || nombreColumna == null || nombreColumna.isBlank()) {
+            throw new IllegalArgumentException("Debes indicar el tipo de error y la columna del problema.");
+        }
+
+        List<FilaImportacionTrabajo> filas =
+                filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+
+        // "Similar" en sentido estricto: mismo tipoError y misma nombreColumna.
+        for (FilaImportacionTrabajo fila : filas) {
+            if (Boolean.TRUE.equals(fila.getExcluida()) || fila.getErroresActuales() == null) {
+                continue;
+            }
+            boolean coincide = fila.getErroresActuales().stream().anyMatch(e ->
+                    tipoError.equals(e.getTipoError()) && nombreColumna.equals(e.getNombreColumna()));
+            if (coincide) {
+                fila.setExcluida(true);
+            }
+        }
+
+        return revalidarYResumir(trabajo);
+    }
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto corregirCelda(
+            Long id, Integer numeroFila, String columna, String valor) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        FilaImportacionTrabajo fila = obtenerFilaOLanzar(id, numeroFila);
+        exigirColumnaConocida(trabajo, fila, columna);
+
+        // Mapa nuevo para que Hibernate detecte el cambio en la columna JSONB.
+        Map<String, String> corregidos = fila.getValoresCorregidos() != null
+                ? new HashMap<>(fila.getValoresCorregidos())
+                : new HashMap<>();
+        corregidos.put(columna, valor);
+        fila.setValoresCorregidos(corregidos);
+
+        return revalidarYResumir(trabajo);
+    }
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto deshacerCorreccionCelda(
+            Long id, Integer numeroFila, String columna) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        FilaImportacionTrabajo fila = obtenerFilaOLanzar(id, numeroFila);
+
+        if (fila.getValoresCorregidos() != null && fila.getValoresCorregidos().containsKey(columna)) {
+            Map<String, String> corregidos = new HashMap<>(fila.getValoresCorregidos());
+            corregidos.remove(columna);
+            fila.setValoresCorregidos(corregidos);
+        }
+
+        return revalidarYResumir(trabajo);
+    }
+
+    // ------------------------------------------------------------------
+    // Importar desde la copia interna
+    // ------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public ImportarDesdeTrabajoResponseDto importarDesdeTrabajo(Long id) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        if (trabajo.getEstado() != EstadoImportacionTrabajo.LISTA_PARA_IMPORTAR) {
+            throw new IllegalArgumentException(
+                    "La copia de trabajo tiene errores pendientes. Corrige o excluye filas y revalida antes de importar.");
+        }
+
+        List<FilaImportacionTrabajo> filas =
+                filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+        List<MapeoCampoImportacion> mapeos = obtenerMapeosActivosOLanzar(trabajo.getPlantilla().getId());
+
+        // Revalidación defensiva: el estado guardado debería estar al día, pero
+        // así la importación nunca depende de una foto obsoleta.
+        revalidarInterno(trabajo, filas, mapeos);
+        if (trabajo.getEstado() != EstadoImportacionTrabajo.LISTA_PARA_IMPORTAR) {
+            importacionTrabajoRepository.save(trabajo);
+            filaImportacionTrabajoRepository.saveAll(filas);
+            throw new IllegalArgumentException(
+                    "Hay errores bloqueantes activos en filas no excluidas. No se puede importar.");
+        }
+
+        PlantillaImportacion plantilla = trabajo.getPlantilla();
+
+        ImportacionGenerica importacion = ImportacionGenerica.builder()
+                .nombreArchivo(java.util.UUID.randomUUID() + "_"
+                        + (trabajo.getNombreArchivoOriginal() != null ? trabajo.getNombreArchivoOriginal() : "archivo"))
+                .nombreOriginal(trabajo.getNombreArchivoOriginal())
+                .fechaImportacion(LocalDateTime.now())
+                .filasLeidas(trabajo.getTotalFilasLeidas())
+                .filasImportadas(0)
+                .filasConError(0)
+                .estado(EstadoImportacion.PENDIENTE)
+                .plantilla(plantilla)
+                .usuario(null)
+                .build();
+        importacion = importacionGenericaRepository.save(importacion);
+
+        // Trazabilidad: las advertencias vigentes se persisten igual que en la
+        // importación genérica directa.
+        List<ErrorImportacionTrabajoDto> advertencias = listarErroresActivos(trabajo, filas);
+        guardarErroresGenerica(importacion, advertencias);
+
+        Set<String> presentes = trabajo.getColumnasPresentes() != null
+                ? new HashSet<>(trabajo.getColumnasPresentes())
+                : Set.of();
+        List<MapeoCampoImportacion> mapeosPresentes = mapeos.stream()
+                .filter(m -> presentes.contains(m.getNombreColumnaOrigen()))
+                .toList();
+
+        // La importación lee exclusivamente la copia interna (valor corregido
+        // sobre valor original); nunca se vuelve a leer el archivo.
+        int filasImportadas = 0;
+        int filasExcluidas = 0;
+        for (FilaImportacionTrabajo fila : filas) {
+            if (Boolean.TRUE.equals(fila.getExcluida())) {
+                filasExcluidas++;
+                continue;
+            }
+
+            List<RegistroClinicoGenericoBuilder.CampoValor> valores = new ArrayList<>();
+            for (MapeoCampoImportacion mapeo : mapeosPresentes) {
+                valores.add(new RegistroClinicoGenericoBuilder.CampoValor(
+                        mapeo, valorEfectivo(fila, mapeo.getNombreColumnaOrigen())));
+            }
+
+            registroClinicoGenericoRepository.save(
+                    RegistroClinicoGenericoBuilder.construir(plantilla, importacion, valores));
+            filasImportadas++;
+        }
+
+        boolean tieneAdvertencias = !advertencias.isEmpty();
+        importacion.setFilasImportadas(filasImportadas);
+        importacion.setEstado(tieneAdvertencias
+                ? EstadoImportacion.IMPORTADA_CON_ERRORES
+                : EstadoImportacion.IMPORTADA);
+        importacionGenericaRepository.save(importacion);
+
+        trabajo.setEstado(EstadoImportacionTrabajo.IMPORTADA);
+        trabajo.setImportacionGenerica(importacion);
+        importacionTrabajoRepository.save(trabajo);
+        filaImportacionTrabajoRepository.saveAll(filas);
+
+        ImportacionTrabajoResponseDto resumenTrabajo = construirResumen(trabajo, filas);
+
+        return ImportarDesdeTrabajoResponseDto.builder()
+                .importacionTrabajo(resumenTrabajo)
+                .importacionGenerica(mapImportacionGenericaToDto(importacion, advertencias.size()))
+                .filasImportadas(filasImportadas)
+                .filasExcluidas(filasExcluidas)
+                .resumen("Se importaron " + filasImportadas + " fila(s) desde la copia de trabajo. "
+                        + filasExcluidas + " fila(s) excluida(s), " + advertencias.size() + " advertencia(s).")
+                .build();
+    }
+
+    private RevalidarImportacionTrabajoResponseDto revalidarYResumir(ImportacionTrabajo trabajo) {
+        List<FilaImportacionTrabajo> filas =
+                filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(trabajo.getId());
+        List<MapeoCampoImportacion> mapeos = obtenerMapeosActivosOLanzar(trabajo.getPlantilla().getId());
+
+        revalidarInterno(trabajo, filas, mapeos);
+        importacionTrabajoRepository.save(trabajo);
+        filaImportacionTrabajoRepository.saveAll(filas);
+
+        ImportacionTrabajoResponseDto resumen = construirResumen(trabajo, filas);
+        return RevalidarImportacionTrabajoResponseDto.builder()
+                .importacionTrabajo(resumen)
+                .resumen(textoResumen(resumen))
+                .build();
+    }
+
+    private List<ErrorImportacionTrabajoDto> listarErroresActivos(
+            ImportacionTrabajo trabajo, List<FilaImportacionTrabajo> filas) {
+        List<ErrorImportacionTrabajoDto> errores = new ArrayList<>();
+        if (trabajo.getErroresGlobales() != null) {
+            errores.addAll(trabajo.getErroresGlobales());
+        }
+        for (FilaImportacionTrabajo fila : filas) {
+            if (Boolean.TRUE.equals(fila.getExcluida()) || fila.getErroresActuales() == null) {
+                continue;
+            }
+            errores.addAll(fila.getErroresActuales());
+        }
+        return errores;
+    }
+
+    private void guardarErroresGenerica(
+            ImportacionGenerica importacion, List<ErrorImportacionTrabajoDto> errores) {
+        for (ErrorImportacionTrabajoDto errorDto : errores) {
+            TipoErrorImportacion tipoError;
+            try {
+                tipoError = TipoErrorImportacion.valueOf(errorDto.getTipoError());
+            } catch (Exception e) {
+                tipoError = TipoErrorImportacion.ERROR_DESCONOCIDO;
+            }
+
+            SeveridadError severidad;
+            try {
+                severidad = SeveridadError.valueOf(errorDto.getSeveridad());
+            } catch (Exception e) {
+                severidad = SeveridadError.ERROR;
+            }
+
+            errorImportacionGenericaRepository.save(ErrorImportacionGenerica.builder()
+                    .importacionGenerica(importacion)
+                    .numeroFila(errorDto.getNumeroFila())
+                    .nombreColumna(errorDto.getNombreColumna())
+                    .valorOriginal(errorDto.getValorOriginal())
+                    .tipoError(tipoError)
+                    .severidad(severidad)
+                    .mensaje(errorDto.getMensaje())
+                    .build());
+        }
+    }
+
+    private ImportacionGenericaResponseDto mapImportacionGenericaToDto(
+            ImportacionGenerica importacion, int totalAdvertencias) {
+        PlantillaImportacion plantilla = importacion.getPlantilla();
+
+        return ImportacionGenericaResponseDto.builder()
+                .importacionId(importacion.getId())
+                .nombreArchivo(importacion.getNombreOriginal())
+                .plantillaId(plantilla != null ? plantilla.getId() : null)
+                .datasetId(plantilla != null && plantilla.getDataset() != null ? plantilla.getDataset().getId() : null)
+                .filasLeidas(importacion.getFilasLeidas())
+                .filasImportadas(importacion.getFilasImportadas())
+                .filasConError(importacion.getFilasConError())
+                .totalAdvertencias(totalAdvertencias)
+                .estado(importacion.getEstado().name())
+                .mensaje("Importación realizada desde la copia de trabajo.")
+                .build();
+    }
+
+    private void exigirColumnaConocida(
+            ImportacionTrabajo trabajo, FilaImportacionTrabajo fila, String columna) {
+        boolean enOriginales = fila.getValoresOriginales() != null
+                && fila.getValoresOriginales().containsKey(columna);
+        if (enOriginales) {
+            return;
+        }
+
+        List<MapeoCampoImportacion> mapeos =
+                mapeoCampoImportacionRepository.findByPlantillaIdAndActivoTrue(trabajo.getPlantilla().getId());
+        boolean enMapeos = mapeos.stream().anyMatch(m -> columna.equals(m.getNombreColumnaOrigen()));
+        if (!enMapeos) {
+            throw new IllegalArgumentException(
+                    "La columna '" + columna + "' no existe en esta importación.");
+        }
+    }
+
+    private FilaImportacionTrabajo obtenerFilaOLanzar(Long importacionTrabajoId, Integer numeroFila) {
+        return filaImportacionTrabajoRepository
+                .findByImportacionTrabajoIdAndNumeroFilaOriginal(importacionTrabajoId, numeroFila)
+                .orElseThrow(() -> new NoSuchElementException(
+                        "No existe la fila " + numeroFila + " en la copia de trabajo " + importacionTrabajoId));
     }
 
     // ------------------------------------------------------------------
