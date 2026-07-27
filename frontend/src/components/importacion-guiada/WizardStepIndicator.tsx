@@ -3,6 +3,7 @@ import styles from './ImportacionGuiada.module.css'
 export const PASOS_WIZARD = [
   { clave: 'subir', etiqueta: 'Subir archivo' },
   { clave: 'columnas', etiqueta: 'Columnas' },
+  { clave: 'correccion-filas', etiqueta: 'Corregir filas' },
   { clave: 'configuracion', etiqueta: 'Nombre' },
   { clave: 'creando', etiqueta: 'Importar' },
   { clave: 'resultado', etiqueta: 'Resultado' },

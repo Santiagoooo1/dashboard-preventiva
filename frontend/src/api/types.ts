@@ -566,3 +566,67 @@ export interface DashboardPanelResponseDto {
   widgets: DashboardWidgetDto[]
   resumen: DashboardPanelResumenDto
 }
+
+// --- Fase 6.8C: copia interna de trabajo (corrección de filas sin tocar el archivo original) ---
+
+export interface ImportacionTrabajoResponseDto {
+  id: number
+  datasetId: number
+  plantillaId: number
+  nombreArchivoOriginal: string | null
+  origen: string | null
+  indiceHoja: number | null
+  filaCabecera: number | null
+  estado: string
+  totalFilasLeidas: number
+  totalFilasExcluidas: number
+  totalErrores: number
+  totalAdvertencias: number
+  importable: boolean
+  fechaCreacion: string
+  fechaUltimaRevalidacion: string | null
+}
+
+export interface ErrorImportacionTrabajoDto {
+  numeroFila: number | null
+  nombreColumna: string | null
+  valorOriginal: string | null
+  tipoError: string
+  severidad: string
+  mensaje: string
+}
+
+export interface FilaImportacionTrabajoResponseDto {
+  id: number
+  numeroFilaOriginal: number
+  excluida: boolean
+  valoresOriginales: Record<string, string | null>
+  valoresCorregidos: Record<string, string | null>
+  errores: ErrorImportacionTrabajoDto[]
+}
+
+export interface PaginaFilasImportacionTrabajoResponseDto {
+  content: FilaImportacionTrabajoResponseDto[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export interface CrearImportacionTrabajoResponseDto {
+  importacionTrabajo: ImportacionTrabajoResponseDto
+  resumen: string
+}
+
+export interface RevalidarImportacionTrabajoResponseDto {
+  importacionTrabajo: ImportacionTrabajoResponseDto
+  resumen: string
+}
+
+export interface ImportarDesdeTrabajoResponseDto {
+  importacionTrabajo: ImportacionTrabajoResponseDto
+  importacionGenerica: ImportacionGenericaResponseDto
+  filasImportadas: number
+  filasExcluidas: number
+  resumen: string
+}

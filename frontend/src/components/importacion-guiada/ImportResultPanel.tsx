@@ -14,6 +14,8 @@ interface ImportResultPanelProps {
   resultado: ResultadoAsistente
   /** Vuelve al paso Columnas conservando archivo y configuración (dataset parcial). */
   onVolverAColumnas?: () => void
+  /** Presente cuando la importación se hizo desde una copia de trabajo corregida en la app. */
+  extra?: { filasExcluidas: number; resumen: string }
 }
 
 // Mensaje propio y en lenguaje claro: el mensaje del backend puede incluir
@@ -26,7 +28,7 @@ function mensajeAmable(estado: string): string {
   return 'La importación no se ha completado.'
 }
 
-export function ImportResultPanel({ resultado, onVolverAColumnas }: ImportResultPanelProps) {
+export function ImportResultPanel({ resultado, onVolverAColumnas, extra }: ImportResultPanelProps) {
   const { importacion, validacionFilas, datasetId, error, pasoFallido } = resultado
   const huboExito = importacion !== null && importacion.estado !== 'RECHAZADA'
   const { mensaje: mensajeFallo, detalleTecnico } = mensajeAmableFallo(pasoFallido, error)
@@ -65,9 +67,10 @@ export function ImportResultPanel({ resultado, onVolverAColumnas }: ImportResult
             <li>Filas leídas: {importacion.filasLeidas}</li>
             <li>Filas importadas: {importacion.filasImportadas}</li>
             <li>Filas con error: {importacion.filasConError}</li>
+            {extra && <li>Filas excluidas: {extra.filasExcluidas}</li>}
             <li>Advertencias: {importacion.totalAdvertencias}</li>
           </ul>
-          <p>{mensajeAmable(importacion.estado)}</p>
+          <p>{extra ? extra.resumen : mensajeAmable(importacion.estado)}</p>
 
           {tieneAdvertencias && (
             <>

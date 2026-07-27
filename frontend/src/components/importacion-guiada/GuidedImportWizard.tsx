@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { detectarColumnasPlantilla } from '../../api/plantillasImportacionApi'
+import { crearImportacionTrabajo } from '../../api/importacionesTrabajoApi'
+import type { ImportarDesdeTrabajoResponseDto } from '../../api/types'
 import {
   ejecutarAsistente,
   PASOS_INICIALES,
@@ -38,6 +40,7 @@ import { DatasetBasicConfigForm } from './DatasetBasicConfigForm'
 import type { ConfigDataset } from './DatasetBasicConfigForm'
 import { ImportProgressPanel } from './ImportProgressPanel'
 import { ImportResultPanel } from './ImportResultPanel'
+import { CorreccionFilasTrabajoPanel } from './CorreccionFilasTrabajoPanel'
 import styles from './ImportacionGuiada.module.css'
 
 export function GuidedImportWizard() {
@@ -56,6 +59,18 @@ export function GuidedImportWizard() {
   const [progreso, setProgreso] = useState<PasoProgreso[]>(PASOS_INICIALES)
   const [resultado, setResultado] = useState<ResultadoAsistente | null>(null)
   const [mostrarErroresTecnicos, setMostrarErroresTecnicos] = useState(false)
+
+  // Copia interna de trabajo (Fase 6.8C.3): permite corregir/excluir filas sin
+  // modificar el archivo original. Solo existe entre "Corregir errores en la
+  // app" y su importación o descarte.
+  const [importacionTrabajoId, setImportacionTrabajoId] = useState<number | null>(null)
+  const [creandoCopiaTrabajo, setCreandoCopiaTrabajo] = useState(false)
+  // Datos propios de la importación desde copia de trabajo, para completar el
+  // resultado genérico del asistente (que no conoce filasExcluidas).
+  const [extraResultadoTrabajo, setExtraResultadoTrabajo] = useState<{
+    filasExcluidas: number
+    resumen: string
+  } | null>(null)
 
   // Código base sugerido (sin sufijo) e intento actual: en cada revalidación se
   // usa un código nuevo (base_2, base_3…) para no chocar con el dataset parcial.
@@ -130,6 +145,8 @@ export function GuidedImportWizard() {
     setIntentoNumero(1)
     setResultado(null)
     setMostrarErroresTecnicos(false)
+    setImportacionTrabajoId(null)
+    setExtraResultadoTrabajo(null)
   }
 
   const analizar = async () => {
@@ -195,6 +212,7 @@ export function GuidedImportWizard() {
     if (!archivo) return
     setPaso('creando')
     setProgreso(PASOS_INICIALES.map((p) => ({ ...p })))
+    setExtraResultadoTrabajo(null)
 
     const res = await ejecutarAsistente(
       {
@@ -251,6 +269,58 @@ export function GuidedImportWizard() {
     await ejecutarImportacionConConfig(configSiguiente)
   }
 
+  // "Corregir errores en la app": crea una copia interna de trabajo con el
+  // mismo archivo/plantilla que ya se usó para validar, y pasa al panel de
+  // corrección de filas. La plantilla ya existe en este punto (se creó en el
+  // paso 3 del orquestador, antes de llegar a validar-filas).
+  const corregirEnApp = async () => {
+    if (!archivo || resultado?.plantillaId == null) return
+    setError(null)
+    setCreandoCopiaTrabajo(true)
+    try {
+      const creado = await crearImportacionTrabajo({
+        archivo,
+        plantillaId: resultado.plantillaId,
+        indiceHoja: Number(indiceHoja) || 0,
+        filaCabecera: Number(filaCabecera) || 0,
+      })
+      setImportacionTrabajoId(creado.importacionTrabajo.id)
+      setPaso('correccion-filas')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la copia de trabajo.')
+    } finally {
+      setCreandoCopiaTrabajo(false)
+    }
+  }
+
+  // Reutiliza ImportResultPanel: completa el resultado del asistente con la
+  // importación genérica creada desde la copia de trabajo, y guarda aparte lo
+  // que ese panel no conoce (filas excluidas, resumen propio del backend).
+  const onImportadoDesdeTrabajo = (res: ImportarDesdeTrabajoResponseDto) => {
+    setResultado((actual) => ({
+      datasetId: actual?.datasetId ?? null,
+      plantillaId: actual?.plantillaId ?? null,
+      camposCreados: actual?.camposCreados ?? 0,
+      mapeosCreados: actual?.mapeosCreados ?? 0,
+      validacionColumnas: actual?.validacionColumnas ?? null,
+      validacionFilas: actual?.validacionFilas ?? null,
+      importacion: res.importacionGenerica,
+      pasoFallido: null,
+      error: null,
+    }))
+    setExtraResultadoTrabajo({ filasExcluidas: res.filasExcluidas, resumen: res.resumen })
+    setImportacionTrabajoId(null)
+    setPaso('resultado')
+  }
+
+  // "Volver y subir otro archivo" desde el panel de corrección: la copia de
+  // trabajo ya se descarta dentro del panel antes de llamar a este callback.
+  const volverASubirDesdeCorreccion = () => {
+    setImportacionTrabajoId(null)
+    cambiarArchivo(null)
+    setPaso('subir')
+  }
+
   const desmarcarDuplicadas = () => {
     setColumnas((actual) => desmarcarDuplicadasAutomaticamente(actual))
   }
@@ -285,7 +355,7 @@ export function GuidedImportWizard() {
   return (
     <div className={styles.page}>
       <WizardStepIndicator actual={paso} />
-      {paso !== 'creando' && paso !== 'resultado' && <ErrorBanner mensaje={error} />}
+      {paso !== 'creando' && paso !== 'resultado' && paso !== 'correccion-filas' && <ErrorBanner mensaje={error} />}
 
       {paso === 'subir' && (
         <Card title="Sube el archivo">
@@ -353,6 +423,17 @@ export function GuidedImportWizard() {
                 </p>
               )}
               <div className={styles.acciones}>
+                <button
+                  type="button"
+                  className="btn btnPrimary"
+                  disabled={creandoCopiaTrabajo || resultado?.plantillaId == null}
+                  onClick={corregirEnApp}
+                >
+                  {creandoCopiaTrabajo ? 'Creando copia de trabajo…' : 'Corregir errores en la app'}
+                </button>
+                <button type="button" className="btn btnSecondary" onClick={() => setPaso('subir')}>
+                  Corregir archivo y volver a subirlo
+                </button>
                 {modoCorreccion && (
                   <>
                     <button type="button" className="btn btnSecondary" onClick={aplicarTodasSugerenciasSeguras}>
@@ -363,7 +444,7 @@ export function GuidedImportWizard() {
                     </button>
                   </>
                 )}
-                <button type="button" className="btn btnPrimary" onClick={revalidarCambios}>
+                <button type="button" className="btn btnSecondary" onClick={revalidarCambios}>
                   Revalidar cambios
                 </button>
                 <button
@@ -442,6 +523,14 @@ export function GuidedImportWizard() {
         </>
       )}
 
+      {paso === 'correccion-filas' && importacionTrabajoId !== null && (
+        <CorreccionFilasTrabajoPanel
+          importacionTrabajoId={importacionTrabajoId}
+          onImportado={onImportadoDesdeTrabajo}
+          onVolver={volverASubirDesdeCorreccion}
+        />
+      )}
+
       {paso === 'configuracion' && (
         <Card title="Nombre del dashboard">
           <DatasetBasicConfigForm valores={config} onChange={setConfig} errores={erroresConfig} />
@@ -463,7 +552,11 @@ export function GuidedImportWizard() {
       )}
 
       {paso === 'resultado' && resultado && (
-        <ImportResultPanel resultado={resultado} onVolverAColumnas={() => setPaso('columnas')} />
+        <ImportResultPanel
+          resultado={resultado}
+          onVolverAColumnas={() => setPaso('columnas')}
+          extra={extraResultadoTrabajo ?? undefined}
+        />
       )}
     </div>
   )

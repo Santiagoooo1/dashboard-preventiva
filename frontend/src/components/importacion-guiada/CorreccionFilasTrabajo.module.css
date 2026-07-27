@@ -1,0 +1,118 @@
+.avisoCopiaTrabajo {
+  background-color: rgba(13, 110, 253, 0.06);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.9rem;
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.resumen {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--spacing-md) 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+}
+
+.estadoAccion {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.filaBloque {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.filaCabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-xs);
+}
+
+.filaCabecera strong {
+  font-size: 0.95rem;
+}
+
+.badgeExcluida {
+  display: inline-block;
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: rgba(108, 117, 125, 0.25);
+  color: #495057;
+}
+
+.filaAcciones {
+  margin-left: auto;
+}
+
+.notaExclusion {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.tablaErroresScroll {
+  overflow-x: auto;
+}
+
+.tablaErrores {
+  font-size: 0.88rem;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.tablaErrores th,
+.tablaErrores td {
+  text-align: left;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.accionesCelda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.editorCelda {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.editorCelda input,
+.editorCelda select {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  min-width: 140px;
+}
+
+.paginacion {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+  font-size: 0.9rem;
+}
+
+.acciones {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--spacing-md);
+}
