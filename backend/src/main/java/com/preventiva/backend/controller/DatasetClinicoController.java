@@ -22,8 +22,9 @@ public class DatasetClinicoController {
     private final CampoClinicoService campoClinicoService;
 
     @GetMapping
-    public List<DatasetClinicoResponseDto> listarActivos() {
-        return datasetClinicoService.listarActivos();
+    public List<DatasetClinicoResponseDto> listar(
+            @RequestParam(value = "incluirBorradores", defaultValue = "false") boolean incluirBorradores) {
+        return datasetClinicoService.listar(incluirBorradores);
     }
 
     @GetMapping("/{id}")
@@ -48,6 +49,17 @@ public class DatasetClinicoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void desactivar(@PathVariable("id") Long id) {
         datasetClinicoService.desactivar(id);
+    }
+
+    @PostMapping("/{id}/activar")
+    public DatasetClinicoResponseDto activar(@PathVariable("id") Long id) {
+        return datasetClinicoService.activar(id);
+    }
+
+    @DeleteMapping("/{id}/descartar-borrador")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void descartarBorrador(@PathVariable("id") Long id) {
+        datasetClinicoService.descartarBorrador(id);
     }
 
     @GetMapping("/{id}/campos")

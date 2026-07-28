@@ -66,7 +66,7 @@ export function DatasetFormPage() {
         {data && (
           <>
             <Breadcrumbs items={breadcrumbs} />
-            <h1>{esEdicion ? 'Editar dataset' : 'Nuevo dataset'}</h1>
+            <h1>{esEdicion ? 'Editar datos básicos' : 'Nuevo dataset'}</h1>
             <ErrorBanner mensaje={errorBackend} />
             <Card title="Datos del dataset">
               <DatasetForm

@@ -8,4 +8,6 @@ import java.util.List;
 public interface RegistroClinicoGenericoRepository extends JpaRepository<RegistroClinicoGenerico, Long> {
 
     List<RegistroClinicoGenerico> findByDatasetId(Long datasetId);
+
+    boolean existsByDatasetId(Long datasetId);
 }

@@ -45,36 +45,68 @@ export function EditorCeldaTrabajo({ tipoDato, valorInicial, disabled, onGuardar
   const fechaIsoInicial = esFecha ? normalizarFechaIso(valorInicial) : null
   const valorInicialEditor = fechaIsoInicial ?? valorInicial
   const [valor, setValor] = useState(valorInicialEditor)
+  const [avisoVacio, setAvisoVacio] = useState(false)
 
   const sinCambios = valor === valorInicialEditor
 
+  const cambiarValor = (nuevo: string) => {
+    setValor(nuevo)
+    if (avisoVacio) setAvisoVacio(false)
+  }
+
+  // No tiene sentido guardar una celda vacía: el problema que se quiere
+  // resolver es justo que falta un valor, así que sin texto no hay nada que
+  // enviar al backend. La alternativa real para esa fila es excluirla.
+  const manejarGuardar = () => {
+    if (valor.trim() === '') {
+      setAvisoVacio(true)
+      return
+    }
+    onGuardar(valor)
+  }
+
   return (
-    <div className={styles.editorCelda}>
-      {tipoDato === 'BOOLEANO' ? (
-        <select value={valor} disabled={disabled} onChange={(e) => setValor(e.target.value)}>
-          {OPCIONES_BOOLEANO.map((o) => (
-            <option key={o.valor} value={o.valor}>
-              {o.etiqueta}
-            </option>
-          ))}
-        </select>
-      ) : esFecha && fechaIsoInicial !== null ? (
-        <input type="date" value={valor} disabled={disabled} onChange={(e) => setValor(e.target.value)} />
-      ) : tipoDato === 'ENTERO' ? (
-        <input type="number" step="1" value={valor} disabled={disabled} onChange={(e) => setValor(e.target.value)} />
-      ) : tipoDato === 'DECIMAL' ? (
-        <input type="number" step="any" value={valor} disabled={disabled} onChange={(e) => setValor(e.target.value)} />
-      ) : (
-        <input type="text" value={valor} disabled={disabled} onChange={(e) => setValor(e.target.value)} />
-      )}
-      <button
-        type="button"
-        className="btn btnPrimary"
-        disabled={disabled || sinCambios}
-        onClick={() => onGuardar(valor)}
-      >
-        Guardar
-      </button>
+    <div className={styles.editorCeldaContenedor}>
+      <div className={styles.editorCelda}>
+        {tipoDato === 'BOOLEANO' ? (
+          <select value={valor} disabled={disabled} onChange={(e) => cambiarValor(e.target.value)}>
+            {OPCIONES_BOOLEANO.map((o) => (
+              <option key={o.valor} value={o.valor}>
+                {o.etiqueta}
+              </option>
+            ))}
+          </select>
+        ) : esFecha && fechaIsoInicial !== null ? (
+          <input type="date" value={valor} disabled={disabled} onChange={(e) => cambiarValor(e.target.value)} />
+        ) : tipoDato === 'ENTERO' ? (
+          <input
+            type="number"
+            step="1"
+            value={valor}
+            disabled={disabled}
+            onChange={(e) => cambiarValor(e.target.value)}
+          />
+        ) : tipoDato === 'DECIMAL' ? (
+          <input
+            type="number"
+            step="any"
+            value={valor}
+            disabled={disabled}
+            onChange={(e) => cambiarValor(e.target.value)}
+          />
+        ) : (
+          <input type="text" value={valor} disabled={disabled} onChange={(e) => cambiarValor(e.target.value)} />
+        )}
+        <button
+          type="button"
+          className="btn btnPrimary"
+          disabled={disabled || sinCambios}
+          onClick={manejarGuardar}
+        >
+          Guardar
+        </button>
+      </div>
+      {avisoVacio && <p className={styles.avisoVacio}>Introduce un valor o excluye la fila.</p>}
     </div>
   )
 }

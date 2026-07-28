@@ -134,7 +134,7 @@ export function DatasetDetailPage() {
                   Nuevo panel
                 </Link>
                 <Link className="btn btnAction" to={`/datasets/${datasetId}/editar`}>
-                  Editar dataset
+                  Editar datos básicos
                 </Link>
               </div>
             </Card>

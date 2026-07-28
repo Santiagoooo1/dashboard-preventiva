@@ -24,10 +24,14 @@ public class CampoClinicoValueEvaluator {
             DateTimeFormatter.ofPattern("dd/MM/yy"),
             DateTimeFormatter.ISO_LOCAL_DATE);
 
-    private static final Set<String> VALORES_VERDADEROS = Set.of(
+    // Públicas para que otros puntos que necesiten interpretar el mismo
+    // vocabulario (p. ej. la normalización asistida de columnas en la copia de
+    // trabajo) no dupliquen la lista; ver nota de CLAUDE.md sobre mantenerla
+    // sincronizada si se añaden valores.
+    public static final Set<String> VALORES_VERDADEROS = Set.of(
             "SI", "S", "TRUE", "VERDADERO", "1", "X", "POSITIVO", "ADECUADA");
 
-    private static final Set<String> VALORES_FALSOS = Set.of(
+    public static final Set<String> VALORES_FALSOS = Set.of(
             "NO", "N", "FALSE", "FALSO", "0", "NEGATIVO", "INADECUADA", "NO ADECUADA");
 
     private CampoClinicoValueEvaluator() {
@@ -56,8 +60,14 @@ public class CampoClinicoValueEvaluator {
         Optional<Object> parseado = parsear(tipoDato, valorOriginal);
 
         if (parseado.isEmpty()) {
-            return resolverSegunPolitica(mapeo, numeroFila, valorOriginal,
-                    tipoErrorFormato(tipoDato), mensajeFormato(tipoDato));
+            // A diferencia de "valor vacío" (que sí sigue la política del mapeo:
+            // ERROR/ADVERTENCIA/IGNORAR/NULO según obligatoriedad), un valor no
+            // vacío que no cumple el tipo es siempre bloqueante: no tiene sentido
+            // dejar pasar como advertencia un dato que directamente no se puede
+            // interpretar (ni importar) como fecha/número/booleano.
+            return Resultado.conReporte(construirError(
+                    mapeo, numeroFila, valorOriginal, tipoErrorFormato(tipoDato), mensajeFormato(tipoDato),
+                    SeveridadError.ERROR));
         }
 
         return Resultado.valorValido(parseado.get());

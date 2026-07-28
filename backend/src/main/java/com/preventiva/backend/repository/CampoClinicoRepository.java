@@ -13,4 +13,6 @@ public interface CampoClinicoRepository extends JpaRepository<CampoClinico, Long
     boolean existsByDatasetIdAndCodigoIgnoreCase(Long datasetId, String codigo);
 
     Optional<CampoClinico> findByDatasetIdAndCodigoIgnoreCase(Long datasetId, String codigo);
+
+    void deleteByDatasetId(Long datasetId);
 }

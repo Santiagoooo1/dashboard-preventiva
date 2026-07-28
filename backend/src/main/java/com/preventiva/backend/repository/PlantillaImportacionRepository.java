@@ -8,4 +8,6 @@ import java.util.List;
 public interface PlantillaImportacionRepository extends JpaRepository<PlantillaImportacion, Long> {
 
     List<PlantillaImportacion> findByDatasetIdAndActivaTrue(Long datasetId);
+
+    List<PlantillaImportacion> findByDatasetId(Long datasetId);
 }

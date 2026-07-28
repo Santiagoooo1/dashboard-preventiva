@@ -24,6 +24,8 @@ public interface FilaImportacionTrabajoRepository extends JpaRepository<FilaImpo
 
     long countByImportacionTrabajoIdAndExcluidaTrue(Long importacionTrabajoId);
 
+    void deleteByImportacionTrabajoIdIn(List<Long> importacionTrabajoIds);
+
     @Query(value = "SELECT * FROM filas_importacion_trabajo "
             + "WHERE importacion_trabajo_id = :importacionTrabajoId "
             + "AND jsonb_array_length(errores_actuales) > 0 "

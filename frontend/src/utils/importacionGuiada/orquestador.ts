@@ -4,7 +4,7 @@ import type {
   ValidacionFilasImportacionGenericaResponseDto,
   ValidacionImportacionGenericaResponseDto,
 } from '../../api/types'
-import { crearCampo, crearDataset } from '../../api/datasetApi'
+import { activarDataset, crearCampo, crearDataset } from '../../api/datasetApi'
 import { crearMapeoPlantilla, crearPlantillaImportacion } from '../../api/plantillasImportacionApi'
 import {
   importarGenerico,
@@ -101,6 +101,9 @@ export async function ejecutarAsistente(
   }
 
   // 1. Dataset
+  // Se crea como BORRADOR: hasta que la importación no se complete con éxito
+  // (más abajo) no se considera un dataset utilizable, y no debe aparecer en
+  // el listado normal de datasets si el asistente falla o se abandona a medias.
   onProgreso('dataset', 'en-curso')
   let datasetId: number
   try {
@@ -108,6 +111,7 @@ export async function ejecutarAsistente(
       codigo: entrada.dataset.codigo,
       nombre: entrada.dataset.nombre,
       descripcion: entrada.dataset.descripcion || null,
+      estadoDataset: 'BORRADOR',
     })
     datasetId = ds.id
     resultado.datasetId = datasetId
@@ -219,6 +223,15 @@ export async function ejecutarAsistente(
     onProgreso('importar', 'correcto')
   } catch (err) {
     return fallar('importar', err)
+  }
+
+  // La importación ya se completó con éxito: promover el dataset a ACTIVO es
+  // un paso de limpieza, no debe hacer fracasar un resultado que ya es bueno.
+  try {
+    await activarDataset(datasetId)
+  } catch {
+    // Si falla, el dataset queda BORRADOR pese a tener datos importados; se
+    // puede reintentar entrando al dataset en modo avanzado.
   }
 
   return resultado

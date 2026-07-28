@@ -16,4 +16,5 @@ public class DatasetClinicoResponseDto {
     private Long hospitalId;
     private String hospitalNombre;
     private Boolean activo;
+    private String estadoDataset;
 }

@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { detectarColumnasPlantilla } from '../../api/plantillasImportacionApi'
-import { crearImportacionTrabajo } from '../../api/importacionesTrabajoApi'
+import { crearImportacionTrabajo, descartarImportacionTrabajo } from '../../api/importacionesTrabajoApi'
+import { activarDataset, descartarDatasetBorrador } from '../../api/datasetApi'
 import type { ImportarDesdeTrabajoResponseDto } from '../../api/types'
 import {
   ejecutarAsistente,
@@ -139,6 +140,11 @@ export function GuidedImportWizard() {
   // Cambiar de archivo reinicia el asistente: cualquier análisis o resultado
   // previo deja de corresponder al fichero actual.
   const cambiarArchivo = (nuevo: File | null) => {
+    // Defensivo: normalmente ya se descartó al salir de "Corregir filas", pero
+    // si quedara una copia de trabajo colgando no debe sobrevivir al cambio de archivo.
+    if (importacionTrabajoId !== null) {
+      descartarImportacionTrabajo(importacionTrabajoId).catch(() => {})
+    }
     setArchivo(nuevo)
     setColumnas([])
     setError(null)
@@ -296,7 +302,8 @@ export function GuidedImportWizard() {
   // Reutiliza ImportResultPanel: completa el resultado del asistente con la
   // importación genérica creada desde la copia de trabajo, y guarda aparte lo
   // que ese panel no conoce (filas excluidas, resumen propio del backend).
-  const onImportadoDesdeTrabajo = (res: ImportarDesdeTrabajoResponseDto) => {
+  const onImportadoDesdeTrabajo = async (res: ImportarDesdeTrabajoResponseDto) => {
+    const datasetIdActual = resultado?.datasetId ?? null
     setResultado((actual) => ({
       datasetId: actual?.datasetId ?? null,
       plantillaId: actual?.plantillaId ?? null,
@@ -311,14 +318,81 @@ export function GuidedImportWizard() {
     setExtraResultadoTrabajo({ filasExcluidas: res.filasExcluidas, resumen: res.resumen })
     setImportacionTrabajoId(null)
     setPaso('resultado')
+
+    // La importación ya se completó con éxito: promover el dataset a ACTIVO
+    // es un paso de limpieza, no debe hacer fracasar un resultado que ya es bueno.
+    if (datasetIdActual !== null) {
+      try {
+        await activarDataset(datasetIdActual)
+      } catch {
+        // Si falla, el dataset queda BORRADOR pese a tener datos importados.
+      }
+    }
   }
 
   // "Volver y subir otro archivo" desde el panel de corrección: la copia de
   // trabajo ya se descarta dentro del panel antes de llamar a este callback.
-  const volverASubirDesdeCorreccion = () => {
+  // El dataset creado para este intento seguía en BORRADOR (no llegó a
+  // importarse), así que se descarta también: no debe quedar como una prueba
+  // huérfana en el listado de datasets.
+  const volverASubirDesdeCorreccion = async () => {
+    const datasetIdActual = resultado?.datasetId ?? null
     setImportacionTrabajoId(null)
     cambiarArchivo(null)
     setPaso('subir')
+    if (datasetIdActual !== null) {
+      try {
+        await descartarDatasetBorrador(datasetIdActual)
+      } catch {
+        // Puede fallar si ya no está en BORRADOR/VALIDANDO; no es bloqueante
+        // y el dataset seguirá disponible en "Pruebas y borradores".
+      }
+    }
+  }
+
+  // Reinicio completo del asistente: usado tanto por "Cancelar creación"
+  // (tras descartar lo que hubiera) como por "Crear otro dashboard" desde el
+  // resultado (ahí no hay nada que descartar: el dataset ya quedó ACTIVO).
+  const reiniciarAsistente = () => {
+    setArchivo(null)
+    setColumnas([])
+    setConfig({ nombre: '', codigo: '', descripcion: '' })
+    setErroresConfig({})
+    setResultado(null)
+    setMostrarErroresTecnicos(false)
+    setImportacionTrabajoId(null)
+    setExtraResultadoTrabajo(null)
+    setIntentoNumero(1)
+    setPaso('subir')
+  }
+
+  const crearOtroDashboard = () => {
+    reiniciarAsistente()
+    setError(null)
+  }
+
+  // "Cancelar creación": disponible desde cualquier paso mientras el dataset
+  // siga en BORRADOR. Si ya se activó (importación ya completada), no se
+  // descarta: se avisa y se redirige a empezar de cero igualmente.
+  const cancelarCreacion = async () => {
+    const datasetIdActual = resultado?.datasetId ?? null
+    if (
+      !window.confirm(
+        'Se descartará el dataset en borrador y sus datos temporales de esta importación. El archivo original no se modifica. ¿Continuar?',
+      )
+    ) {
+      return
+    }
+    let mensajeError: string | null = null
+    if (datasetIdActual !== null) {
+      try {
+        await descartarDatasetBorrador(datasetIdActual)
+      } catch {
+        mensajeError = 'Este dataset ya fue activado. Puedes archivarlo desde la pantalla de datasets.'
+      }
+    }
+    reiniciarAsistente()
+    setError(mensajeError)
   }
 
   const desmarcarDuplicadas = () => {
@@ -391,6 +465,11 @@ export function GuidedImportWizard() {
             <button type="button" className="btn btnPrimary" disabled={!archivo || analizando} onClick={analizar}>
               {analizando ? 'Analizando…' : 'Analizar archivo'}
             </button>
+            {resultado?.datasetId != null && (
+              <button type="button" className="btn btnDanger" onClick={cancelarCreacion}>
+                Cancelar creación
+              </button>
+            )}
           </div>
         </Card>
       )}
@@ -528,6 +607,11 @@ export function GuidedImportWizard() {
           importacionTrabajoId={importacionTrabajoId}
           onImportado={onImportadoDesdeTrabajo}
           onVolver={volverASubirDesdeCorreccion}
+          onVolverAColumnas={() => {
+            setImportacionTrabajoId(null)
+            setPaso('columnas')
+          }}
+          onCancelarCreacion={cancelarCreacion}
         />
       )}
 
@@ -555,6 +639,7 @@ export function GuidedImportWizard() {
         <ImportResultPanel
           resultado={resultado}
           onVolverAColumnas={() => setPaso('columnas')}
+          onCrearOtroDashboard={crearOtroDashboard}
           extra={extraResultadoTrabajo ?? undefined}
         />
       )}

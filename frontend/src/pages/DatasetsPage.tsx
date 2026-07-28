@@ -7,11 +7,25 @@ import { Card } from '../components/Card'
 import { DataTable } from '../components/DataTable'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { DatasetRowActions } from '../components/datasets/DatasetRowActions'
+import { DatasetBorradorRowActions } from '../components/datasets/DatasetBorradorRowActions'
 import styles from './DatasetsPage.module.css'
 
+// Datasets que el asistente guiado deja a medias (fallo o abandono antes de
+// importar con éxito): no son datasets utilizables todavía y no deben
+// mezclarse con el listado principal.
+function esBorrador(estadoDataset: string): boolean {
+  return estadoDataset !== 'ACTIVO'
+}
+
 export function DatasetsPage() {
-  const { data, loading, error, reload } = useApiResource((signal) => listarDatasets(signal), [])
+  // Se pide todo de una vez (incluidos los borradores) y se separa en el
+  // cliente: son pocos datasets (escala hospital/departamento), así que evita
+  // una segunda petición solo para la sección secundaria.
+  const { data, loading, error, reload } = useApiResource((signal) => listarDatasets(true, signal), [])
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
+
+  const datasetsActivos = (data ?? []).filter((d) => !esBorrador(d.estadoDataset))
+  const datasetsBorrador = (data ?? []).filter((d) => esBorrador(d.estadoDataset))
 
   return (
     <div className={styles.page}>
@@ -30,7 +44,7 @@ export function DatasetsPage() {
       <StateContainer
         loading={loading}
         error={error}
-        empty={data !== null && data.length === 0}
+        empty={data !== null && datasetsActivos.length === 0}
         emptyMessage="No hay datasets todavía. Crea el primero para empezar a definir campos y métricas."
         emptyAction={
           <Link className="btn btnPrimary" to="/datasets/nuevo">
@@ -53,11 +67,37 @@ export function DatasetsPage() {
                 ),
               },
             ]}
-            rows={data ?? []}
+            rows={datasetsActivos}
             getRowKey={(d) => d.id}
           />
         </Card>
       </StateContainer>
+
+      {datasetsBorrador.length > 0 && (
+        <details className={styles.borradores}>
+          <summary>Pruebas y borradores ({datasetsBorrador.length})</summary>
+          <p className={styles.intro}>
+            Datasets creados durante una importación guiada que no llegó a completarse. No son utilizables hasta
+            que se importen datos con éxito; puedes descartarlos si ya no los necesitas.
+          </p>
+          <DataTable
+            columns={[
+              { key: 'codigo', header: 'Código' },
+              { key: 'nombre', header: 'Nombre' },
+              { key: 'estadoDataset', header: 'Estado' },
+              {
+                key: 'acciones',
+                header: 'Acciones',
+                render: (d) => (
+                  <DatasetBorradorRowActions dataset={d} onError={setErrorAccion} onDescartado={reload} />
+                ),
+              },
+            ]}
+            rows={datasetsBorrador}
+            getRowKey={(d) => d.id}
+          />
+        </details>
+      )}
     </div>
   )
 }

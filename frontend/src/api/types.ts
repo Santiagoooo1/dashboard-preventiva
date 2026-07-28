@@ -75,6 +75,8 @@ export interface CatalogoFrontendResponseDto {
 
 // --- Fase 5.2: metadata de dataset ---
 
+export type EstadoDatasetClinico = 'BORRADOR' | 'VALIDANDO' | 'ACTIVO' | 'ARCHIVADO' | 'DESCARTADO'
+
 export interface DatasetClinicoResponseDto {
   id: number
   codigo: string
@@ -83,6 +85,7 @@ export interface DatasetClinicoResponseDto {
   hospitalId: number | null
   hospitalNombre: string | null
   activo: boolean
+  estadoDataset: EstadoDatasetClinico | string
 }
 
 export type TipoDato = 'TEXTO' | 'ENTERO' | 'DECIMAL' | 'FECHA' | 'BOOLEANO'
@@ -94,6 +97,8 @@ export interface DatasetClinicoRequestDto {
   nombre: string
   descripcion?: string | null
   hospitalId?: number | null
+  /** Opcional: si no se indica, el backend crea el dataset como ACTIVO. */
+  estadoDataset?: EstadoDatasetClinico | null
 }
 
 export interface CampoClinicoRequestDto {

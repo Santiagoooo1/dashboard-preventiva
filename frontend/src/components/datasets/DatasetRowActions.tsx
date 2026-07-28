@@ -46,7 +46,7 @@ export function DatasetRowActions({ dataset, onError, onEliminado }: DatasetRowA
         Paneles
       </Link>
       <Link className="btn btnAction" to={`/datasets/${dataset.id}/editar`}>
-        Editar
+        Editar datos básicos
       </Link>
       <button type="button" className="btn btnDanger" disabled={ocupado} onClick={archivar}>
         Archivar

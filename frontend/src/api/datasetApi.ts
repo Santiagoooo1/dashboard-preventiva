@@ -7,8 +7,14 @@ import type {
   DatasetFrontendMetadataResponseDto,
 } from './types'
 
-export function listarDatasets(signal?: AbortSignal): Promise<DatasetClinicoResponseDto[]> {
-  return apiGet<DatasetClinicoResponseDto[]>('/datasets-clinicos', signal)
+export function listarDatasets(
+  incluirBorradores = false,
+  signal?: AbortSignal,
+): Promise<DatasetClinicoResponseDto[]> {
+  return apiGet<DatasetClinicoResponseDto[]>(
+    `/datasets-clinicos?incluirBorradores=${incluirBorradores}`,
+    signal,
+  )
 }
 
 export function obtenerDataset(
@@ -35,6 +41,19 @@ export function actualizarDataset(
 
 export function eliminarDataset(id: string | number, signal?: AbortSignal): Promise<void> {
   return apiDelete(`/datasets-clinicos/${id}`, signal)
+}
+
+/** Promueve un dataset BORRADOR/VALIDANDO a ACTIVO (importación completada con éxito). */
+export function activarDataset(
+  id: string | number,
+  signal?: AbortSignal,
+): Promise<DatasetClinicoResponseDto> {
+  return apiPost<DatasetClinicoResponseDto>(`/datasets-clinicos/${id}/activar`, undefined, signal)
+}
+
+/** Borra un dataset BORRADOR/VALIDANDO y sus dependencias temporales. Rechaza si tiene registros reales. */
+export function descartarDatasetBorrador(id: string | number, signal?: AbortSignal): Promise<void> {
+  return apiDelete(`/datasets-clinicos/${id}/descartar-borrador`, signal)
 }
 
 export function listarCampos(

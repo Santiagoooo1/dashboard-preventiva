@@ -39,7 +39,7 @@ const PASOS: Paso[] = [
 ]
 
 export function HomePage() {
-  const { data, loading, error } = useApiResource((signal) => listarDatasets(signal), [])
+  const { data, loading, error } = useApiResource((signal) => listarDatasets(false, signal), [])
   const totalDatasets = data?.length ?? 0
   const hayDatasets = totalDatasets > 0
 

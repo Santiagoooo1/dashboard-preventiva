@@ -8,7 +8,9 @@ import com.preventiva.backend.dto.ErrorImportacionTrabajoDto;
 import com.preventiva.backend.dto.ExcluirSimilaresRequestDto;
 import com.preventiva.backend.dto.ImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.ImportarDesdeTrabajoResponseDto;
+import com.preventiva.backend.dto.NormalizarColumnaTrabajoRequestDto;
 import com.preventiva.backend.dto.PaginaFilasImportacionTrabajoResponseDto;
+import com.preventiva.backend.dto.RellenarColumnaTrabajoRequestDto;
 import com.preventiva.backend.dto.RevalidarImportacionTrabajoResponseDto;
 import com.preventiva.backend.service.interfaces.ImportacionTrabajoService;
 import lombok.RequiredArgsConstructor;
@@ -128,6 +130,49 @@ public class ImportacionTrabajoController {
             @PathVariable("numeroFila") Integer numeroFila,
             @PathVariable("columna") String columna) {
         return importacionTrabajoService.deshacerCorreccionCelda(id, numeroFila, columna);
+    }
+
+    // ---- Deshacer en bloque (Fase 6.8C.4) ----
+
+    @PostMapping("/{id}/filas/{numeroFila}/correcciones/deshacer-todas")
+    public RevalidarImportacionTrabajoResponseDto deshacerTodasLasCorreccionesDeFila(
+            @PathVariable("id") Long id,
+            @PathVariable("numeroFila") Integer numeroFila) {
+        return importacionTrabajoService.deshacerTodasLasCorreccionesDeFila(id, numeroFila);
+    }
+
+    @PostMapping("/{id}/correcciones/deshacer-todas")
+    public RevalidarImportacionTrabajoResponseDto deshacerTodasLasCorrecciones(@PathVariable("id") Long id) {
+        return importacionTrabajoService.deshacerTodasLasCorrecciones(id);
+    }
+
+    @PostMapping("/{id}/exclusiones/deshacer-todas")
+    public RevalidarImportacionTrabajoResponseDto deshacerTodasLasExclusiones(@PathVariable("id") Long id) {
+        return importacionTrabajoService.deshacerTodasLasExclusiones(id);
+    }
+
+    @PostMapping("/{id}/restaurar-original")
+    public RevalidarImportacionTrabajoResponseDto restaurarOriginal(@PathVariable("id") Long id) {
+        return importacionTrabajoService.restaurarOriginal(id);
+    }
+
+    // ---- Corrección asistida (Fase 6.8C.4) ----
+
+    @PostMapping("/{id}/correcciones/rellenar-columna")
+    public RevalidarImportacionTrabajoResponseDto rellenarColumna(
+            @PathVariable("id") Long id,
+            @RequestBody RellenarColumnaTrabajoRequestDto request) {
+        boolean soloConEsteProblema = request.getSoloFilasConEsteProblema() == null
+                || request.getSoloFilasConEsteProblema();
+        return importacionTrabajoService.rellenarColumna(
+                id, request.getNombreColumna(), request.getTipoError(), request.getValor(), soloConEsteProblema);
+    }
+
+    @PostMapping("/{id}/correcciones/normalizar-columna")
+    public RevalidarImportacionTrabajoResponseDto normalizarColumna(
+            @PathVariable("id") Long id,
+            @RequestBody NormalizarColumnaTrabajoRequestDto request) {
+        return importacionTrabajoService.normalizarColumna(id, request.getNombreColumna(), request.getEstrategia());
     }
 
     @PostMapping("/{id}/importar")

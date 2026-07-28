@@ -34,5 +34,23 @@ public interface ImportacionTrabajoService {
 
     RevalidarImportacionTrabajoResponseDto deshacerCorreccionCelda(Long id, Integer numeroFila, String columna);
 
+    // ---- Deshacer en bloque (Fase 6.8C.4) ----
+
+    RevalidarImportacionTrabajoResponseDto deshacerTodasLasCorreccionesDeFila(Long id, Integer numeroFila);
+
+    RevalidarImportacionTrabajoResponseDto deshacerTodasLasCorrecciones(Long id);
+
+    RevalidarImportacionTrabajoResponseDto deshacerTodasLasExclusiones(Long id);
+
+    /** Vacía correcciones y exclusiones a la vez; el archivo original y valoresOriginales no se tocan. */
+    RevalidarImportacionTrabajoResponseDto restaurarOriginal(Long id);
+
+    // ---- Corrección asistida (Fase 6.8C.4) ----
+
+    RevalidarImportacionTrabajoResponseDto rellenarColumna(
+            Long id, String nombreColumna, String tipoError, String valor, boolean soloFilasConEsteProblema);
+
+    RevalidarImportacionTrabajoResponseDto normalizarColumna(Long id, String nombreColumna, String estrategia);
+
     ImportarDesdeTrabajoResponseDto importarDesdeTrabajo(Long id);
 }

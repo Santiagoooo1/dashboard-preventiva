@@ -17,4 +17,6 @@ public interface MapeoCampoImportacionRepository extends JpaRepository<MapeoCamp
 
     Optional<MapeoCampoImportacion> findByPlantillaIdAndCampoClinicoIdAndActivoTrue(
             Long plantillaId, Long campoClinicoId);
+
+    void deleteByPlantillaId(Long plantillaId);
 }

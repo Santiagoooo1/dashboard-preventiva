@@ -8,4 +8,6 @@ import java.util.List;
 public interface ErrorImportacionGenericaRepository extends JpaRepository<ErrorImportacionGenerica, Long> {
 
     List<ErrorImportacionGenerica> findByImportacionGenericaId(Long importacionGenericaId);
+
+    void deleteByImportacionGenericaIdIn(List<Long> importacionGenericaIds);
 }

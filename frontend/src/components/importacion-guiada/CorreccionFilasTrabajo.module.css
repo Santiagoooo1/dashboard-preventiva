@@ -22,6 +22,24 @@
   margin: 0 0 var(--spacing-sm) 0;
 }
 
+.avisoAccionExitosa {
+  font-size: 0.85rem;
+  color: var(--color-success);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.cajaAdvertenciasCompacta {
+  background-color: rgba(108, 117, 125, 0.08);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.cajaAdvertenciasCompacta p {
+  margin: 0;
+}
+
 .filaBloque {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
@@ -115,4 +133,143 @@
   flex-wrap: wrap;
   align-items: center;
   margin-top: var(--spacing-md);
+}
+
+/* Estado principal (casos A-D) */
+.estadoTitulo {
+  font-weight: 600;
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.estadoPositivo {
+  background-color: rgba(25, 135, 84, 0.08);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.estadoBloqueante {
+  background-color: rgba(220, 53, 69, 0.06);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.notaAdvertencia {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: var(--spacing-xs) 0 0 0;
+}
+
+/* Secciones y grupos por problema */
+.seccion {
+  margin-bottom: var(--spacing-md);
+}
+
+.seccion h4 {
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.seccionColapsable {
+  margin-bottom: var(--spacing-md);
+}
+
+.seccionColapsable summary {
+  cursor: pointer;
+  font-weight: 600;
+  padding: var(--spacing-xs) 0;
+}
+
+.grupoProblema {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+}
+
+.grupoProblemaCabecera {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.grupoProblemaContador {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.grupoProblemaAcciones {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-sm);
+}
+
+/* Badges de severidad, reutilizados en el resumen por problema y en el
+   detalle por fila */
+.badgeErrorBloqueante,
+.badgeAdvertencia {
+  display: inline-block;
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.badgeErrorBloqueante {
+  background-color: var(--color-error);
+  color: #fff;
+}
+
+.badgeAdvertencia {
+  background-color: rgba(255, 193, 7, 0.2);
+  color: #7a5b00;
+}
+
+/* Correcciones sugeridas (dentro de un grupo por problema) */
+.correccionesSugeridas {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px dashed var(--color-border);
+}
+
+.correccionesSugeridasTitulo {
+  font-weight: 600;
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 0.9rem;
+}
+
+/* Acciones globales de deshacer (arriba del panel) */
+.accionesGlobales {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Identificadores de fila (HC, servicio, procedimiento...) */
+.identificadoresFila {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--spacing-sm) 0;
+}
+
+.editorCeldaContenedor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.avisoVacio {
+  font-size: 0.78rem;
+  color: var(--color-error);
+  margin: 0;
 }

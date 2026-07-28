@@ -142,6 +142,97 @@ export function deshacerCorreccionCeldaImportacionTrabajo(
   )
 }
 
+// ---- Deshacer en bloque (Fase 6.8C.4) ----
+
+export function deshacerTodasLasCorreccionesDeFila(
+  id: string | number,
+  numeroFila: number,
+  signal?: AbortSignal,
+): Promise<RevalidarImportacionTrabajoResponseDto> {
+  return apiPost<RevalidarImportacionTrabajoResponseDto>(
+    `/importaciones-trabajo/${id}/filas/${numeroFila}/correcciones/deshacer-todas`,
+    undefined,
+    signal,
+  )
+}
+
+export function deshacerTodasLasCorrecciones(
+  id: string | number,
+  signal?: AbortSignal,
+): Promise<RevalidarImportacionTrabajoResponseDto> {
+  return apiPost<RevalidarImportacionTrabajoResponseDto>(
+    `/importaciones-trabajo/${id}/correcciones/deshacer-todas`,
+    undefined,
+    signal,
+  )
+}
+
+export function deshacerTodasLasExclusiones(
+  id: string | number,
+  signal?: AbortSignal,
+): Promise<RevalidarImportacionTrabajoResponseDto> {
+  return apiPost<RevalidarImportacionTrabajoResponseDto>(
+    `/importaciones-trabajo/${id}/exclusiones/deshacer-todas`,
+    undefined,
+    signal,
+  )
+}
+
+/** Vacía correcciones y exclusiones a la vez. No modifica el archivo original. */
+export function restaurarOriginalImportacionTrabajo(
+  id: string | number,
+  signal?: AbortSignal,
+): Promise<RevalidarImportacionTrabajoResponseDto> {
+  return apiPost<RevalidarImportacionTrabajoResponseDto>(
+    `/importaciones-trabajo/${id}/restaurar-original`,
+    undefined,
+    signal,
+  )
+}
+
+// ---- Corrección asistida (Fase 6.8C.4) ----
+
+export interface RellenarColumnaParams {
+  nombreColumna: string
+  /** Si se indica, solo se rellenan filas cuyo error activo coincida con este tipo. */
+  tipoError?: string
+  valor: string
+  /** Por defecto true: solo filas con un error activo en esta columna. */
+  soloFilasConEsteProblema?: boolean
+}
+
+export function rellenarColumnaImportacionTrabajo(
+  id: string | number,
+  params: RellenarColumnaParams,
+  signal?: AbortSignal,
+): Promise<RevalidarImportacionTrabajoResponseDto> {
+  return apiPost<RevalidarImportacionTrabajoResponseDto>(
+    `/importaciones-trabajo/${id}/correcciones/rellenar-columna`,
+    {
+      nombreColumna: params.nombreColumna,
+      tipoError: params.tipoError ?? null,
+      valor: params.valor,
+      soloFilasConEsteProblema: params.soloFilasConEsteProblema ?? true,
+    },
+    signal,
+  )
+}
+
+export type EstrategiaNormalizacion = 'FECHA' | 'BOOLEANO' | 'NUMERO' | 'TEXTO_TRIM'
+
+export function normalizarColumnaImportacionTrabajo(
+  id: string | number,
+  nombreColumna: string,
+  estrategia: EstrategiaNormalizacion,
+  signal?: AbortSignal,
+): Promise<RevalidarImportacionTrabajoResponseDto> {
+  return apiPost<RevalidarImportacionTrabajoResponseDto>(
+    `/importaciones-trabajo/${id}/correcciones/normalizar-columna`,
+    { nombreColumna, estrategia },
+    signal,
+  )
+}
+
 export function importarDesdeTrabajo(
   id: string | number,
   signal?: AbortSignal,

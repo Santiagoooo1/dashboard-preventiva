@@ -1,5 +1,6 @@
 package com.preventiva.backend.entity;
 
+import com.preventiva.backend.enums.EstadoDatasetClinico;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -32,4 +33,11 @@ public class DatasetClinico {
     @Column(nullable = false)
     @Builder.Default
     private Boolean activo = true;
+
+    // Nula en filas creadas antes de esta columna: se trata como ACTIVO en el
+    // servicio, así que no hace falta backfill ni columna NOT NULL con
+    // ddl-auto=update.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_dataset", length = 20)
+    private EstadoDatasetClinico estadoDataset;
 }

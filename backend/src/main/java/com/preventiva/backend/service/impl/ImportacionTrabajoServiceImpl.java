@@ -351,6 +351,210 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
     }
 
     // ------------------------------------------------------------------
+    // Deshacer en bloque (Fase 6.8C.4): ninguno de estos métodos toca
+    // contenidoArchivo ni valoresOriginales, solo el estado mutable de cada
+    // fila (valoresCorregidos / excluida).
+    // ------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto deshacerTodasLasCorreccionesDeFila(Long id, Integer numeroFila) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        FilaImportacionTrabajo fila = obtenerFilaOLanzar(id, numeroFila);
+        fila.setValoresCorregidos(new HashMap<>());
+
+        return revalidarYResumir(trabajo);
+    }
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto deshacerTodasLasCorrecciones(Long id) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        List<FilaImportacionTrabajo> filas =
+                filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+        for (FilaImportacionTrabajo fila : filas) {
+            fila.setValoresCorregidos(new HashMap<>());
+        }
+
+        return revalidarYResumir(trabajo);
+    }
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto deshacerTodasLasExclusiones(Long id) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        List<FilaImportacionTrabajo> filas =
+                filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+        for (FilaImportacionTrabajo fila : filas) {
+            fila.setExcluida(false);
+        }
+
+        return revalidarYResumir(trabajo);
+    }
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto restaurarOriginal(Long id) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        List<FilaImportacionTrabajo> filas =
+                filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+        for (FilaImportacionTrabajo fila : filas) {
+            fila.setValoresCorregidos(new HashMap<>());
+            fila.setExcluida(false);
+        }
+
+        return revalidarYResumir(trabajo);
+    }
+
+    // ------------------------------------------------------------------
+    // Corrección asistida (Fase 6.8C.4)
+    // ------------------------------------------------------------------
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto rellenarColumna(
+            Long id, String nombreColumna, String tipoError, String valor, boolean soloFilasConEsteProblema) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+
+        if (valor == null || valor.isBlank()) {
+            throw new IllegalArgumentException("Debes indicar un valor para rellenar la columna.");
+        }
+        exigirColumnaConocidaPorNombre(trabajo, nombreColumna);
+
+        List<FilaImportacionTrabajo> filas =
+                filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+
+        for (FilaImportacionTrabajo fila : filas) {
+            if (Boolean.TRUE.equals(fila.getExcluida())) {
+                continue;
+            }
+
+            boolean coincide = !soloFilasConEsteProblema || tieneErrorActivo(fila, nombreColumna, tipoError);
+            if (!coincide) {
+                continue;
+            }
+
+            Map<String, String> corregidos = fila.getValoresCorregidos() != null
+                    ? new HashMap<>(fila.getValoresCorregidos())
+                    : new HashMap<>();
+            corregidos.put(nombreColumna, valor);
+            fila.setValoresCorregidos(corregidos);
+        }
+
+        return revalidarYResumir(trabajo);
+    }
+
+    @Override
+    @Transactional
+    public RevalidarImportacionTrabajoResponseDto normalizarColumna(Long id, String nombreColumna, String estrategia) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        exigirEditable(trabajo);
+        exigirColumnaConocidaPorNombre(trabajo, nombreColumna);
+
+        List<FilaImportacionTrabajo> filas =
+                filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+
+        for (FilaImportacionTrabajo fila : filas) {
+            if (Boolean.TRUE.equals(fila.getExcluida())) {
+                continue;
+            }
+
+            String valorEfectivo = valorEfectivo(fila, nombreColumna);
+            String normalizado = normalizarValor(valorEfectivo, estrategia);
+            if (normalizado == null || normalizado.equals(valorEfectivo)) {
+                continue;
+            }
+
+            Map<String, String> corregidos = fila.getValoresCorregidos() != null
+                    ? new HashMap<>(fila.getValoresCorregidos())
+                    : new HashMap<>();
+            corregidos.put(nombreColumna, normalizado);
+            fila.setValoresCorregidos(corregidos);
+        }
+
+        return revalidarYResumir(trabajo);
+    }
+
+    private boolean tieneErrorActivo(FilaImportacionTrabajo fila, String nombreColumna, String tipoError) {
+        if (fila.getErroresActuales() == null) {
+            return false;
+        }
+        return fila.getErroresActuales().stream().anyMatch(e ->
+                nombreColumna.equals(e.getNombreColumna()) && (tipoError == null || tipoError.equals(e.getTipoError())));
+    }
+
+    private void exigirColumnaConocidaPorNombre(ImportacionTrabajo trabajo, String columna) {
+        if (columna == null || columna.isBlank()) {
+            throw new IllegalArgumentException("Debes indicar la columna.");
+        }
+        List<MapeoCampoImportacion> mapeos =
+                mapeoCampoImportacionRepository.findByPlantillaIdAndActivoTrue(trabajo.getPlantilla().getId());
+        boolean enMapeos = mapeos.stream().anyMatch(m -> columna.equals(m.getNombreColumnaOrigen()));
+        if (!enMapeos) {
+            throw new IllegalArgumentException("La columna '" + columna + "' no existe en esta importación.");
+        }
+    }
+
+    /**
+     * Normaliza un valor según la estrategia elegida. Devuelve null si el
+     * valor está vacío o no se reconoce (en cuyo caso la fila no se toca:
+     * mejor dejar el error visible que adivinar un dato clínico).
+     */
+    private String normalizarValor(String valorOriginal, String estrategia) {
+        if (valorOriginal == null || valorOriginal.isBlank()) {
+            return null;
+        }
+        String valor = valorOriginal.trim();
+        return switch (estrategia) {
+            case "TEXTO_TRIM" -> valor.replaceAll("\\s+", " ");
+            case "NUMERO" -> valor.replace(",", ".");
+            case "BOOLEANO" -> normalizarBooleano(valor);
+            case "FECHA" -> normalizarFecha(valor);
+            default -> null;
+        };
+    }
+
+    private String normalizarBooleano(String valor) {
+        String normalizado = TextNormalizer.normalize(valor);
+        if (CampoClinicoValueEvaluator.VALORES_VERDADEROS.contains(normalizado)) {
+            return "SI";
+        }
+        if (CampoClinicoValueEvaluator.VALORES_FALSOS.contains(normalizado)) {
+            return "NO";
+        }
+        return null;
+    }
+
+    private String normalizarFecha(String valor) {
+        for (java.time.format.DateTimeFormatter formato : FORMATOS_FECHA_NORMALIZAR) {
+            try {
+                return java.time.LocalDate.parse(valor, formato).format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
+            } catch (java.time.format.DateTimeParseException ignored) {
+                // Probamos el siguiente formato.
+            }
+        }
+        return null;
+    }
+
+    private static final List<java.time.format.DateTimeFormatter> FORMATOS_FECHA_NORMALIZAR = List.of(
+            java.time.format.DateTimeFormatter.ofPattern("d/M/yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("d-M-yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+            java.time.format.DateTimeFormatter.ofPattern("d/M/yy"),
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM/yy"),
+            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE);
+
+    // ------------------------------------------------------------------
     // Importar desde la copia interna
     // ------------------------------------------------------------------
 

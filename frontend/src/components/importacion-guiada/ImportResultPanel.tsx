@@ -14,6 +14,8 @@ interface ImportResultPanelProps {
   resultado: ResultadoAsistente
   /** Vuelve al paso Columnas conservando archivo y configuración (dataset parcial). */
   onVolverAColumnas?: () => void
+  /** Reinicia el asistente desde cero para crear otro dashboard. */
+  onCrearOtroDashboard?: () => void
   /** Presente cuando la importación se hizo desde una copia de trabajo corregida en la app. */
   extra?: { filasExcluidas: number; resumen: string }
 }
@@ -28,7 +30,12 @@ function mensajeAmable(estado: string): string {
   return 'La importación no se ha completado.'
 }
 
-export function ImportResultPanel({ resultado, onVolverAColumnas, extra }: ImportResultPanelProps) {
+export function ImportResultPanel({
+  resultado,
+  onVolverAColumnas,
+  onCrearOtroDashboard,
+  extra,
+}: ImportResultPanelProps) {
   const { importacion, validacionFilas, datasetId, error, pasoFallido } = resultado
   const huboExito = importacion !== null && importacion.estado !== 'RECHAZADA'
   const { mensaje: mensajeFallo, detalleTecnico } = mensajeAmableFallo(pasoFallido, error)
@@ -116,6 +123,14 @@ export function ImportResultPanel({ resultado, onVolverAColumnas, extra }: Impor
             </Link>
             <Link className="btn btnSecondary" to={`/datasets/${datasetId}`}>
               Configuración avanzada
+            </Link>
+            {onCrearOtroDashboard && (
+              <button type="button" className="btn btnSecondary" onClick={onCrearOtroDashboard}>
+                Crear otro dashboard
+              </button>
+            )}
+            <Link className="btn btnSecondary" to="/datasets">
+              Ir a datasets
             </Link>
           </>
         )}
