@@ -28,6 +28,7 @@ import com.preventiva.backend.repository.MapeoCampoImportacionRepository;
 import com.preventiva.backend.repository.PlantillaImportacionRepository;
 import com.preventiva.backend.repository.RegistroClinicoGenericoRepository;
 import com.preventiva.backend.service.interfaces.ImportacionTrabajoService;
+import com.preventiva.backend.service.interfaces.TrazabilidadImportacionTrabajoService;
 import com.preventiva.backend.util.CampoClinicoValueEvaluator;
 import com.preventiva.backend.util.RegistroClinicoGenericoBuilder;
 import com.preventiva.backend.util.TextNormalizer;
@@ -48,6 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -76,6 +78,7 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
     private final ImportacionGenericaRepository importacionGenericaRepository;
     private final ErrorImportacionGenericaRepository errorImportacionGenericaRepository;
     private final RegistroClinicoGenericoRepository registroClinicoGenericoRepository;
+    private final TrazabilidadImportacionTrabajoService trazabilidadService;
 
     private final DataFormatter dataFormatter = new DataFormatter();
 
@@ -130,6 +133,9 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
                 // El archivo original se conserva como referencia inmutable;
                 // las correcciones se guardan aparte.
                 .contenidoArchivo(contenido)
+                // Calculado una única vez aquí, nunca se recalcula: sirve para
+                // demostrar que las correcciones no tocan el archivo original.
+                .hashArchivoOriginal(calcularHashSha256(contenido))
                 .origen(WorkbookLoader.esCsv(archivo) ? OrigenImportacion.CSV : OrigenImportacion.EXCEL)
                 .indiceHoja(indiceHojaEfectivo)
                 .filaCabecera(filaCabeceraEfectiva)
@@ -161,10 +167,28 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         filaImportacionTrabajoRepository.saveAll(filas);
 
         ImportacionTrabajoResponseDto resumen = construirResumen(trabajo, filas);
+        trazabilidadService.registrarCopiaCreada(trabajo, resumen);
+
         return CrearImportacionTrabajoResponseDto.builder()
                 .importacionTrabajo(resumen)
                 .resumen(textoResumen(resumen))
                 .build();
+    }
+
+    private String calcularHashSha256(byte[] contenido) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(contenido);
+            StringBuilder hex = new StringBuilder(hash.length * 2);
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            // No debería ocurrir (SHA-256 siempre está disponible en la JVM); si
+            // pasara, mejor una copia sin hash que una creación rota.
+            return null;
+        }
     }
 
     // ------------------------------------------------------------------
@@ -241,6 +265,7 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         filaImportacionTrabajoRepository.saveAll(filas);
 
         ImportacionTrabajoResponseDto resumen = construirResumen(trabajo, filas);
+        trazabilidadService.registrarRevalidacion(trabajo, resumen);
         return RevalidarImportacionTrabajoResponseDto.builder()
                 .importacionTrabajo(resumen)
                 .resumen(textoResumen(resumen))
@@ -258,6 +283,7 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
 
         trabajo.setEstado(EstadoImportacionTrabajo.DESCARTADA);
         importacionTrabajoRepository.save(trabajo);
+        trazabilidadService.registrarCopiaDescartada(trabajo);
     }
 
     // ------------------------------------------------------------------
@@ -280,7 +306,13 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         FilaImportacionTrabajo fila = obtenerFilaOLanzar(id, numeroFila);
         fila.setExcluida(excluida);
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        if (Boolean.TRUE.equals(excluida)) {
+            trazabilidadService.registrarFilaExcluida(trabajo, fila, resultado.getImportacionTrabajo());
+        } else {
+            trazabilidadService.registrarFilaIncluida(trabajo, numeroFila, resultado.getImportacionTrabajo());
+        }
+        return resultado;
     }
 
     @Override
@@ -297,6 +329,7 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         List<FilaImportacionTrabajo> filas =
                 filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
 
+        List<Integer> filasAfectadas = new ArrayList<>();
         // "Similar" en sentido estricto: mismo tipoError y misma nombreColumna.
         for (FilaImportacionTrabajo fila : filas) {
             if (Boolean.TRUE.equals(fila.getExcluida()) || fila.getErroresActuales() == null) {
@@ -306,10 +339,14 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
                     tipoError.equals(e.getTipoError()) && nombreColumna.equals(e.getNombreColumna()));
             if (coincide) {
                 fila.setExcluida(true);
+                filasAfectadas.add(fila.getNumeroFilaOriginal());
             }
         }
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        trazabilidadService.registrarFilasSimilaresExcluidas(
+                trabajo, tipoError, nombreColumna, filasAfectadas, resultado.getImportacionTrabajo());
+        return resultado;
     }
 
     @Override
@@ -322,6 +359,8 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         FilaImportacionTrabajo fila = obtenerFilaOLanzar(id, numeroFila);
         exigirColumnaConocida(trabajo, fila, columna);
 
+        String valorAnterior = valorEfectivo(fila, columna);
+
         // Mapa nuevo para que Hibernate detecte el cambio en la columna JSONB.
         Map<String, String> corregidos = fila.getValoresCorregidos() != null
                 ? new HashMap<>(fila.getValoresCorregidos())
@@ -329,7 +368,10 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         corregidos.put(columna, valor);
         fila.setValoresCorregidos(corregidos);
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        trazabilidadService.registrarCeldaCorregida(
+                trabajo, numeroFila, columna, valorAnterior, valor, resultado.getImportacionTrabajo());
+        return resultado;
     }
 
     @Override
@@ -342,9 +384,16 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         FilaImportacionTrabajo fila = obtenerFilaOLanzar(id, numeroFila);
 
         if (fila.getValoresCorregidos() != null && fila.getValoresCorregidos().containsKey(columna)) {
+            String valorAnterior = fila.getValoresCorregidos().get(columna);
             Map<String, String> corregidos = new HashMap<>(fila.getValoresCorregidos());
             corregidos.remove(columna);
             fila.setValoresCorregidos(corregidos);
+
+            String valorNuevo = fila.getValoresOriginales() != null ? fila.getValoresOriginales().get(columna) : null;
+            RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+            trazabilidadService.registrarCorreccionCeldaDeshecha(
+                    trabajo, numeroFila, columna, valorAnterior, valorNuevo, resultado.getImportacionTrabajo());
+            return resultado;
         }
 
         return revalidarYResumir(trabajo);
@@ -363,9 +412,15 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         exigirEditable(trabajo);
 
         FilaImportacionTrabajo fila = obtenerFilaOLanzar(id, numeroFila);
+        List<String> columnasAfectadas = fila.getValoresCorregidos() != null
+                ? new ArrayList<>(fila.getValoresCorregidos().keySet())
+                : List.of();
         fila.setValoresCorregidos(new HashMap<>());
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        trazabilidadService.registrarCorreccionesFilaDeshechas(
+                trabajo, numeroFila, columnasAfectadas, resultado.getImportacionTrabajo());
+        return resultado;
     }
 
     @Override
@@ -376,11 +431,21 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
 
         List<FilaImportacionTrabajo> filas =
                 filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+        int totalCorreccionesEliminadas = 0;
+        int filasAfectadas = 0;
         for (FilaImportacionTrabajo fila : filas) {
+            int tamano = fila.getValoresCorregidos() != null ? fila.getValoresCorregidos().size() : 0;
+            if (tamano > 0) {
+                totalCorreccionesEliminadas += tamano;
+                filasAfectadas++;
+            }
             fila.setValoresCorregidos(new HashMap<>());
         }
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        trazabilidadService.registrarTodasCorreccionesDeshechas(
+                trabajo, totalCorreccionesEliminadas, filasAfectadas, resultado.getImportacionTrabajo());
+        return resultado;
     }
 
     @Override
@@ -391,11 +456,18 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
 
         List<FilaImportacionTrabajo> filas =
                 filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+        int totalFilasReincluidas = 0;
         for (FilaImportacionTrabajo fila : filas) {
+            if (Boolean.TRUE.equals(fila.getExcluida())) {
+                totalFilasReincluidas++;
+            }
             fila.setExcluida(false);
         }
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        trazabilidadService.registrarTodasExclusionesDeshechas(
+                trabajo, totalFilasReincluidas, resultado.getImportacionTrabajo());
+        return resultado;
     }
 
     @Override
@@ -406,12 +478,27 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
 
         List<FilaImportacionTrabajo> filas =
                 filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
+        int totalCorreccionesEliminadas = 0;
+        int totalExclusionesEliminadas = 0;
+        int totalFilasAfectadas = 0;
         for (FilaImportacionTrabajo fila : filas) {
+            int correccionesFila = fila.getValoresCorregidos() != null ? fila.getValoresCorregidos().size() : 0;
+            boolean estabaExcluida = Boolean.TRUE.equals(fila.getExcluida());
+            if (correccionesFila > 0 || estabaExcluida) {
+                totalFilasAfectadas++;
+            }
+            totalCorreccionesEliminadas += correccionesFila;
+            if (estabaExcluida) {
+                totalExclusionesEliminadas++;
+            }
             fila.setValoresCorregidos(new HashMap<>());
             fila.setExcluida(false);
         }
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        trazabilidadService.registrarCopiaRestauradaOriginal(trabajo, totalCorreccionesEliminadas,
+                totalExclusionesEliminadas, totalFilasAfectadas, resultado.getImportacionTrabajo());
+        return resultado;
     }
 
     // ------------------------------------------------------------------
@@ -433,6 +520,7 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         List<FilaImportacionTrabajo> filas =
                 filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
 
+        List<Integer> filasAfectadas = new ArrayList<>();
         for (FilaImportacionTrabajo fila : filas) {
             if (Boolean.TRUE.equals(fila.getExcluida())) {
                 continue;
@@ -448,9 +536,13 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
                     : new HashMap<>();
             corregidos.put(nombreColumna, valor);
             fila.setValoresCorregidos(corregidos);
+            filasAfectadas.add(fila.getNumeroFilaOriginal());
         }
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        trazabilidadService.registrarColumnaRellenada(trabajo, nombreColumna, valor, tipoError,
+                soloFilasConEsteProblema, filasAfectadas, resultado.getImportacionTrabajo());
+        return resultado;
     }
 
     @Override
@@ -463,6 +555,8 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         List<FilaImportacionTrabajo> filas =
                 filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
 
+        List<Integer> filasAfectadas = new ArrayList<>();
+        List<TrazabilidadImportacionTrabajoService.EjemploValor> ejemplos = new ArrayList<>();
         for (FilaImportacionTrabajo fila : filas) {
             if (Boolean.TRUE.equals(fila.getExcluida())) {
                 continue;
@@ -479,9 +573,17 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
                     : new HashMap<>();
             corregidos.put(nombreColumna, normalizado);
             fila.setValoresCorregidos(corregidos);
+            filasAfectadas.add(fila.getNumeroFilaOriginal());
+            if (ejemplos.size() < 3) {
+                ejemplos.add(new TrazabilidadImportacionTrabajoService.EjemploValor(
+                        fila.getNumeroFilaOriginal(), valorEfectivo, normalizado));
+            }
         }
 
-        return revalidarYResumir(trabajo);
+        RevalidarImportacionTrabajoResponseDto resultado = revalidarYResumir(trabajo);
+        trazabilidadService.registrarColumnaNormalizada(
+                trabajo, nombreColumna, estrategia, filasAfectadas, ejemplos, resultado.getImportacionTrabajo());
+        return resultado;
     }
 
     private boolean tieneErrorActivo(FilaImportacionTrabajo fila, String nombreColumna, String tipoError) {
@@ -645,6 +747,8 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         filaImportacionTrabajoRepository.saveAll(filas);
 
         ImportacionTrabajoResponseDto resumenTrabajo = construirResumen(trabajo, filas);
+        trazabilidadService.registrarImportacionRealizada(
+                trabajo, importacion, filasImportadas, filasExcluidas, advertencias.size());
 
         return ImportarDesdeTrabajoResponseDto.builder()
                 .importacionTrabajo(resumenTrabajo)
@@ -1072,6 +1176,7 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
                 .datasetId(trabajo.getDataset().getId())
                 .plantillaId(trabajo.getPlantilla().getId())
                 .nombreArchivoOriginal(trabajo.getNombreArchivoOriginal())
+                .hashArchivoOriginal(trabajo.getHashArchivoOriginal())
                 .origen(trabajo.getOrigen() != null ? trabajo.getOrigen().name() : null)
                 .indiceHoja(trabajo.getIndiceHoja())
                 .filaCabecera(trabajo.getFilaCabecera())

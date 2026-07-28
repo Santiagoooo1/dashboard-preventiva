@@ -11,6 +11,7 @@ import com.preventiva.backend.enums.EstadoDatasetClinico;
 import com.preventiva.backend.repository.CampoClinicoRepository;
 import com.preventiva.backend.repository.DatasetClinicoRepository;
 import com.preventiva.backend.repository.ErrorImportacionGenericaRepository;
+import com.preventiva.backend.repository.EventoImportacionTrabajoRepository;
 import com.preventiva.backend.repository.HospitalRepository;
 import com.preventiva.backend.repository.ImportacionGenericaRepository;
 import com.preventiva.backend.repository.ImportacionTrabajoRepository;
@@ -19,6 +20,7 @@ import com.preventiva.backend.repository.MapeoCampoImportacionRepository;
 import com.preventiva.backend.repository.PlantillaImportacionRepository;
 import com.preventiva.backend.repository.RegistroClinicoGenericoRepository;
 import com.preventiva.backend.service.interfaces.DatasetClinicoService;
+import com.preventiva.backend.service.interfaces.TrazabilidadImportacionTrabajoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,8 @@ public class DatasetClinicoServiceImpl implements DatasetClinicoService {
     private final ImportacionGenericaRepository importacionGenericaRepository;
     private final ErrorImportacionGenericaRepository errorImportacionGenericaRepository;
     private final RegistroClinicoGenericoRepository registroClinicoGenericoRepository;
+    private final EventoImportacionTrabajoRepository eventoImportacionTrabajoRepository;
+    private final TrazabilidadImportacionTrabajoService trazabilidadService;
 
     @Override
     public List<DatasetClinicoResponseDto> listar(boolean incluirBorradores) {
@@ -108,8 +112,22 @@ public class DatasetClinicoServiceImpl implements DatasetClinicoService {
     @Override
     public DatasetClinicoResponseDto activar(Long id) {
         DatasetClinico dataset = obtenerDatasetOLanzar(id);
+        String estadoAnterior = dataset.getEstadoDataset() != null
+                ? dataset.getEstadoDataset().name()
+                : EstadoDatasetClinico.ACTIVO.name();
         dataset.setEstadoDataset(EstadoDatasetClinico.ACTIVO);
-        return mapToDto(datasetClinicoRepository.save(dataset));
+        DatasetClinicoResponseDto resultado = mapToDto(datasetClinicoRepository.save(dataset));
+
+        // Solo se registra si hay una copia de trabajo que efectivamente
+        // terminó en importación: si el dataset se activó por otra vía (o no
+        // hay ninguna ImportacionTrabajo asociada), no se fuerza el evento.
+        importacionTrabajoRepository.findByDatasetId(id).stream()
+                .filter(t -> t.getEstado() == com.preventiva.backend.enums.EstadoImportacionTrabajo.IMPORTADA)
+                .findFirst()
+                .ifPresent(trabajo -> trazabilidadService.registrarDatasetActivado(
+                        trabajo, id, estadoAnterior, EstadoDatasetClinico.ACTIVO.name()));
+
+        return resultado;
     }
 
     @Override
@@ -128,9 +146,14 @@ public class DatasetClinicoServiceImpl implements DatasetClinicoService {
                     "Este dataset ya tiene registros importados; no puede descartarse como borrador.");
         }
 
+        // Decisión (Fase 6.8D.1): al borrar el borrador en cascada, sus eventos
+        // de trazabilidad también se borran. No tiene sentido conservar un
+        // evento BORRADOR_DESCARTADO que desaparecería en la misma
+        // transacción, así que ese tipo de evento no se registra aquí.
         List<ImportacionTrabajo> trabajos = importacionTrabajoRepository.findByDatasetId(id);
         if (!trabajos.isEmpty()) {
             List<Long> idsTrabajos = trabajos.stream().map(ImportacionTrabajo::getId).toList();
+            eventoImportacionTrabajoRepository.deleteByImportacionTrabajoIdIn(idsTrabajos);
             filaImportacionTrabajoRepository.deleteByImportacionTrabajoIdIn(idsTrabajos);
             importacionTrabajoRepository.deleteAll(trabajos);
         }

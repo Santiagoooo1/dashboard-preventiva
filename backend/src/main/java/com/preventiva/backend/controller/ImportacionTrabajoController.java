@@ -12,7 +12,10 @@ import com.preventiva.backend.dto.NormalizarColumnaTrabajoRequestDto;
 import com.preventiva.backend.dto.PaginaFilasImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.RellenarColumnaTrabajoRequestDto;
 import com.preventiva.backend.dto.RevalidarImportacionTrabajoResponseDto;
+import com.preventiva.backend.dto.ResumenTrazabilidadImportacionTrabajoDto;
+import com.preventiva.backend.dto.TrazabilidadImportacionTrabajoResponseDto;
 import com.preventiva.backend.service.interfaces.ImportacionTrabajoService;
+import com.preventiva.backend.service.interfaces.TrazabilidadImportacionTrabajoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,6 +28,7 @@ import java.util.List;
 public class ImportacionTrabajoController {
 
     private final ImportacionTrabajoService importacionTrabajoService;
+    private final TrazabilidadImportacionTrabajoService trazabilidadService;
 
     @PostMapping
     public CrearImportacionTrabajoResponseDto crear(
@@ -178,5 +182,17 @@ public class ImportacionTrabajoController {
     @PostMapping("/{id}/importar")
     public ImportarDesdeTrabajoResponseDto importarDesdeTrabajo(@PathVariable("id") Long id) {
         return importacionTrabajoService.importarDesdeTrabajo(id);
+    }
+
+    // ---- Trazabilidad (Fase 6.8D.1) ----
+
+    @GetMapping("/{id}/trazabilidad")
+    public TrazabilidadImportacionTrabajoResponseDto obtenerTrazabilidad(@PathVariable("id") Long id) {
+        return trazabilidadService.obtenerTrazabilidad(id);
+    }
+
+    @GetMapping("/{id}/trazabilidad/resumen")
+    public ResumenTrazabilidadImportacionTrabajoDto obtenerResumenTrazabilidad(@PathVariable("id") Long id) {
+        return trazabilidadService.obtenerResumen(id);
     }
 }

@@ -2,10 +2,12 @@ package com.preventiva.backend.controller;
 
 import com.preventiva.backend.dto.ErrorImportacionGenericaResponseDto;
 import com.preventiva.backend.dto.ImportacionGenericaResponseDto;
+import com.preventiva.backend.dto.TrazabilidadImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.ValidacionFilasImportacionGenericaResponseDto;
 import com.preventiva.backend.dto.ValidacionImportacionGenericaResponseDto;
 import com.preventiva.backend.service.interfaces.ImportacionGenericaService;
 import com.preventiva.backend.service.interfaces.ImportacionGenericaValidationService;
+import com.preventiva.backend.service.interfaces.TrazabilidadImportacionTrabajoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,6 +21,7 @@ public class ImportacionGenericaController {
 
     private final ImportacionGenericaValidationService validationService;
     private final ImportacionGenericaService importacionGenericaService;
+    private final TrazabilidadImportacionTrabajoService trazabilidadService;
 
     @PostMapping("/validar")
     public ValidacionImportacionGenericaResponseDto validar(
@@ -55,5 +58,16 @@ public class ImportacionGenericaController {
     @GetMapping("/{id}/errores")
     public List<ErrorImportacionGenericaResponseDto> listarErrores(@PathVariable("id") Long id) {
         return importacionGenericaService.listarErrores(id);
+    }
+
+    /**
+     * Trazabilidad de la copia de trabajo que produjo esta importación
+     * genérica (Fase 6.8D.1). Solo existe si la importación se hizo desde
+     * /api/importaciones-trabajo/{id}/importar; si el archivo se importó
+     * directamente, no hay copia de trabajo asociada y este endpoint lanza 404.
+     */
+    @GetMapping("/{id}/trazabilidad")
+    public TrazabilidadImportacionTrabajoResponseDto obtenerTrazabilidad(@PathVariable("id") Long id) {
+        return trazabilidadService.obtenerTrazabilidadPorImportacionGenerica(id);
     }
 }

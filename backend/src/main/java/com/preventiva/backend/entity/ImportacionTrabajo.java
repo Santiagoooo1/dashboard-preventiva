@@ -46,6 +46,13 @@ public class ImportacionTrabajo {
     @Column(name = "contenido_archivo", columnDefinition = "bytea", nullable = false)
     private byte[] contenidoArchivo;
 
+    // SHA-256 en hexadecimal de contenidoArchivo, calculado una única vez al
+    // crear la copia (Fase 6.8D.1). Sirve para demostrar que las correcciones
+    // posteriores no tocan el archivo original. Nullable: las copias creadas
+    // antes de este campo no tienen hash retroactivo.
+    @Column(name = "hash_archivo_original", length = 64)
+    private String hashArchivoOriginal;
+
     @Enumerated(EnumType.STRING)
     @Column(length = 20)
     private OrigenImportacion origen;
