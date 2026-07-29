@@ -71,6 +71,7 @@ export function GuidedImportWizard() {
   const [extraResultadoTrabajo, setExtraResultadoTrabajo] = useState<{
     filasExcluidas: number
     resumen: string
+    importacionTrabajoId: number
   } | null>(null)
 
   // Código base sugerido (sin sufijo) e intento actual: en cada revalidación se
@@ -315,7 +316,11 @@ export function GuidedImportWizard() {
       pasoFallido: null,
       error: null,
     }))
-    setExtraResultadoTrabajo({ filasExcluidas: res.filasExcluidas, resumen: res.resumen })
+    setExtraResultadoTrabajo({
+      filasExcluidas: res.filasExcluidas,
+      resumen: res.resumen,
+      importacionTrabajoId: res.importacionTrabajo.id,
+    })
     setImportacionTrabajoId(null)
     setPaso('resultado')
 

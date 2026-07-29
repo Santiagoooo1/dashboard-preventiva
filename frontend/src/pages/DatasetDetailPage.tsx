@@ -265,6 +265,12 @@ export function DatasetDetailPage() {
               )}
             </Card>
 
+            <Card title="Trazabilidad reciente">
+              <p className="stateEmpty">
+                La trazabilidad se muestra desde el resultado de importación o desde la copia de trabajo.
+              </p>
+            </Card>
+
             <Card title="Plantillas de importación">
               <div className={styles.metricasAcciones}>
                 <Link className="btn btnPrimary" to={`/datasets/${datasetId}/plantillas/nueva`}>

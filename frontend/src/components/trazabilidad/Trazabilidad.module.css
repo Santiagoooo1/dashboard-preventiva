@@ -1,0 +1,173 @@
+.resumenLista {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--spacing-md) 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm) var(--spacing-lg);
+  font-size: 0.9rem;
+}
+
+.hashValor {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  user-select: all;
+  word-break: break-all;
+}
+
+.hashFila {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.botonCopiar {
+  font-size: 0.75rem;
+  padding: 2px var(--spacing-xs);
+}
+
+.avisoCopiado {
+  font-size: 0.78rem;
+  color: var(--color-success);
+}
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.eventoItem {
+  border: 1px solid var(--color-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.eventoCabecera {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.eventoFecha {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.eventoTexto {
+  font-weight: 600;
+  margin: 0;
+}
+
+.eventoActor {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.eventoUbicacion {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: var(--spacing-xs) 0 0 0;
+}
+
+.eventoValores {
+  font-size: 0.85rem;
+  margin: var(--spacing-xs) 0 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+}
+
+.valorAnterior {
+  color: var(--color-error);
+  text-decoration: line-through;
+}
+
+.valorNuevo {
+  color: var(--color-success);
+}
+
+.valorTruncado {
+  max-width: 260px;
+  display: inline-block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* Categorías de evento: colores discretos por franja izquierda, no por fondo completo */
+.categoria-creacion {
+  border-left-color: var(--color-primary);
+}
+
+.categoria-correccion {
+  border-left-color: var(--color-warning);
+}
+
+.categoria-exclusion {
+  border-left-color: var(--color-error);
+}
+
+.categoria-restauracion {
+  border-left-color: var(--chart-series-3);
+}
+
+.categoria-importacion {
+  border-left-color: var(--color-success);
+}
+
+.categoria-activacion {
+  border-left-color: var(--chart-series-1);
+}
+
+.categoria-otro {
+  border-left-color: var(--color-border);
+}
+
+.detalleContenedor {
+  margin: var(--spacing-xs) 0 0 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: rgba(108, 117, 125, 0.06);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.detalleLista {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detalleItem {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.detalleItem dt {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.detalleItem dd {
+  margin: 0;
+}
+
+.detalleTexto {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.botonToggle {
+  margin-top: var(--spacing-sm);
+}

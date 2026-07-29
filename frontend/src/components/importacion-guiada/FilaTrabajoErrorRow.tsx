@@ -131,6 +131,7 @@ export function FilaTrabajoErrorRow({
                         tipoDato={tipoDato}
                         valorInicial={tieneCorreccion ? (valorCorregido as string) : valorOriginal}
                         disabled={disabled}
+                        esBloqueante={esBloqueante}
                         onGuardar={(valor) => onGuardarCelda(fila.numeroFilaOriginal, columna, valor)}
                       />
                       {tieneCorreccion && (

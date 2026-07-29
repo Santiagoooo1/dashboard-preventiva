@@ -6,7 +6,44 @@ interface EditorCeldaTrabajoProps {
   tipoDato: string | null
   valorInicial: string
   disabled?: boolean
+  /** Si la celda tiene un error bloqueante: la ayuda de tipo se muestra más visible. */
+  esBloqueante?: boolean
   onGuardar: (valor: string) => void
+}
+
+// Ayuda visual del tipo esperado, mostrada bajo el input al editar una celda.
+// Si tipoDato es null (columna sin mapeo conocido) no se muestra nada: no hay
+// nada fiable que decir sobre el formato esperado.
+function ayudaTipoDato(tipoDato: string | null): string | null {
+  switch (tipoDato) {
+    case 'FECHA':
+      return 'Tipo esperado: fecha. Formato recomendado: AAAA-MM-DD. Ejemplo: 2026-07-29.'
+    case 'ENTERO':
+      return 'Tipo esperado: número entero. Ejemplo: 76.'
+    case 'DECIMAL':
+      return 'Tipo esperado: número decimal. Ejemplo: 76.5.'
+    case 'BOOLEANO':
+      return 'Tipo esperado: Sí/No.'
+    case 'TEXTO':
+      return 'Tipo esperado: texto.'
+    default:
+      return null
+  }
+}
+
+function mensajeVacioTipoDato(tipoDato: string | null): string {
+  switch (tipoDato) {
+    case 'FECHA':
+      return 'Introduce una fecha válida o excluye la fila.'
+    case 'ENTERO':
+      return 'Introduce un número entero válido o excluye la fila.'
+    case 'DECIMAL':
+      return 'Introduce un número decimal válido o excluye la fila.'
+    case 'BOOLEANO':
+      return 'Selecciona Sí o No, o excluye la fila.'
+    default:
+      return 'Introduce un valor o excluye la fila.'
+  }
 }
 
 const OPCIONES_BOOLEANO = [
@@ -40,7 +77,13 @@ function normalizarFechaIso(valor: string): string | null {
   return null
 }
 
-export function EditorCeldaTrabajo({ tipoDato, valorInicial, disabled, onGuardar }: EditorCeldaTrabajoProps) {
+export function EditorCeldaTrabajo({
+  tipoDato,
+  valorInicial,
+  disabled,
+  esBloqueante,
+  onGuardar,
+}: EditorCeldaTrabajoProps) {
   const esFecha = tipoDato === 'FECHA'
   const fechaIsoInicial = esFecha ? normalizarFechaIso(valorInicial) : null
   const valorInicialEditor = fechaIsoInicial ?? valorInicial
@@ -64,6 +107,8 @@ export function EditorCeldaTrabajo({ tipoDato, valorInicial, disabled, onGuardar
     }
     onGuardar(valor)
   }
+
+  const ayuda = ayudaTipoDato(tipoDato)
 
   return (
     <div className={styles.editorCeldaContenedor}>
@@ -106,7 +151,10 @@ export function EditorCeldaTrabajo({ tipoDato, valorInicial, disabled, onGuardar
           Guardar
         </button>
       </div>
-      {avisoVacio && <p className={styles.avisoVacio}>Introduce un valor o excluye la fila.</p>}
+      {ayuda && (
+        <p className={esBloqueante ? styles.ayudaTipoDatoBloqueante : styles.ayudaTipoDato}>{ayuda}</p>
+      )}
+      {avisoVacio && <p className={styles.avisoVacio}>{mensajeVacioTipoDato(tipoDato)}</p>}
     </div>
   )
 }

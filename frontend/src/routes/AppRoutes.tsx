@@ -18,6 +18,8 @@ import { PanelFormPage } from '../pages/PanelFormPage'
 import { PanelWidgetsPage } from '../pages/PanelWidgetsPage'
 import { CatalogoPage } from '../pages/CatalogoPage'
 import { PanelDashboardPage } from '../pages/PanelDashboardPage'
+import { TrazabilidadImportacionTrabajoPage } from '../pages/TrazabilidadImportacionTrabajoPage'
+import { TrazabilidadImportacionGenericaPage } from '../pages/TrazabilidadImportacionGenericaPage'
 import { NotFoundPage } from '../pages/NotFoundPage'
 
 export function AppRoutes() {
@@ -47,6 +49,8 @@ export function AppRoutes() {
         <Route path="/datasets/:datasetId/paneles/:panelId/widgets" element={<PanelWidgetsPage />} />
         <Route path="/catalogo" element={<CatalogoPage />} />
         <Route path="/paneles/:panelId/dashboard" element={<PanelDashboardPage />} />
+        <Route path="/importaciones-trabajo/:id/trazabilidad" element={<TrazabilidadImportacionTrabajoPage />} />
+        <Route path="/trazabilidad/importacion-generica/:id" element={<TrazabilidadImportacionGenericaPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

@@ -273,3 +273,17 @@
   color: var(--color-error);
   margin: 0;
 }
+
+.ayudaTipoDato {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Misma ayuda, pero algo más visible cuando la celda tiene un error
+   bloqueante: no es un aviso nuevo, solo deja de estar tan apagada. */
+.ayudaTipoDatoBloqueante {
+  font-size: 0.78rem;
+  color: var(--color-text);
+  margin: 0;
+}

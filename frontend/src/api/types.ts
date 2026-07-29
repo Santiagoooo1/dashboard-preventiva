@@ -635,3 +635,64 @@ export interface ImportarDesdeTrabajoResponseDto {
   filasExcluidas: number
   resumen: string
 }
+
+// --- Fase 6.8D: trazabilidad de importaciones y correcciones ---
+
+export type TipoEventoImportacionTrabajo =
+  | 'COPIA_CREADA'
+  | 'CELDA_CORREGIDA'
+  | 'CORRECCION_CELDA_DESHECHA'
+  | 'CORRECCIONES_FILA_DESHECHAS'
+  | 'TODAS_CORRECCIONES_DESHECHAS'
+  | 'FILA_EXCLUIDA'
+  | 'FILA_INCLUIDA'
+  | 'FILAS_SIMILARES_EXCLUIDAS'
+  | 'TODAS_EXCLUSIONES_DESHECHAS'
+  | 'COPIA_RESTAURADA_ORIGINAL'
+  | 'COLUMNA_RELLENADA'
+  | 'COLUMNA_NORMALIZADA'
+  | 'REVALIDACION_EJECUTADA'
+  | 'IMPORTACION_REALIZADA'
+  | 'DATASET_ACTIVADO'
+  | 'BORRADOR_DESCARTADO'
+  | 'COPIA_DESCARTADA'
+
+export interface EventoImportacionTrabajoDto {
+  id: number
+  tipoEvento: TipoEventoImportacionTrabajo | string
+  numeroFilaOriginal: number | null
+  nombreColumna: string | null
+  valorAnterior: string | null
+  valorNuevo: string | null
+  detalle: string | null
+  fechaEvento: string
+  actor: string | null
+}
+
+export interface ResumenTrazabilidadImportacionTrabajoDto {
+  importacionTrabajoId: number
+  importacionGenericaId: number | null
+  datasetId: number
+  plantillaId: number
+  nombreArchivoOriginal: string | null
+  hashArchivoOriginal: string | null
+  estado: string
+  totalFilasLeidas: number
+  totalFilasExcluidas: number
+  totalErrores: number
+  totalAdvertencias: number
+  importable: boolean
+  totalEventos: number
+  totalCorreccionesManuales: number
+  totalCorreccionesEnBloque: number
+  totalNormalizaciones: number
+  totalExclusiones: number
+  totalRestauraciones: number
+  fechaCreacion: string
+  fechaUltimaRevalidacion: string | null
+}
+
+export interface TrazabilidadImportacionTrabajoResponseDto {
+  resumen: ResumenTrazabilidadImportacionTrabajoDto
+  eventos: EventoImportacionTrabajoDto[]
+}

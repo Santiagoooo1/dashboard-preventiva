@@ -34,6 +34,7 @@ import { StateContainer } from '../StateContainer'
 import { FilaTrabajoErrorRow } from './FilaTrabajoErrorRow'
 import { GrupoProblemaRow } from './GrupoProblemaRow'
 import { ResumenImportacionTrabajo } from './ResumenImportacionTrabajo'
+import { TrazabilidadImportacionPanel } from '../trazabilidad/TrazabilidadImportacionPanel'
 import styles from './CorreccionFilasTrabajo.module.css'
 
 // Tamaño de página generoso: minimiza que "ver filas afectadas" de un grupo
@@ -105,6 +106,7 @@ export function CorreccionFilasTrabajoPanel({
   // Las advertencias (importantes y campos opcionales) empiezan colapsadas
   // siempre, para no llenar la pantalla de editores cuando hay cientos.
   const [advertenciasVisibles, setAdvertenciasVisibles] = useState(false)
+  const [mostrarTrazabilidad, setMostrarTrazabilidad] = useState(false)
 
   useEffect(() => {
     let cancelado = false
@@ -425,7 +427,20 @@ export function CorreccionFilasTrabajoPanel({
           <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={handleRestaurarOriginal}>
             Restaurar copia al estado original
           </button>
+          <button
+            type="button"
+            className="btn btnSecondary"
+            onClick={() => setMostrarTrazabilidad((v) => !v)}
+          >
+            {mostrarTrazabilidad ? 'Ocultar historial de cambios' : 'Ver historial de cambios'}
+          </button>
         </div>
+
+        {mostrarTrazabilidad && (
+          <div className={styles.seccion}>
+            <TrazabilidadImportacionPanel importacionTrabajoId={importacionTrabajoId} titulo="Historial de cambios" />
+          </div>
+        )}
 
         {gruposBloqueantes.length > 0 && (
           <section className={styles.seccion}>

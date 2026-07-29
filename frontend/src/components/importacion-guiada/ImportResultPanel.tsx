@@ -8,6 +8,7 @@ import { Card } from '../Card'
 import { ErrorBanner } from '../ErrorBanner'
 import { ImportErrorsTable } from '../importacion/ImportErrorsTable'
 import { DashboardInicialCta } from './DashboardInicialCta'
+import { TrazabilidadImportacionPanel } from '../trazabilidad/TrazabilidadImportacionPanel'
 import styles from './ImportacionGuiada.module.css'
 
 interface ImportResultPanelProps {
@@ -17,7 +18,7 @@ interface ImportResultPanelProps {
   /** Reinicia el asistente desde cero para crear otro dashboard. */
   onCrearOtroDashboard?: () => void
   /** Presente cuando la importación se hizo desde una copia de trabajo corregida en la app. */
-  extra?: { filasExcluidas: number; resumen: string }
+  extra?: { filasExcluidas: number; resumen: string; importacionTrabajoId: number }
 }
 
 // Mensaje propio y en lenguaje claro: el mensaje del backend puede incluir
@@ -43,6 +44,7 @@ export function ImportResultPanel({
   const [advertencias, setAdvertencias] = useState<ErrorImportacionGenericaResponseDto[] | null>(null)
   const [cargandoAdv, setCargandoAdv] = useState(false)
   const [errorAdv, setErrorAdv] = useState<string | null>(null)
+  const [mostrarTrazabilidad, setMostrarTrazabilidad] = useState(false)
 
   const verAdvertencias = async () => {
     if (!importacion) return
@@ -93,6 +95,25 @@ export function ImportResultPanel({
                 </div>
               )}
             </>
+          )}
+
+          <div className={styles.acciones}>
+            <button
+              type="button"
+              className="btn btnSecondary"
+              onClick={() => setMostrarTrazabilidad((v) => !v)}
+            >
+              {mostrarTrazabilidad ? 'Ocultar trazabilidad' : 'Ver trazabilidad de la importación'}
+            </button>
+          </div>
+          {mostrarTrazabilidad && (
+            <div style={{ marginTop: 'var(--spacing-md)' }}>
+              {extra ? (
+                <TrazabilidadImportacionPanel importacionTrabajoId={extra.importacionTrabajoId} />
+              ) : (
+                <TrazabilidadImportacionPanel importacionGenericaId={importacion.importacionId} />
+              )}
+            </div>
           )}
         </Card>
       ) : (
