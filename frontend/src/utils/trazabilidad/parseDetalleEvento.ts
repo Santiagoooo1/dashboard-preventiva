@@ -16,7 +16,7 @@ const ETIQUETAS_CONOCIDAS: Record<string, string> = {
   totalAfectadas: 'Total afectadas',
   estrategia: 'Estrategia',
   importacionGenericaId: 'Importación final',
-  importacionTrabajoId: 'Copia de trabajo',
+  importacionTrabajoId: 'Copia interna',
   datasetId: 'Dataset',
   plantillaId: 'Plantilla',
   numeroFila: 'Fila',

@@ -20,6 +20,10 @@ export interface GrupoErrorColumna {
   severidadMaxima: 'ERROR' | 'ADVERTENCIA'
   tipoErrorPredominante: string
   valoresEjemplo: string[]
+  /** Mensaje del backend para un error representativo del tipo predominante. */
+  mensajeEjemplo: string
+  /** numeroFila de un error representativo del tipo predominante (puede ser una fila de cabecera, no clínica). */
+  numeroFilaEjemplo: number | null
 }
 
 export interface CorreccionSugerida {
@@ -62,22 +66,62 @@ export function problemaLegibleParaColumna(tipoError: string, columna: ColumnaCo
   return problemaLegible(tipoError)
 }
 
+/**
+ * Separa errores "globales" (sin columna asociada, p. ej. SIN_FILAS_CLINICAS:
+ * el archivo entero no tiene filas clínicas reconocibles) de los que sí
+ * describen un problema de una columna concreta. Un error global no debe
+ * agruparse como si fuera una columna llamada "Columna desconocida": no hay
+ * fila ni columna real que corregir, es un problema del archivo en su
+ * conjunto.
+ */
+export function separarErroresGlobales(errores: ErrorFilaImportacionGenericaDto[]): {
+  globales: ErrorFilaImportacionGenericaDto[]
+  porColumna: ErrorFilaImportacionGenericaDto[]
+} {
+  const globales: ErrorFilaImportacionGenericaDto[] = []
+  const porColumna: ErrorFilaImportacionGenericaDto[] = []
+  for (const error of errores) {
+    if (error.nombreColumna === null || error.nombreColumna.trim() === '') {
+      globales.push(error)
+    } else {
+      porColumna.push(error)
+    }
+  }
+  return { globales, porColumna }
+}
+
 /** Agrupa la lista de errores de fila por columna, con muestra de valores. */
 export function agruparErroresPorColumna(errores: ErrorFilaImportacionGenericaDto[]): GrupoErrorColumna[] {
   const mapa = new Map<
     string,
-    { total: number; severidades: Set<string>; tipos: Map<string, number>; valores: Set<string> }
+    {
+      total: number
+      severidades: Set<string>
+      tipos: Map<string, number>
+      valores: Set<string>
+      mensajesPorTipo: Map<string, string>
+      numerosPorTipo: Map<string, number | null>
+    }
   >()
 
   for (const error of errores) {
     const columna = (error.nombreColumna ?? 'Columna desconocida').trim()
     if (!mapa.has(columna)) {
-      mapa.set(columna, { total: 0, severidades: new Set(), tipos: new Map(), valores: new Set() })
+      mapa.set(columna, {
+        total: 0,
+        severidades: new Set(),
+        tipos: new Map(),
+        valores: new Set(),
+        mensajesPorTipo: new Map(),
+        numerosPorTipo: new Map(),
+      })
     }
     const grupo = mapa.get(columna)!
     grupo.total += 1
     grupo.severidades.add(error.severidad)
     grupo.tipos.set(error.tipoError, (grupo.tipos.get(error.tipoError) ?? 0) + 1)
+    if (!grupo.mensajesPorTipo.has(error.tipoError)) grupo.mensajesPorTipo.set(error.tipoError, error.mensaje)
+    if (!grupo.numerosPorTipo.has(error.tipoError)) grupo.numerosPorTipo.set(error.tipoError, error.numeroFila)
     if (error.valorOriginal && error.valorOriginal.trim() !== '' && grupo.valores.size < 3) {
       grupo.valores.add(error.valorOriginal.trim())
     }
@@ -91,8 +135,29 @@ export function agruparErroresPorColumna(errores: ErrorFilaImportacionGenericaDt
       severidadMaxima: g.severidades.has('ERROR') ? 'ERROR' : 'ADVERTENCIA',
       tipoErrorPredominante,
       valoresEjemplo: [...g.valores],
+      mensajeEjemplo: g.mensajesPorTipo.get(tipoErrorPredominante) ?? '',
+      numeroFilaEjemplo: g.numerosPorTipo.get(tipoErrorPredominante) ?? null,
     }
   })
+}
+
+/** numeroFila (sin duplicados, ordenados) de los errores de una columna y severidad concretas. */
+export function numerosFilaConError(
+  errores: ErrorFilaImportacionGenericaDto[],
+  severidad: string,
+  nombreColumna: string,
+): number[] {
+  const numeros = new Set<number>()
+  for (const error of errores) {
+    if (
+      error.severidad === severidad &&
+      (error.nombreColumna ?? '').trim() === nombreColumna.trim() &&
+      error.numeroFila !== null
+    ) {
+      numeros.add(error.numeroFila)
+    }
+  }
+  return [...numeros].sort((a, b) => a - b)
 }
 
 function todosBooleanos(valores: string[]): boolean {

@@ -27,6 +27,8 @@ interface GrupoProblemaRowProps {
   estrategiaNormalizacion?: string | null
   /** true si esta columna es un dato de seguimiento clínico que puede faltar legítimamente. */
   advertenciaClinicaEsperable?: boolean
+  /** Necesario para el bloque especial de "columna no reconocida" (volver a revisar mapeos). */
+  onVolverAColumnas?: () => void
 }
 
 export function GrupoProblemaRow({
@@ -41,10 +43,44 @@ export function GrupoProblemaRow({
   onNormalizarColumna,
   estrategiaNormalizacion,
   advertenciaClinicaEsperable,
+  onVolverAColumnas,
 }: GrupoProblemaRowProps) {
   const [mostrarRellenar, setMostrarRellenar] = useState(false)
   const [valorRellenar, setValorRellenar] = useState('')
   const [avisoVacio, setAvisoVacio] = useState(false)
+
+  // Caso especial: una columna del archivo no está mapeada a ningún campo
+  // clínico de la plantilla. No es un dato de paciente incorrecto, es un
+  // problema de configuración de columnas/cabecera, así que no tiene sentido
+  // ofrecer "ver filas afectadas" ni "excluir filas": no hay filas que corregir.
+  if (grupo.tipoErrorPredominante === 'COLUMNA_NO_RECONOCIDA') {
+    return (
+      <div className={styles.grupoProblema}>
+        <div className={styles.grupoProblemaCabecera}>
+          <span className={styles.badgeAdvertencia}>Columna no reconocida</span>
+          <strong>{grupo.nombreColumna}</strong>
+        </div>
+        <p className={styles.notaAdvertencia}>
+          La aplicación no sabe a qué campo clínico corresponde esta columna. Debes ignorarla, mapearla o cambiar la
+          fila de cabecera antes de importar.
+        </p>
+        {grupo.valoresEjemplo.length > 0 && (
+          <p className={styles.notaAdvertencia}>Valor detectado: {grupo.valoresEjemplo[0]}</p>
+        )}
+        <p className={styles.notaAdvertencia}>
+          Para ignorarla: vuelve al paso Columnas y desmárcala. Para cambiar la fila de cabecera: vuelve a Subir
+          archivo y ajústala allí.
+        </p>
+        {onVolverAColumnas && (
+          <div className={styles.grupoProblemaAcciones}>
+            <button type="button" className="btn btnSecondary" disabled={disabled} onClick={onVolverAColumnas}>
+              Volver a columnas
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   const esCritica = esColumnaClinicaCritica(grupo.nombreColumna)
 
@@ -70,7 +106,7 @@ export function GrupoProblemaRow({
   const excluirSimilares = () => {
     if (
       !window.confirm(
-        `Vas a excluir ${grupo.totalErrores} fila(s) completa(s) de la importación. Solo debes hacerlo si esas filas no son pacientes válidos o no deben importarse.`,
+        `Vas a excluir ${grupo.totalErrores} fila(s) de la importación. El archivo original no se modificará. Solo debes hacerlo si esas filas no son pacientes válidos o no deben importarse.`,
       )
     ) {
       return
@@ -99,7 +135,7 @@ export function GrupoProblemaRow({
         </button>
         <button
           type="button"
-          className="btn btnSecondary"
+          className="btn btnDanger"
           disabled={disabled}
           title="Se omitirán las filas que tengan el mismo tipo de error en esta columna."
           onClick={excluirSimilares}

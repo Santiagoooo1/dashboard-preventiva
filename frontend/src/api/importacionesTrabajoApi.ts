@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPost, apiPostFormData, apiPut } from './apiClient'
 import type {
+  ColumnasReanudacionResponseDto,
   CrearImportacionTrabajoResponseDto,
   ErrorImportacionTrabajoDto,
   ImportacionTrabajoResponseDto,
@@ -242,4 +243,13 @@ export function importarDesdeTrabajo(
 
 export function descartarImportacionTrabajo(id: string | number, signal?: AbortSignal): Promise<void> {
   return apiDelete(`/importaciones-trabajo/${id}`, signal)
+}
+
+// ---- Reanudación de borradores (Fase 6.8E.2.1) ----
+
+export function obtenerColumnasReanudacion(
+  id: string | number,
+  signal?: AbortSignal,
+): Promise<ColumnasReanudacionResponseDto> {
+  return apiGet<ColumnasReanudacionResponseDto>(`/importaciones-trabajo/${id}/columnas-reanudacion`, signal)
 }

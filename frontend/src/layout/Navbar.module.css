@@ -25,6 +25,20 @@
   color: var(--color-text-muted);
 }
 
+.grupoAvanzado {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding-left: var(--spacing-md);
+  border-left: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.grupoAvanzadoEtiqueta {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
 .active {
   color: var(--color-text) !important;
   font-weight: 600;

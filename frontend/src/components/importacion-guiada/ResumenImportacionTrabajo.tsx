@@ -30,7 +30,7 @@ export function ResumenImportacionTrabajo({ trabajo, bloqueado, onImportar }: Re
           <p className={styles.estadoTitulo}>
             {trabajo.totalAdvertencias > 0
               ? 'La importación ya puede continuar.'
-              : 'La copia de trabajo está lista para importar.'}
+              : 'La copia interna está lista para importar.'}
           </p>
           {puedeImportar && (
             <button type="button" className="btn btnPrimary" disabled={bloqueado} onClick={onImportar}>

@@ -10,11 +10,12 @@ type ErrorImportacion = ErrorFilaImportacionGenericaDto | ErrorImportacionGeneri
 
 interface ImportErrorsTableProps {
   errores: ErrorImportacion[]
+  mensajeVacio?: string
 }
 
-export function ImportErrorsTable({ errores }: ImportErrorsTableProps) {
+export function ImportErrorsTable({ errores, mensajeVacio }: ImportErrorsTableProps) {
   if (errores.length === 0) {
-    return <p className="stateEmpty">Sin errores.</p>
+    return <p className="stateEmpty">{mensajeVacio ?? 'Sin errores.'}</p>
   }
 
   const visibles = errores.slice(0, MAXIMO_VISIBLE)

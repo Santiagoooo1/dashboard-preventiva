@@ -636,6 +636,58 @@ export interface ImportarDesdeTrabajoResponseDto {
   resumen: string
 }
 
+// --- Fase 6.8E.2: reanudación de datasets BORRADOR/VALIDANDO ---
+
+export type PasoRecomendadoReanudacion =
+  | 'SUBIR_ARCHIVO'
+  | 'COLUMNAS'
+  | 'CORREGIR_FILAS'
+  | 'IMPORTAR'
+  | 'RESULTADO'
+  | 'DETALLE_DATASET'
+
+export interface ReanudarBorradorDatasetDto {
+  datasetId: number
+  codigo: string
+  nombre: string
+  estadoDataset: string
+  puedeReanudarse: boolean
+  motivoNoReanudable: string | null
+  pasoRecomendado: PasoRecomendadoReanudacion | string
+  importacionTrabajoId: number | null
+  plantillaId: number | null
+  importacionGenericaId: number | null
+  totalFilasLeidas: number | null
+  totalErrores: number | null
+  totalAdvertencias: number | null
+  totalFilasExcluidas: number | null
+  importable: boolean | null
+  estadoImportacionTrabajo: string | null
+  mensaje: string
+  huboCopiaDescartada: boolean
+}
+
+// --- Fase 6.8E.2.1: reconstrucción de columnas al reanudar ---
+
+export interface ColumnaReanudacionDto {
+  nombreOriginal: string
+  nombreVisible: string
+  usar: boolean
+  tipoDato: string | null
+  campoClinicoCodigo: string | null
+  campoClinicoEtiqueta: string | null
+  obligatorio: boolean
+  mapeada: boolean
+}
+
+export interface ColumnasReanudacionResponseDto {
+  importacionTrabajoId: number
+  datasetId: number
+  plantillaId: number
+  columnas: ColumnaReanudacionDto[]
+  mensaje: string | null
+}
+
 // --- Fase 6.8D: trazabilidad de importaciones y correcciones ---
 
 export type TipoEventoImportacionTrabajo =

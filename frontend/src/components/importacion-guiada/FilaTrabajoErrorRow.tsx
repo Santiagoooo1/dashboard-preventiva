@@ -146,13 +146,13 @@ export function FilaTrabajoErrorRow({
                       )}
                       <button
                         type="button"
-                        className="btn btnSecondary"
+                        className="btn btnDanger"
                         disabled={disabled}
                         title="Se omitirán las filas que tengan el mismo tipo de error en esta columna."
                         onClick={() => {
                           if (
                             window.confirm(
-                              'Vas a excluir todas las filas con este mismo problema. Solo debes hacerlo si esas filas no son pacientes válidos o no deben importarse.',
+                              'Vas a excluir todas las filas con este mismo problema. El archivo original no se modificará. Solo debes hacerlo si esas filas no son pacientes válidos o no deben importarse.',
                             )
                           ) {
                             onExcluirSimilares(error.tipoError, columna)

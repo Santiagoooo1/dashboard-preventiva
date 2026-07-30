@@ -64,20 +64,14 @@ export function ImportResultPanel({
   return (
     <div>
       {huboExito ? (
-        <Card title="Importación completada">
+        <Card title="Datos importados correctamente" className={styles.cardExito}>
           <ul className={styles.resumen}>
-            <li>
-              Estado:{' '}
-              <span className={importacion.estado === 'IMPORTADA' ? styles.estadoOk : styles.estadoAviso}>
-                {importacion.estado === 'IMPORTADA' ? 'Importado' : 'Importado con advertencias'}
-              </span>
-            </li>
-            <li>Columnas creadas: {resultado.camposCreados}</li>
-            <li>Filas leídas: {importacion.filasLeidas}</li>
+            <li>Archivo importado: {importacion.nombreArchivo}</li>
             <li>Filas importadas: {importacion.filasImportadas}</li>
-            <li>Filas con error: {importacion.filasConError}</li>
             {extra && <li>Filas excluidas: {extra.filasExcluidas}</li>}
-            <li>Advertencias: {importacion.totalAdvertencias}</li>
+            {importacion.filasConError > 0 && <li>Filas con error: {importacion.filasConError}</li>}
+            {tieneAdvertencias && <li>Advertencias: {importacion.totalAdvertencias}</li>}
+            <li>Dataset: creado</li>
           </ul>
           <p>{extra ? extra.resumen : mensajeAmable(importacion.estado)}</p>
 
@@ -91,29 +85,10 @@ export function ImportResultPanel({
               <ErrorBanner mensaje={errorAdv} />
               {advertencias && (
                 <div style={{ marginTop: 'var(--spacing-md)' }}>
-                  <ImportErrorsTable errores={advertencias} />
+                  <ImportErrorsTable errores={advertencias} mensajeVacio="No hay advertencias." />
                 </div>
               )}
             </>
-          )}
-
-          <div className={styles.acciones}>
-            <button
-              type="button"
-              className="btn btnSecondary"
-              onClick={() => setMostrarTrazabilidad((v) => !v)}
-            >
-              {mostrarTrazabilidad ? 'Ocultar trazabilidad' : 'Ver trazabilidad de la importación'}
-            </button>
-          </div>
-          {mostrarTrazabilidad && (
-            <div style={{ marginTop: 'var(--spacing-md)' }}>
-              {extra ? (
-                <TrazabilidadImportacionPanel importacionTrabajoId={extra.importacionTrabajoId} />
-              ) : (
-                <TrazabilidadImportacionPanel importacionGenericaId={importacion.importacionId} />
-              )}
-            </div>
           )}
         </Card>
       ) : (
@@ -135,15 +110,17 @@ export function ImportResultPanel({
         </Card>
       )}
 
+      {huboExito && datasetId !== null && (
+        <div className={styles.ctaPrincipal}>
+          <DashboardInicialCta datasetId={datasetId} />
+        </div>
+      )}
+
       <div className={styles.ctas}>
         {huboExito && datasetId !== null && (
           <>
-            <DashboardInicialCta datasetId={datasetId} />
             <Link className="btn btnSecondary" to={`/datasets/${datasetId}`}>
               Ver dataset
-            </Link>
-            <Link className="btn btnSecondary" to={`/datasets/${datasetId}`}>
-              Configuración avanzada
             </Link>
             {onCrearOtroDashboard && (
               <button type="button" className="btn btnSecondary" onClick={onCrearOtroDashboard}>
@@ -153,6 +130,13 @@ export function ImportResultPanel({
             <Link className="btn btnSecondary" to="/datasets">
               Ir a datasets
             </Link>
+            <button
+              type="button"
+              className="btn btnSecondary"
+              onClick={() => setMostrarTrazabilidad((v) => !v)}
+            >
+              {mostrarTrazabilidad ? 'Ocultar trazabilidad' : 'Ver trazabilidad de la importación'}
+            </button>
           </>
         )}
         {!huboExito && datasetId !== null && (
@@ -174,6 +158,16 @@ export function ImportResultPanel({
           </Link>
         )}
       </div>
+
+      {huboExito && mostrarTrazabilidad && (
+        <div style={{ marginTop: 'var(--spacing-md)' }}>
+          {extra ? (
+            <TrazabilidadImportacionPanel importacionTrabajoId={extra.importacionTrabajoId} />
+          ) : (
+            <TrazabilidadImportacionPanel importacionGenericaId={importacion.importacionId} />
+          )}
+        </div>
+      )}
     </div>
   )
 }

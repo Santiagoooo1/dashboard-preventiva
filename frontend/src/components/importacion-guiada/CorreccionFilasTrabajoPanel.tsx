@@ -26,13 +26,18 @@ import type {
   ImportarDesdeTrabajoResponseDto,
   RevalidarImportacionTrabajoResponseDto,
 } from '../../api/types'
-import { agruparErroresPorColumna } from '../../utils/importacionGuiada/sugerenciasErrores'
+import {
+  agruparErroresPorColumna,
+  numerosFilaConError,
+  separarErroresGlobales,
+} from '../../utils/importacionGuiada/sugerenciasErrores'
 import { esAdvertenciaClinicaEsperable } from '../../utils/importacionGuiada/advertenciasClinicas'
 import { Card } from '../Card'
 import { ErrorBanner } from '../ErrorBanner'
 import { StateContainer } from '../StateContainer'
 import { FilaTrabajoErrorRow } from './FilaTrabajoErrorRow'
 import { GrupoProblemaRow } from './GrupoProblemaRow'
+import { ProblemaGlobalImportacion } from './ProblemaGlobalImportacion'
 import { ResumenImportacionTrabajo } from './ResumenImportacionTrabajo'
 import { TrazabilidadImportacionPanel } from '../trazabilidad/TrazabilidadImportacionPanel'
 import styles from './CorreccionFilasTrabajo.module.css'
@@ -47,14 +52,22 @@ interface CorreccionFilasTrabajoPanelProps {
   onImportado: (resultado: ImportarDesdeTrabajoResponseDto) => void
   /** "Volver y subir otro archivo": descarta la copia de trabajo y vuelve al inicio del asistente. */
   onVolver: () => void
-  /** "Volver a columnas": descarta la copia de trabajo y vuelve a revisar los mapeos. */
-  onVolverAColumnas: () => void
+  /**
+   * "Volver a columnas": descarta la copia de trabajo y vuelve a revisar los
+   * mapeos. Ausente cuando no hay columnas reconstruidas que mostrar (p. ej.
+   * al reanudar un borrador sin el archivo original): en ese caso se oculta
+   * el botón y, si se indica `avisoVolverAColumnasNoDisponible`, se muestra
+   * ese mensaje en su lugar (ver Fase 6.8E.2.1, punto 3).
+   */
+  onVolverAColumnas?: () => void
+  /** Mensaje mostrado en vez del botón "Volver a columnas" cuando no está disponible. */
+  avisoVolverAColumnasNoDisponible?: string
   /** "Cancelar creación": descarta la copia de trabajo y el dataset BORRADOR asociado. */
   onCancelarCreacion: () => void
 }
 
 const CONFIRMACION_PERDER_CORRECCIONES =
-  'Se perderán las correcciones hechas en esta copia de trabajo. El archivo original no se modificará.'
+  'Se perderán las correcciones hechas en esta copia interna. El archivo original no se modificará.'
 
 function claveGrupo(severidad: string, nombreColumna: string): string {
   return `${severidad}|${nombreColumna}`
@@ -83,6 +96,7 @@ export function CorreccionFilasTrabajoPanel({
   onImportado,
   onVolver,
   onVolverAColumnas,
+  avisoVolverAColumnasNoDisponible,
   onCancelarCreacion,
 }: CorreccionFilasTrabajoPanelProps) {
   const [trabajo, setTrabajo] = useState<ImportacionTrabajoResponseDto | null>(null)
@@ -132,7 +146,7 @@ export function CorreccionFilasTrabajoPanel({
         setTiposPorColumna(new Map(mapeos.map((m) => [m.nombreColumnaOrigen, m.tipoDato])))
       } catch (err) {
         if (!cancelado) {
-          setError(err instanceof Error ? err.message : 'No se pudo cargar la copia de trabajo.')
+          setError(err instanceof Error ? err.message : 'No se pudo cargar la copia interna.')
         }
       } finally {
         if (!cancelado) setCargando(false)
@@ -230,7 +244,7 @@ export function CorreccionFilasTrabajoPanel({
   const handleDeshacerTodasCorrecciones = () => {
     if (
       !window.confirm(
-        'Se eliminarán las correcciones hechas en esta copia de trabajo. El archivo original no se modificará.',
+        'Se eliminarán las correcciones hechas en esta copia interna. El archivo original no se modificará.',
       )
     ) {
       return
@@ -241,7 +255,7 @@ export function CorreccionFilasTrabajoPanel({
   const handleDeshacerTodasExclusiones = () => {
     if (
       !window.confirm(
-        'Se incluirán de nuevo todas las filas excluidas de esta copia de trabajo. El archivo original no se modificará.',
+        'Se incluirán de nuevo todas las filas excluidas de esta copia interna. El archivo original no se modificará.',
       )
     ) {
       return
@@ -252,7 +266,7 @@ export function CorreccionFilasTrabajoPanel({
   const handleRestaurarOriginal = () => {
     if (
       !window.confirm(
-        'Se eliminarán las correcciones hechas en esta copia de trabajo. El archivo original no se modificará.',
+        'Vas a deshacer todas las correcciones y exclusiones de esta copia interna, volviendo al archivo tal como se leyó. El archivo original no se modifica.',
       )
     ) {
       return
@@ -307,7 +321,9 @@ export function CorreccionFilasTrabajoPanel({
   }
 
   const handleVolver = () => descartarCopiaYSalir(onVolver)
-  const handleVolverAColumnas = () => descartarCopiaYSalir(onVolverAColumnas)
+  const handleVolverAColumnas = onVolverAColumnas
+    ? () => descartarCopiaYSalir(onVolverAColumnas)
+    : undefined
   const handleCancelarCreacion = () => descartarCopiaYSalir(onCancelarCreacion)
 
   const toggleGrupoExpandido = (clave: string) => {
@@ -325,12 +341,30 @@ export function CorreccionFilasTrabajoPanel({
 
   const bloqueado = accionEnCurso !== null
 
+  // Errores sin columna asociada (p. ej. "el archivo no tiene ninguna fila
+  // clínica reconocible"): no son un problema de una columna ni de una fila
+  // real, así que se separan antes de agrupar por columna (si no, el
+  // agrupador los mete bajo una columna ficticia "Columna desconocida" con
+  // una "fila afectada" que en realidad no existe).
+  const { globales: erroresGlobales, porColumna: erroresPorColumnaTodos } = useMemo(
+    () => separarErroresGlobales(todosLosErrores),
+    [todosLosErrores],
+  )
+  const erroresGlobalesBloqueantes = useMemo(
+    () => erroresGlobales.filter((e) => e.severidad === 'ERROR'),
+    [erroresGlobales],
+  )
+  const erroresGlobalesAdvertencia = useMemo(
+    () => erroresGlobales.filter((e) => e.severidad !== 'ERROR'),
+    [erroresGlobales],
+  )
+
   // Filas activas (no excluidas) agrupadas por problema: la fuente de verdad
   // para los recuentos es listarErroresImportacionTrabajo (sin paginar, cubre
   // toda la copia de trabajo), no la página de filas cargada.
   const gruposBloqueantes = useMemo(
-    () => agruparErroresPorColumna(todosLosErrores.filter((e) => e.severidad === 'ERROR')),
-    [todosLosErrores],
+    () => agruparErroresPorColumna(erroresPorColumnaTodos.filter((e) => e.severidad === 'ERROR')),
+    [erroresPorColumnaTodos],
   )
 
   // Las advertencias se separan en "campos opcionales esperables" (datos de
@@ -339,8 +373,8 @@ export function CorreccionFilasTrabajoPanel({
   // encaje en ese patrón). Así el grueso del ruido clínico esperado no se
   // mezcla con lo que sí conviene revisar.
   const advertenciasTodas = useMemo(
-    () => todosLosErrores.filter((e) => e.severidad === 'ADVERTENCIA'),
-    [todosLosErrores],
+    () => erroresPorColumnaTodos.filter((e) => e.severidad === 'ADVERTENCIA'),
+    [erroresPorColumnaTodos],
   )
   const gruposAdvertenciasEsperablesTodos = useMemo(
     () => agruparErroresPorColumna(advertenciasTodas.filter(esAdvertenciaClinicaEsperable)),
@@ -356,19 +390,31 @@ export function CorreccionFilasTrabajoPanel({
   const gruposAdvertenciasImportantes = gruposAdvertenciasImportantesTodos.filter(
     (g) => !advertenciasOcultas.has(claveGrupo('ADVERTENCIA', g.nombreColumna)),
   )
-  const totalGruposAdvertencias = gruposAdvertenciasEsperablesTodos.length + gruposAdvertenciasImportantesTodos.length
+  const totalGruposAdvertencias =
+    gruposAdvertenciasEsperablesTodos.length +
+    gruposAdvertenciasImportantesTodos.length +
+    erroresGlobalesAdvertencia.length
 
   const filasExcluidas = filas.filter((f) => f.excluida)
 
-  const filasDelGrupo = (severidad: string, nombreColumna: string) =>
-    filas.filter(
+  // Filas cargadas en la página actual que tienen el problema, más los
+  // números de fila que lo tienen pero no están en esta página (para no
+  // dejar el desplegable vacío sin explicación, ver Fase 6.8E.2).
+  const filasYFaltantesDelGrupo = (severidad: string, nombreColumna: string) => {
+    const cargadas = filas.filter(
       (f) => !f.excluida && f.errores.some((e) => e.severidad === severidad && e.nombreColumna === nombreColumna),
     )
+    const numerosCargados = new Set(cargadas.map((f) => f.numeroFilaOriginal))
+    const faltantes = numerosFilaConError(todosLosErrores, severidad, nombreColumna).filter(
+      (n) => !numerosCargados.has(n),
+    )
+    return { cargadas, faltantes }
+  }
 
   if (trabajo?.estado === 'DESCARTADA') {
     return (
-      <Card title="Copia de trabajo descartada">
-        <p>Esta copia de trabajo fue descartada.</p>
+      <Card title="Copia interna descartada">
+        <p>Esta copia interna fue descartada.</p>
         <div className={styles.acciones}>
           <button type="button" className="btn btnSecondary" onClick={onVolver}>
             Volver
@@ -380,8 +426,8 @@ export function CorreccionFilasTrabajoPanel({
 
   if (trabajo?.estado === 'IMPORTADA') {
     return (
-      <Card title="Copia de trabajo ya importada">
-        <p>Esta copia de trabajo ya fue importada.</p>
+      <Card title="Copia interna ya importada">
+        <p>Esta copia interna ya fue importada.</p>
         <div className={styles.acciones}>
           <button type="button" className="btn btnSecondary" onClick={onVolver}>
             Volver
@@ -424,7 +470,7 @@ export function CorreccionFilasTrabajoPanel({
           >
             Deshacer todas las exclusiones
           </button>
-          <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={handleRestaurarOriginal}>
+          <button type="button" className="btn btnDanger" disabled={bloqueado} onClick={handleRestaurarOriginal}>
             Restaurar copia al estado original
           </button>
           <button
@@ -442,6 +488,22 @@ export function CorreccionFilasTrabajoPanel({
           </div>
         )}
 
+        {erroresGlobalesBloqueantes.length > 0 && (
+          <section className={styles.seccion}>
+            <h4>Problemas del archivo</h4>
+            {erroresGlobalesBloqueantes.map((error, i) => (
+              <ProblemaGlobalImportacion
+                key={i}
+                error={error}
+                bloqueante
+                disabled={bloqueado}
+                onVolverAColumnas={handleVolverAColumnas}
+                onVolver={handleVolver}
+              />
+            ))}
+          </section>
+        )}
+
         {gruposBloqueantes.length > 0 && (
           <section className={styles.seccion}>
             <h4>Problemas que impiden importar</h4>
@@ -449,6 +511,7 @@ export function CorreccionFilasTrabajoPanel({
               const clave = claveGrupo('ERROR', grupo.nombreColumna)
               const expandido = gruposExpandidos.has(clave)
               const estrategia = estrategiaParaTipoDato(tiposPorColumna.get(grupo.nombreColumna))
+              const { cargadas, faltantes } = filasYFaltantesDelGrupo('ERROR', grupo.nombreColumna)
               return (
                 <div key={clave}>
                   <GrupoProblemaRow
@@ -458,6 +521,7 @@ export function CorreccionFilasTrabajoPanel({
                     disabled={bloqueado}
                     onToggleExpandir={() => toggleGrupoExpandido(clave)}
                     onExcluirSimilares={handleExcluirSimilares}
+                    onVolverAColumnas={handleVolverAColumnas}
                     onRellenarColumna={
                       grupo.tipoErrorPredominante === 'VALOR_OBLIGATORIO_VACIO'
                         ? (valor) => handleRellenarColumna(grupo.nombreColumna, grupo.tipoErrorPredominante, valor)
@@ -468,8 +532,16 @@ export function CorreccionFilasTrabajoPanel({
                     }
                     estrategiaNormalizacion={estrategia}
                   />
+                  {expandido && faltantes.length > 0 && (
+                    <p className={styles.notaAdvertencia}>
+                      {faltantes.map((n) => `Fila Excel ${n}`).join(', ')} afectada
+                      {faltantes.length === 1 ? '' : 's'}, pero no está{faltantes.length === 1 ? '' : 'n'} cargada
+                      {faltantes.length === 1 ? '' : 's'} en esta página. Usa la paginación para verla
+                      {faltantes.length === 1 ? '' : 'las'}.
+                    </p>
+                  )}
                   {expandido &&
-                    filasDelGrupo('ERROR', grupo.nombreColumna).map((fila) => (
+                    cargadas.map((fila) => (
                       <FilaTrabajoErrorRow
                         key={fila.id}
                         fila={fila}
@@ -509,6 +581,22 @@ export function CorreccionFilasTrabajoPanel({
 
         {advertenciasVisibles && (
           <>
+            {erroresGlobalesAdvertencia.length > 0 && (
+              <section className={styles.seccion}>
+                <h4>Problemas del archivo</h4>
+                {erroresGlobalesAdvertencia.map((error, i) => (
+                  <ProblemaGlobalImportacion
+                    key={i}
+                    error={error}
+                    bloqueante={false}
+                    disabled={bloqueado}
+                    onVolverAColumnas={handleVolverAColumnas}
+                    onVolver={handleVolver}
+                  />
+                ))}
+              </section>
+            )}
+
             {gruposAdvertenciasImportantesTodos.length > 0 && (
               <section className={styles.seccion}>
                 <h4>Advertencias importantes</h4>
@@ -528,6 +616,7 @@ export function CorreccionFilasTrabajoPanel({
                     const clave = claveGrupo('ADVERTENCIA', grupo.nombreColumna)
                     const expandido = gruposExpandidos.has(clave)
                     const estrategia = estrategiaParaTipoDato(tiposPorColumna.get(grupo.nombreColumna))
+                    const { cargadas, faltantes } = filasYFaltantesDelGrupo('ADVERTENCIA', grupo.nombreColumna)
                     return (
                       <div key={clave}>
                         <GrupoProblemaRow
@@ -538,6 +627,7 @@ export function CorreccionFilasTrabajoPanel({
                           onToggleExpandir={() => toggleGrupoExpandido(clave)}
                           onExcluirSimilares={handleExcluirSimilares}
                           onOcultar={() => ocultarAdvertencia(grupo.nombreColumna)}
+                          onVolverAColumnas={handleVolverAColumnas}
                           onRellenarColumna={
                             grupo.tipoErrorPredominante === 'VALOR_OBLIGATORIO_VACIO'
                               ? (valor) =>
@@ -549,8 +639,16 @@ export function CorreccionFilasTrabajoPanel({
                           }
                           estrategiaNormalizacion={estrategia}
                         />
+                        {expandido && faltantes.length > 0 && (
+                          <p className={styles.notaAdvertencia}>
+                            {faltantes.map((n) => `Fila Excel ${n}`).join(', ')} afectada
+                            {faltantes.length === 1 ? '' : 's'}, pero no está{faltantes.length === 1 ? '' : 'n'} cargada
+                            {faltantes.length === 1 ? '' : 's'} en esta página. Usa la paginación para verla
+                            {faltantes.length === 1 ? '' : 'las'}.
+                          </p>
+                        )}
                         {expandido &&
-                          filasDelGrupo('ADVERTENCIA', grupo.nombreColumna).map((fila) => (
+                          cargadas.map((fila) => (
                             <FilaTrabajoErrorRow
                               key={fila.id}
                               fila={fila}
@@ -581,6 +679,7 @@ export function CorreccionFilasTrabajoPanel({
                   const clave = claveGrupo('ADVERTENCIA', grupo.nombreColumna)
                   const expandido = gruposExpandidos.has(clave)
                   const estrategia = estrategiaParaTipoDato(tiposPorColumna.get(grupo.nombreColumna))
+                  const { cargadas, faltantes } = filasYFaltantesDelGrupo('ADVERTENCIA', grupo.nombreColumna)
                   return (
                     <div key={clave}>
                       <GrupoProblemaRow
@@ -591,6 +690,7 @@ export function CorreccionFilasTrabajoPanel({
                         onToggleExpandir={() => toggleGrupoExpandido(clave)}
                         onExcluirSimilares={handleExcluirSimilares}
                         onOcultar={() => ocultarAdvertencia(grupo.nombreColumna)}
+                        onVolverAColumnas={handleVolverAColumnas}
                         onRellenarColumna={
                           grupo.tipoErrorPredominante === 'VALOR_OBLIGATORIO_VACIO'
                             ? (valor) =>
@@ -603,8 +703,16 @@ export function CorreccionFilasTrabajoPanel({
                         estrategiaNormalizacion={estrategia}
                         advertenciaClinicaEsperable
                       />
+                      {expandido && faltantes.length > 0 && (
+                        <p className={styles.notaAdvertencia}>
+                          {faltantes.map((n) => `Fila Excel ${n}`).join(', ')} afectada
+                          {faltantes.length === 1 ? '' : 's'}, pero no está{faltantes.length === 1 ? '' : 'n'} cargada
+                          {faltantes.length === 1 ? '' : 's'} en esta página. Usa la paginación para verla
+                          {faltantes.length === 1 ? '' : 'las'}.
+                        </p>
+                      )}
                       {expandido &&
-                        filasDelGrupo('ADVERTENCIA', grupo.nombreColumna).map((fila) => (
+                        cargadas.map((fila) => (
                           <FilaTrabajoErrorRow
                             key={fila.id}
                             fila={fila}
@@ -652,9 +760,10 @@ export function CorreccionFilasTrabajoPanel({
           </details>
         )}
 
-        {gruposBloqueantes.length === 0 && totalGruposAdvertencias === 0 && filas.length === 0 && (
-          <p className="stateEmpty">No quedan filas con errores pendientes.</p>
-        )}
+        {erroresGlobalesBloqueantes.length === 0 &&
+          gruposBloqueantes.length === 0 &&
+          totalGruposAdvertencias === 0 &&
+          filas.length === 0 && <p className="stateEmpty">No hay errores que corregir.</p>}
 
         {totalPages > 1 && (
           <div className={styles.paginacion}>
@@ -694,9 +803,15 @@ export function CorreccionFilasTrabajoPanel({
           </button>
         </div>
         <div className={styles.acciones}>
-          <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={handleVolverAColumnas}>
-            Volver a columnas
-          </button>
+          {handleVolverAColumnas ? (
+            <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={handleVolverAColumnas}>
+              Volver a columnas
+            </button>
+          ) : (
+            avisoVolverAColumnasNoDisponible && (
+              <p className={styles.notaAdvertencia}>{avisoVolverAColumnasNoDisponible}</p>
+            )
+          )}
           <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={handleVolver}>
             Volver y subir otro archivo
           </button>

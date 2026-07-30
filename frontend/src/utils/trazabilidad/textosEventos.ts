@@ -15,11 +15,11 @@ const TEXTOS_EVENTO: Record<TipoEventoImportacionTrabajo, string> = {
   COPIA_RESTAURADA_ORIGINAL: 'Se restauró la copia al estado original.',
   COLUMNA_RELLENADA: 'Se rellenó una columna en bloque.',
   COLUMNA_NORMALIZADA: 'Se normalizó una columna.',
-  REVALIDACION_EJECUTADA: 'Se revalidó la copia de trabajo.',
+  REVALIDACION_EJECUTADA: 'Se revalidó la copia interna.',
   IMPORTACION_REALIZADA: 'Se importaron los datos corregidos.',
   DATASET_ACTIVADO: 'El dataset pasó a estar activo.',
   BORRADOR_DESCARTADO: 'Se descartó el borrador.',
-  COPIA_DESCARTADA: 'Se descartó la copia de trabajo.',
+  COPIA_DESCARTADA: 'Se descartó la copia interna.',
 }
 
 export function textoEvento(tipoEvento: string): string {

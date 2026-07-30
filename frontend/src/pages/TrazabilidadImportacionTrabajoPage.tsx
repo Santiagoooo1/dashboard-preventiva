@@ -8,14 +8,14 @@ export function TrazabilidadImportacionTrabajoPage() {
 
   return (
     <div>
-      <Breadcrumbs items={[{ label: 'Trazabilidad de la copia de trabajo' }]} />
+      <Breadcrumbs items={[{ label: 'Trazabilidad de la copia interna' }]} />
       {Number.isFinite(importacionTrabajoId) ? (
         <TrazabilidadImportacionPanel
           importacionTrabajoId={importacionTrabajoId}
-          titulo="Trazabilidad de la copia de trabajo"
+          titulo="Trazabilidad de la copia interna"
         />
       ) : (
-        <p className="stateError">El identificador de la copia de trabajo no es válido.</p>
+        <p className="stateError">El identificador de la copia interna no es válido.</p>
       )}
     </div>
   )

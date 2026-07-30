@@ -18,8 +18,21 @@ async function leerMensajeError(response: Response): Promise<string> {
   return `Error ${response.status}: ${response.statusText}`
 }
 
+// fetch() rechaza con un TypeError de bajo nivel ("Failed to fetch",
+// "NetworkError...") cuando el backend no responde en absoluto (caído, CORS,
+// sin red). Se traduce a un mensaje claro; un AbortError sigue propagándose
+// tal cual porque los llamantes ya lo distinguen vía signal.aborted.
+async function fetchOFallarConMensajeClaro(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    throw new Error('No se pudo conectar con el backend.')
+  }
+}
+
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, { signal })
+  const response = await fetchOFallarConMensajeClaro(`${BASE_URL}${path}`, { signal })
   if (!response.ok) {
     throw new Error(await leerMensajeError(response))
   }
@@ -27,7 +40,7 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
 }
 
 export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetchOFallarConMensajeClaro(`${BASE_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body ?? {}),
@@ -46,7 +59,7 @@ export async function apiPostFormData<T>(
   formData: FormData,
   signal?: AbortSignal,
 ): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetchOFallarConMensajeClaro(`${BASE_URL}${path}`, {
     method: 'POST',
     body: formData,
     signal,
@@ -58,7 +71,7 @@ export async function apiPostFormData<T>(
 }
 
 export async function apiPut<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetchOFallarConMensajeClaro(`${BASE_URL}${path}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body ?? {}),
@@ -71,14 +84,14 @@ export async function apiPut<T>(path: string, body?: unknown, signal?: AbortSign
 }
 
 export async function apiDelete(path: string, signal?: AbortSignal): Promise<void> {
-  const response = await fetch(`${BASE_URL}${path}`, { method: 'DELETE', signal })
+  const response = await fetchOFallarConMensajeClaro(`${BASE_URL}${path}`, { method: 'DELETE', signal })
   if (!response.ok) {
     throw new Error(await leerMensajeError(response))
   }
 }
 
 export async function apiGetText(path: string, signal?: AbortSignal): Promise<string> {
-  const response = await fetch(`${BASE_URL}${path}`, { signal })
+  const response = await fetchOFallarConMensajeClaro(`${BASE_URL}${path}`, { signal })
   if (!response.ok) {
     throw new Error(await leerMensajeError(response))
   }

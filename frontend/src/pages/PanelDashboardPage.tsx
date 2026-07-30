@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import type { CatalogoFrontendResponseDto, DashboardPanelResponseDto } from '../api/types'
 import { ejecutarDashboard } from '../api/dashboardApi'
 import { obtenerDashboardMetadata } from '../api/panelesApi'
@@ -15,6 +15,8 @@ import styles from './PanelDashboardPage.module.css'
 
 export function PanelDashboardPage() {
   const { panelId } = useParams<{ panelId: string }>()
+  const [searchParams] = useSearchParams()
+  const esDashboardInicial = searchParams.get('inicial') === '1'
 
   const [datos, setDatos] = useState<DashboardPanelResponseDto | null>(null)
   const [cargandoInicial, setCargandoInicial] = useState(true)
@@ -99,6 +101,16 @@ export function PanelDashboardPage() {
               {datos.dataset.nombre} · {datos.resumen.widgetsOk} OK / {datos.resumen.widgetsConError} con error de{' '}
               {datos.resumen.totalWidgets} widgets
             </p>
+
+            {esDashboardInicial && (
+              <div className={styles.avisoInicial}>
+                <p className={styles.avisoInicialTitulo}>Dashboard inicial generado</p>
+                <p>
+                  Estos indicadores se han creado automáticamente a partir de las columnas detectadas. Puedes
+                  modificarlos después desde la gestión avanzada.
+                </p>
+              </div>
+            )}
 
             <Card title="Filtros del dashboard">
               <DashboardFilters

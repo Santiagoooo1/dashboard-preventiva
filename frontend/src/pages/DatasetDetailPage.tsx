@@ -98,6 +98,7 @@ export function DatasetDetailPage() {
             <h1>{data.dataset.nombre}</h1>
             <p className={styles.codigo}>{data.dataset.codigo}</p>
             {data.dataset.descripcion && <p>{data.dataset.descripcion}</p>}
+            <p className="stateEmpty">Esta es una vista avanzada de configuración.</p>
 
             <Card title="Siguiente paso recomendado" className={styles.recomendacion}>
               <p className={styles.recomendacionTitulo}>{recomendacion.titulo}</p>
@@ -267,7 +268,7 @@ export function DatasetDetailPage() {
 
             <Card title="Trazabilidad reciente">
               <p className="stateEmpty">
-                La trazabilidad se muestra desde el resultado de importación o desde la copia de trabajo.
+                La trazabilidad se muestra desde el resultado de importación o desde la copia interna.
               </p>
             </Card>
 

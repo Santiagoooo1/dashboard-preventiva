@@ -10,14 +10,50 @@
   margin: 0;
 }
 
+/* Aviso al reanudar un borrador (Fase 6.8E.2): mismo estilo discreto que el
+   aviso de copia interna, para no competir visualmente con el CTA principal. */
+.avisoReanudacion {
+  background-color: rgba(13, 110, 253, 0.06);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.9rem;
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.avisoReanudacion p {
+  margin: 0 0 var(--spacing-xs) 0;
+}
+
+.avisoReanudacion p:last-child {
+  margin-bottom: 0;
+}
+
+.avisoReanudacionTitulo {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
 /* Indicador de pasos */
 .pasos {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-sm);
+  align-items: center;
+  gap: 2px;
   list-style: none;
   padding: 0;
   margin: 0;
+}
+
+.pasoContenedor {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pasoConector {
+  color: var(--color-border);
+  padding: 0 2px;
 }
 
 .paso {
@@ -36,8 +72,11 @@
   background-color: var(--color-bg);
 }
 
+/* Completado (o saltado sin errores que corregir): mismo estilo en ambos
+   casos para no dar la sensación de que faltó hacer algo. */
 .pasoCompletado {
   color: var(--color-success);
+  background-color: rgba(25, 135, 84, 0.08);
 }
 
 .pasoNumero {
@@ -49,6 +88,7 @@
   border-radius: 50%;
   border: 1px solid currentColor;
   font-size: 0.72rem;
+  flex-shrink: 0;
 }
 
 /* Subir archivo */
@@ -365,6 +405,22 @@
   gap: var(--spacing-sm);
   flex-wrap: wrap;
   margin-top: var(--spacing-md);
+}
+
+/* Card de éxito: mismo componente Card, con un acento verde discreto para
+   distinguirla de una card neutra sin recurrir a un color de fondo fuerte. */
+.cardExito {
+  border-left: 4px solid var(--color-success);
+}
+
+/* Acción principal tras importar (crear/ver dashboard inicial): debe ser lo
+   primero que se vea, claramente por delante de las acciones secundarias. */
+.ctaPrincipal {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: rgba(37, 99, 235, 0.06);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .acciones {

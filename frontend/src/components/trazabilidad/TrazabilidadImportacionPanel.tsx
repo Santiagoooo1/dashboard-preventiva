@@ -18,7 +18,7 @@ interface TrazabilidadImportacionPanelProps {
 }
 
 const MENSAJE_NO_ENCONTRADA =
-  'No se encontró trazabilidad para esta importación. Puede que se haya realizado sin copia de trabajo.'
+  'No se encontró trazabilidad para esta importación. Puede que se haya realizado sin copia interna.'
 const MENSAJE_FALLO_CARGA = 'No se pudo cargar la trazabilidad.'
 
 export function TrazabilidadImportacionPanel({

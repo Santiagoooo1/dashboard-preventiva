@@ -47,6 +47,12 @@ export interface EntradaOrquestador {
   filaCabecera: number
   dataset: { nombre: string; codigo: string; descripcion: string }
   columnas: ColumnaConfigurada[]
+  /**
+   * Si se indica, reutiliza este dataset (BORRADOR reanudado) en vez de crear
+   * uno nuevo: `dataset.{nombre,codigo,descripcion}` se ignoran en ese caso.
+   * Ver Fase 6.8E.2 — reanudar un borrador no debe crear un dataset duplicado.
+   */
+  datasetIdExistente?: number
 }
 
 export interface ResultadoAsistente {
@@ -104,20 +110,28 @@ export async function ejecutarAsistente(
   // Se crea como BORRADOR: hasta que la importación no se complete con éxito
   // (más abajo) no se considera un dataset utilizable, y no debe aparecer en
   // el listado normal de datasets si el asistente falla o se abandona a medias.
+  // Si se reanuda un borrador existente, se reutiliza su id en vez de crear
+  // otro dataset (evita duplicados al continuar una prueba abandonada).
   onProgreso('dataset', 'en-curso')
   let datasetId: number
-  try {
-    const ds = await crearDataset({
-      codigo: entrada.dataset.codigo,
-      nombre: entrada.dataset.nombre,
-      descripcion: entrada.dataset.descripcion || null,
-      estadoDataset: 'BORRADOR',
-    })
-    datasetId = ds.id
+  if (entrada.datasetIdExistente !== undefined) {
+    datasetId = entrada.datasetIdExistente
     resultado.datasetId = datasetId
     onProgreso('dataset', 'correcto')
-  } catch (err) {
-    return fallar('dataset', err)
+  } else {
+    try {
+      const ds = await crearDataset({
+        codigo: entrada.dataset.codigo,
+        nombre: entrada.dataset.nombre,
+        descripcion: entrada.dataset.descripcion || null,
+        estadoDataset: 'BORRADOR',
+      })
+      datasetId = ds.id
+      resultado.datasetId = datasetId
+      onProgreso('dataset', 'correcto')
+    } catch (err) {
+      return fallar('dataset', err)
+    }
   }
 
   // 2. Campos (guarda código → id para los mapeos)

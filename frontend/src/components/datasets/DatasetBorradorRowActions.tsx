@@ -15,7 +15,7 @@ export function DatasetBorradorRowActions({ dataset, onError, onDescartado }: Da
   const descartar = async () => {
     if (
       !window.confirm(
-        `¿Descartar la prueba '${dataset.nombre}'? Se borrará el dataset y sus datos temporales de importación (campos, plantillas, copias de trabajo). El archivo original no se ve afectado.`,
+        `¿Descartar la prueba '${dataset.nombre}'? Se eliminará este borrador y sus copias internas. El archivo original no se modificará.`,
       )
     ) {
       return
@@ -33,6 +33,9 @@ export function DatasetBorradorRowActions({ dataset, onError, onDescartado }: Da
 
   return (
     <div className="rowActions">
+      <Link className="btn btnPrimary" to={`/crear-dashboard/borrador/${dataset.id}`}>
+        Continuar creación
+      </Link>
       <Link className="btn btnAction" to={`/datasets/${dataset.id}`}>
         Detalle
       </Link>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ResumenTrazabilidadImportacionTrabajoDto } from '../../api/types'
 import { formatearFechaHora } from '../../utils/trazabilidad/fechas'
+import { traducirEstado } from '../../utils/textosEstado'
 import styles from './Trazabilidad.module.css'
 
 interface ResumenTrazabilidadCardProps {
@@ -40,14 +41,14 @@ export function ResumenTrazabilidadCard({ resumen }: ResumenTrazabilidadCardProp
       </li>
       <li>Dataset: {resumen.datasetId}</li>
       <li>Plantilla: {resumen.plantillaId}</li>
-      <li>Copia de trabajo: {resumen.importacionTrabajoId}</li>
+      <li>Copia interna: {resumen.importacionTrabajoId}</li>
       <li>Importación final: {resumen.importacionGenericaId ?? 'aún no importada'}</li>
-      <li>Estado: {resumen.estado}</li>
+      <li>Estado: {traducirEstado(resumen.estado)}</li>
       <li>Filas leídas: {resumen.totalFilasLeidas}</li>
       <li>Filas excluidas: {resumen.totalFilasExcluidas}</li>
       <li>Errores: {resumen.totalErrores}</li>
       <li>Advertencias: {resumen.totalAdvertencias}</li>
-      <li>Importable: {resumen.importable ? 'Sí' : 'No'}</li>
+      {!resumen.importable && <li>Aún no se puede importar: quedan errores por corregir.</li>}
       <li>Eventos registrados: {resumen.totalEventos}</li>
       <li>Correcciones manuales: {resumen.totalCorreccionesManuales}</li>
       <li>Correcciones en bloque: {resumen.totalCorreccionesEnBloque}</li>

@@ -3,3 +3,22 @@
   flex-direction: column;
   gap: var(--spacing-md);
 }
+
+.introCard {
+  background-color: var(--color-bg);
+}
+
+.intro {
+  margin: 0 0 var(--spacing-sm) 0;
+  max-width: 720px;
+}
+
+.pasosFlujo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-lg);
+  margin: 0;
+  padding-left: var(--spacing-lg);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}

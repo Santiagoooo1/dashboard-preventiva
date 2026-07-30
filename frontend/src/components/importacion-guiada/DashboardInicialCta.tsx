@@ -67,7 +67,7 @@ export function DashboardInicialCta({ datasetId }: DashboardInicialCtaProps) {
 
     const huboOmitidos = res.metricasFallidas.length > 0 || res.widgetsFallidos.length > 0
     if (!huboOmitidos && res.panelId !== null) {
-      navigate(`/paneles/${res.panelId}/dashboard`)
+      navigate(`/paneles/${res.panelId}/dashboard?inicial=1`)
       return
     }
     setEstado('creado')
@@ -83,7 +83,7 @@ export function DashboardInicialCta({ datasetId }: DashboardInicialCtaProps) {
 
   if (estado === 'idle' && panelExistenteId !== null) {
     return (
-      <Link className="btn btnPrimary" to={`/paneles/${panelExistenteId}/dashboard`}>
+      <Link className="btn btnPrimary" to={`/paneles/${panelExistenteId}/dashboard?inicial=1`}>
         Ver dashboard inicial
       </Link>
     )
@@ -114,7 +114,7 @@ export function DashboardInicialCta({ datasetId }: DashboardInicialCtaProps) {
       <div>
         <p>El dashboard se creó con algunos indicadores omitidos.</p>
         {resultado.panelId !== null && (
-          <Link className="btn btnPrimary" to={`/paneles/${resultado.panelId}/dashboard`}>
+          <Link className="btn btnPrimary" to={`/paneles/${resultado.panelId}/dashboard?inicial=1`}>
             Ver dashboard
           </Link>
         )}

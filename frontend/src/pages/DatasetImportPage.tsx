@@ -15,6 +15,7 @@ import {
   validarImportacionGenerica,
 } from '../api/importacionesApi'
 import { useApiResource } from '../hooks/useApiResource'
+import { traducirEstado } from '../utils/textosEstado'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { Breadcrumbs } from '../components/Breadcrumbs'
@@ -318,7 +319,8 @@ export function DatasetImportPage() {
                   <Card title="4. Resultado de la importación">
                     <ul className={styles.metricas}>
                       <li>
-                        Estado: <span className={claseEstado(resultado.estado)}>{resultado.estado}</span>
+                        Estado:{' '}
+                        <span className={claseEstado(resultado.estado)}>{traducirEstado(resultado.estado)}</span>
                       </li>
                       <li>Filas leídas: {resultado.filasLeidas}</li>
                       <li>Filas importadas: {resultado.filasImportadas}</li>

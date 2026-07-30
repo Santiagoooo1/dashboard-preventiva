@@ -28,6 +28,7 @@ export function AppRoutes() {
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/crear-dashboard" element={<CrearDashboardPage />} />
+        <Route path="/crear-dashboard/borrador/:datasetId" element={<CrearDashboardPage />} />
         <Route path="/datasets" element={<DatasetsPage />} />
         <Route path="/datasets/nuevo" element={<DatasetFormPage />} />
         <Route path="/datasets/:datasetId" element={<DatasetDetailPage />} />

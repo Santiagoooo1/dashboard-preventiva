@@ -5,6 +5,7 @@ import type {
   DatasetClinicoRequestDto,
   DatasetClinicoResponseDto,
   DatasetFrontendMetadataResponseDto,
+  ReanudarBorradorDatasetDto,
 } from './types'
 
 export function listarDatasets(
@@ -54,6 +55,14 @@ export function activarDataset(
 /** Borra un dataset BORRADOR/VALIDANDO y sus dependencias temporales. Rechaza si tiene registros reales. */
 export function descartarDatasetBorrador(id: string | number, signal?: AbortSignal): Promise<void> {
   return apiDelete(`/datasets-clinicos/${id}/descartar-borrador`, signal)
+}
+
+/** Determina si un dataset BORRADOR/VALIDANDO puede reanudarse en el asistente guiado, y en qué paso. */
+export function reanudarDatasetBorrador(
+  id: string | number,
+  signal?: AbortSignal,
+): Promise<ReanudarBorradorDatasetDto> {
+  return apiGet<ReanudarBorradorDatasetDto>(`/datasets-clinicos/${id}/reanudar-borrador`, signal)
 }
 
 export function listarCampos(

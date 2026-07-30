@@ -17,10 +17,10 @@ export function BackendStatusBadge() {
           setMensaje(texto)
         }
       })
-      .catch((err: unknown) => {
+      .catch(() => {
         if (!controller.signal.aborted) {
           setEstado('error')
-          setMensaje(err instanceof Error ? err.message : 'Error de conexión.')
+          setMensaje('No se pudo conectar con el backend.')
         }
       })
 

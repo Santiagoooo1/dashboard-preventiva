@@ -24,13 +24,15 @@ export function WizardStepIndicator({ actual }: WizardStepIndicatorProps) {
         const completado = i < indiceActual
         const activo = i === indiceActual
         return (
-          <li
-            key={paso.clave}
-            className={`${styles.paso} ${activo ? styles.pasoActivo : ''} ${completado ? styles.pasoCompletado : ''}`}
-            aria-current={activo ? 'step' : undefined}
-          >
-            <span className={styles.pasoNumero}>{completado ? '✓' : i + 1}</span>
-            {paso.etiqueta}
+          <li key={paso.clave} className={styles.pasoContenedor}>
+            {i > 0 && <span className={styles.pasoConector} aria-hidden="true">›</span>}
+            <span
+              className={`${styles.paso} ${activo ? styles.pasoActivo : ''} ${completado ? styles.pasoCompletado : ''}`}
+              aria-current={activo ? 'step' : undefined}
+            >
+              <span className={styles.pasoNumero}>{completado ? '✓' : i + 1}</span>
+              {paso.etiqueta}
+            </span>
           </li>
         )
       })}
