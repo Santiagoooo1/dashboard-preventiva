@@ -1,6 +1,7 @@
 package com.preventiva.backend.controller;
 
 import com.preventiva.backend.dto.ActualizarExclusionFilaTrabajoRequestDto;
+import com.preventiva.backend.dto.ColumnasReanudacionResponseDto;
 import com.preventiva.backend.dto.CorregirCeldaTrabajoRequestDto;
 import com.preventiva.backend.dto.CrearImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.DeshacerCorreccionCeldaTrabajoRequestDto;
@@ -182,6 +183,13 @@ public class ImportacionTrabajoController {
     @PostMapping("/{id}/importar")
     public ImportarDesdeTrabajoResponseDto importarDesdeTrabajo(@PathVariable("id") Long id) {
         return importacionTrabajoService.importarDesdeTrabajo(id);
+    }
+
+    // ---- Reanudación de borradores (Fase 6.8E.2.1) ----
+
+    @GetMapping("/{id}/columnas-reanudacion")
+    public ColumnasReanudacionResponseDto obtenerColumnasReanudacion(@PathVariable("id") Long id) {
+        return importacionTrabajoService.obtenerColumnasReanudacion(id);
     }
 
     // ---- Trazabilidad (Fase 6.8D.1) ----

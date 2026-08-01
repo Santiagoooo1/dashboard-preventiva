@@ -10,5 +10,7 @@ public interface ImportacionTrabajoRepository extends JpaRepository<ImportacionT
 
     List<ImportacionTrabajo> findByDatasetId(Long datasetId);
 
+    List<ImportacionTrabajo> findByDatasetIdOrderByFechaCreacionDesc(Long datasetId);
+
     Optional<ImportacionTrabajo> findByImportacionGenericaId(Long importacionGenericaId);
 }

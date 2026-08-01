@@ -1,5 +1,7 @@
 package com.preventiva.backend.service.impl;
 
+import com.preventiva.backend.dto.ColumnaReanudacionDto;
+import com.preventiva.backend.dto.ColumnasReanudacionResponseDto;
 import com.preventiva.backend.dto.CrearImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.ErrorFilaImportacionGenericaDto;
 import com.preventiva.backend.dto.ErrorImportacionTrabajoDto;
@@ -202,6 +204,77 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         List<FilaImportacionTrabajo> filas =
                 filaImportacionTrabajoRepository.findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(id);
         return construirResumen(trabajo, filas);
+    }
+
+    private static final String MENSAJE_SIN_RECONSTRUCCION = "No se pueden reconstruir columnas de esta copia.";
+
+    @Override
+    public ColumnasReanudacionResponseDto obtenerColumnasReanudacion(Long id) {
+        ImportacionTrabajo trabajo = obtenerTrabajoOLanzar(id);
+        Long plantillaId = trabajo.getPlantilla().getId();
+
+        List<String> columnasPresentes = trabajo.getColumnasPresentes();
+        List<ErrorImportacionTrabajoDto> erroresGlobales = trabajo.getErroresGlobales();
+        boolean hayColumnasNoReconocidas = erroresGlobales != null
+                && erroresGlobales.stream().anyMatch(e -> "COLUMNA_NO_RECONOCIDA".equals(e.getTipoError()));
+
+        if ((columnasPresentes == null || columnasPresentes.isEmpty()) && !hayColumnasNoReconocidas) {
+            return ColumnasReanudacionResponseDto.builder()
+                    .importacionTrabajoId(id)
+                    .datasetId(trabajo.getDataset().getId())
+                    .plantillaId(plantillaId)
+                    .columnas(List.of())
+                    .mensaje(MENSAJE_SIN_RECONSTRUCCION)
+                    .build();
+        }
+
+        List<MapeoCampoImportacion> mapeos = mapeoCampoImportacionRepository.findByPlantillaIdAndActivoTrue(plantillaId);
+        Map<String, MapeoCampoImportacion> mapeosPorNombre = mapeos.stream()
+                .collect(Collectors.toMap(MapeoCampoImportacion::getNombreColumnaOrigen, m -> m, (a, b) -> a));
+
+        List<ColumnaReanudacionDto> columnas = new ArrayList<>();
+        if (columnasPresentes != null) {
+            for (String nombreColumna : columnasPresentes) {
+                MapeoCampoImportacion mapeo = mapeosPorNombre.get(nombreColumna);
+                // Defensivo: si el mapeo se borró/desactivó después de crear la copia,
+                // no hay datos fiables de tipo/campo para esa columna; se omite en vez
+                // de inventar un tipo de dato.
+                if (mapeo == null) continue;
+                columnas.add(ColumnaReanudacionDto.builder()
+                        .nombreOriginal(nombreColumna)
+                        .nombreVisible(mapeo.getCampoClinico().getEtiqueta())
+                        .usar(true)
+                        .tipoDato(mapeo.getTipoDato().name())
+                        .campoClinicoCodigo(mapeo.getCampoClinico().getCodigo())
+                        .campoClinicoEtiqueta(mapeo.getCampoClinico().getEtiqueta())
+                        .obligatorio(Boolean.TRUE.equals(mapeo.getObligatorio()))
+                        .mapeada(true)
+                        .build());
+            }
+        }
+        if (erroresGlobales != null) {
+            for (ErrorImportacionTrabajoDto error : erroresGlobales) {
+                if (!"COLUMNA_NO_RECONOCIDA".equals(error.getTipoError()) || error.getNombreColumna() == null) continue;
+                columnas.add(ColumnaReanudacionDto.builder()
+                        .nombreOriginal(error.getNombreColumna())
+                        .nombreVisible(error.getNombreColumna())
+                        .usar(false)
+                        .tipoDato(null)
+                        .campoClinicoCodigo(null)
+                        .campoClinicoEtiqueta(null)
+                        .obligatorio(false)
+                        .mapeada(false)
+                        .build());
+            }
+        }
+
+        return ColumnasReanudacionResponseDto.builder()
+                .importacionTrabajoId(id)
+                .datasetId(trabajo.getDataset().getId())
+                .plantillaId(plantillaId)
+                .columnas(columnas)
+                .mensaje(columnas.isEmpty() ? MENSAJE_SIN_RECONSTRUCCION : null)
+                .build();
     }
 
     @Override

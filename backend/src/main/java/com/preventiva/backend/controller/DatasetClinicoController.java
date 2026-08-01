@@ -4,6 +4,7 @@ import com.preventiva.backend.dto.CampoClinicoRequestDto;
 import com.preventiva.backend.dto.CampoClinicoResponseDto;
 import com.preventiva.backend.dto.DatasetClinicoRequestDto;
 import com.preventiva.backend.dto.DatasetClinicoResponseDto;
+import com.preventiva.backend.dto.ReanudarBorradorDatasetDto;
 import com.preventiva.backend.service.interfaces.CampoClinicoService;
 import com.preventiva.backend.service.interfaces.DatasetClinicoService;
 import jakarta.validation.Valid;
@@ -60,6 +61,11 @@ public class DatasetClinicoController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void descartarBorrador(@PathVariable("id") Long id) {
         datasetClinicoService.descartarBorrador(id);
+    }
+
+    @GetMapping("/{id}/reanudar-borrador")
+    public ReanudarBorradorDatasetDto reanudarBorrador(@PathVariable("id") Long id) {
+        return datasetClinicoService.reanudarBorrador(id);
     }
 
     @GetMapping("/{id}/campos")

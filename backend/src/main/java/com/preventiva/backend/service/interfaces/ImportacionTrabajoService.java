@@ -1,5 +1,6 @@
 package com.preventiva.backend.service.interfaces;
 
+import com.preventiva.backend.dto.ColumnasReanudacionResponseDto;
 import com.preventiva.backend.dto.CrearImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.ErrorImportacionTrabajoDto;
 import com.preventiva.backend.dto.ImportacionTrabajoResponseDto;
@@ -53,4 +54,13 @@ public interface ImportacionTrabajoService {
     RevalidarImportacionTrabajoResponseDto normalizarColumna(Long id, String nombreColumna, String estrategia);
 
     ImportarDesdeTrabajoResponseDto importarDesdeTrabajo(Long id);
+
+    /**
+     * Reconstruye la revisión de columnas de una copia de trabajo a partir de
+     * columnasPresentes/erroresGlobales (guardados al crearla) y los mapeos
+     * activos de su plantilla, para reanudar un borrador sin el archivo
+     * original (Fase 6.8E.2.1). Si no hay suficiente información, devuelve
+     * una lista de columnas vacía y un mensaje explicando por qué.
+     */
+    ColumnasReanudacionResponseDto obtenerColumnasReanudacion(Long id);
 }
