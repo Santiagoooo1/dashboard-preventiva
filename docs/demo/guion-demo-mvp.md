@@ -72,12 +72,13 @@ Riesgo que resuelve: registros basura o incompletos ya no obligan a limpiar el a
 app antes de importar.
 
 **Paso 10 — Rellenar columna**
-Acción: en el grupo "MICROOR." (vacío en dos filas con cultivo positivo), usar "Rellenar columna"
-con el valor "No informado".
-Mensaje: "Cuando el mismo problema se repite en varias filas, no hace falta corregirlas una a
-una."
-Resultado esperado: las filas afectadas quedan con el valor aplicado y desaparecen del grupo de
-advertencias.
+Acción: en el grupo "MICROOR." (vacío en la mayoría de las filas, porque solo se informa cuando
+hay cultivo), usar "Rellenar columna" con el valor "No informado".
+Mensaje: "Cuando el mismo problema se repite en muchas filas — aquí en unas diez de golpe —, no
+hace falta corregirlas una a una."
+Resultado esperado: todas las filas activas con esa columna vacía quedan con el valor aplicado y
+desaparecen del grupo de advertencias. Las dos filas que sí tienen microorganismo informado
+(las que tuvieron infección) no se tocan.
 
 **Paso 11 — Normalizar columna**
 Acción: en una columna de fecha con formatos mixtos (`1/2/2026`, `10-01-2026`, `05/01/2026`), usar

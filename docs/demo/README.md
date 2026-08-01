@@ -27,11 +27,12 @@ columnas, y el registro de trazabilidad.
 | H005                | `FECHA ALTA` = `SIGUE INGRESADO`                        | Caso clínico especial, no es un error   |
 | H006 / H007         | Fechas válidas pero en formatos distintos entre sí      | Normalizar columna                      |
 | H010                | `DURACION MINUTOS` = `NO CONSTA`                        | Valor ausente clínico reconocido        |
-| H013 / H014         | `MICROOR.` vacío en dos filas con cultivo positivo      | Rellenar columna (aplica a varias filas)|
+| casi todas          | `MICROOR.` vacío (solo se informa si hubo cultivo)      | Rellenar columna (aplica a ~10 filas de golpe)|
 
 El resto de columnas opcionales vacías (fecha de ILQ, localización de infección, cultivo cuando no
 hubo infección) son advertencias esperables, no errores: sirven para mostrar que la aplicación
-distingue "campo que no aplica" de "dato roto".
+distingue "campo que no aplica" de "dato roto". `MICROOR.` sigue el mismo patrón, pero se eligió a
+propósito para la demo de "rellenar columna" porque afecta a muchas filas a la vez, no a una o dos.
 
 ## Qué acciones demostrar
 
