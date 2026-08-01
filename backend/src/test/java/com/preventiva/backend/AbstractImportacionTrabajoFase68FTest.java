@@ -26,6 +26,7 @@ import com.preventiva.backend.service.interfaces.TrazabilidadImportacionTrabajoS
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
@@ -42,6 +43,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * vía curl en fases anteriores; lo que falta es protegerlos de regresiones.
  */
 @SpringBootTest
+@ActiveProfiles("test")
 @Transactional
 abstract class AbstractImportacionTrabajoFase68FTest {
 
