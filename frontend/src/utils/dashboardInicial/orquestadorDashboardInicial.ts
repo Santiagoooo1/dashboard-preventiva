@@ -1,5 +1,5 @@
 import type { CampoMetricaMetadataDto, PanelClinicoResponseDto, PanelMetricaConfiguracionWidgetRequestDto } from '../../api/types'
-import { crearMetrica, obtenerMetadataMetricas } from '../../api/metricasApi'
+import { crearMetrica, obtenerMetadataMetricas, previewMetrica } from '../../api/metricasApi'
 import { actualizarConfiguracionWidget, anadirWidget, crearPanel, listarPaneles } from '../../api/panelesApi'
 import { proponerMetricas } from './reglasMetricas'
 
@@ -51,6 +51,30 @@ function mensajeErrorAmable(err: unknown): string {
 export async function buscarDashboardInicialExistente(datasetId: number): Promise<PanelClinicoResponseDto | null> {
   const paneles = await listarPaneles(datasetId)
   return paneles.find((p) => p.activo && p.codigo.startsWith(CODIGO_BASE_PANEL)) ?? null
+}
+
+/**
+ * Comprueba si el dataset tiene al menos un registro clínico importado, sin
+ * crear nada persistido: reutiliza el endpoint de previsualización de
+ * métricas con un conteo sin filtros (la misma configuración que la métrica
+ * "Total de registros" del dashboard inicial). Si la previsualización falla
+ * (p. ej. el dataset todavía no tiene campos), se asume que no hay datos: es
+ * más seguro no ofrecer "Crear dashboard inicial" que ofrecerlo sin base.
+ */
+export async function datasetTieneRegistros(datasetId: number): Promise<boolean> {
+  try {
+    const resultado = await previewMetrica(datasetId, {
+      metrica: {
+        codigo: 'comprobacion_total_registros',
+        nombre: 'Comprobación de registros',
+        tipoMetrica: 'CONTEO',
+        configuracion: { filtros: [] },
+      },
+    })
+    return (resultado.valor ?? 0) > 0
+  } catch {
+    return false
+  }
 }
 
 // Reintenta con sufijo _2/_3 solo si el fallo es por código duplicado (defensivo:

@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import type { DatasetClinicoResponseDto } from '../../api/types'
 import { eliminarDataset } from '../../api/datasetApi'
+import { buscarDashboardInicialExistente } from '../../utils/dashboardInicial/orquestadorDashboardInicial'
 
 interface DatasetRowActionsProps {
   dataset: DatasetClinicoResponseDto
@@ -11,6 +12,23 @@ interface DatasetRowActionsProps {
 
 export function DatasetRowActions({ dataset, onError, onEliminado }: DatasetRowActionsProps) {
   const [ocupado, setOcupado] = useState(false)
+  // Solo se comprueba para datasets activos: un borrador nunca tiene dashboard inicial todavía.
+  const [panelDashboardId, setPanelDashboardId] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (dataset.estadoDataset !== 'ACTIVO') return
+    let cancelado = false
+    buscarDashboardInicialExistente(dataset.id)
+      .then((panel) => {
+        if (!cancelado) setPanelDashboardId(panel?.id ?? null)
+      })
+      .catch(() => {
+        // Si falla la comprobación, se deja el enlace "Dashboard" genérico (al detalle) en vez de bloquear la fila.
+      })
+    return () => {
+      cancelado = true
+    }
+  }, [dataset.estadoDataset, dataset.id])
 
   const archivar = async () => {
     if (
@@ -36,14 +54,24 @@ export function DatasetRowActions({ dataset, onError, onEliminado }: DatasetRowA
       <Link className="btn btnAction" to={`/datasets/${dataset.id}`}>
         Detalle
       </Link>
+      {dataset.estadoDataset === 'ACTIVO' &&
+        (panelDashboardId !== null ? (
+          <Link className="btn btnAction" to={`/paneles/${panelDashboardId}/dashboard?inicial=1`}>
+            Ver dashboard
+          </Link>
+        ) : (
+          <Link className="btn btnAction" to={`/datasets/${dataset.id}`}>
+            Crear dashboard
+          </Link>
+        ))}
       <Link className="btn btnAction" to={`/datasets/${dataset.id}/campos`}>
         Campos
       </Link>
       <Link className="btn btnAction" to={`/datasets/${dataset.id}/metricas`}>
-        Métricas
+        Configurar métricas
       </Link>
       <Link className="btn btnAction" to={`/datasets/${dataset.id}/paneles`}>
-        Paneles
+        Configurar paneles
       </Link>
       <Link className="btn btnAction" to={`/datasets/${dataset.id}/editar`}>
         Editar datos básicos

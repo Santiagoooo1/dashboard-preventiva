@@ -9,6 +9,7 @@ import { DataTable } from '../components/DataTable'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { PanelRowActions } from '../components/paneles/PanelRowActions'
+import { DashboardInicialCard } from '../components/dashboard/DashboardInicialCard'
 import styles from './PanelesPage.module.css'
 
 export function PanelesPage() {
@@ -55,6 +56,10 @@ export function PanelesPage() {
                 <Link className="btn btnPrimary" to={`/datasets/${datasetId}/paneles/nuevo`}>
                   Nuevo panel
                 </Link>
+                <p className={styles.opcionAutomatica}>
+                  Puedes generar automáticamente un primer panel con métricas básicas.
+                </p>
+                <DashboardInicialCard datasetId={Number(datasetId)} />
               </div>
             ) : (
               <Card title="Paneles">

@@ -1,22 +1,12 @@
-import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import {
-  PASOS_DASHBOARD_INICIAL,
-  buscarDashboardInicialExistente,
-  crearDashboardInicial,
-} from '../../utils/dashboardInicial/orquestadorDashboardInicial'
-import type {
-  PasoProgresoDashboardInicial,
-  ResultadoDashboardInicial,
-} from '../../utils/dashboardInicial/orquestadorDashboardInicial'
+import { useDashboardInicial } from '../../utils/dashboardInicial/useDashboardInicial'
+import type { PasoProgresoDashboardInicial } from '../../utils/dashboardInicial/orquestadorDashboardInicial'
 import { ErrorBanner } from '../ErrorBanner'
 import styles from './ImportacionGuiada.module.css'
 
 interface DashboardInicialCtaProps {
   datasetId: number
 }
-
-type Estado = 'comprobando' | 'idle' | 'creando' | 'creado' | 'error'
 
 function iconoDe(estado: PasoProgresoDashboardInicial['estado']): { clase: string; simbolo: string } {
   if (estado === 'correcto') return { clase: styles.iconoCorrecto, simbolo: '✓' }
@@ -27,50 +17,18 @@ function iconoDe(estado: PasoProgresoDashboardInicial['estado']): { clase: strin
 
 export function DashboardInicialCta({ datasetId }: DashboardInicialCtaProps) {
   const navigate = useNavigate()
-  const [estado, setEstado] = useState<Estado>('comprobando')
-  const [panelExistenteId, setPanelExistenteId] = useState<number | null>(null)
-  const [pasos, setPasos] = useState<PasoProgresoDashboardInicial[]>(PASOS_DASHBOARD_INICIAL)
-  const [resultado, setResultado] = useState<ResultadoDashboardInicial | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  // Se usa justo tras una importación que acaba de tener éxito: no hace falta
+  // volver a comprobar si hay registros (comprobarRegistros=false), y así un
+  // fallo transitorio de esa comprobación extra no bloquea este CTA.
+  const { estado, panelExistenteId, pasos, resultado, error, crear } = useDashboardInicial(datasetId, false)
 
-  useEffect(() => {
-    let cancelado = false
-    buscarDashboardInicialExistente(datasetId)
-      .then((panel) => {
-        if (cancelado) return
-        setPanelExistenteId(panel?.id ?? null)
-        setEstado('idle')
-      })
-      .catch(() => {
-        if (!cancelado) setEstado('idle')
-      })
-    return () => {
-      cancelado = true
-    }
-  }, [datasetId])
-
-  const crear = async () => {
-    setEstado('creando')
-    setError(null)
-    setPasos(PASOS_DASHBOARD_INICIAL.map((p) => ({ ...p })))
-
-    const res = await crearDashboardInicial(datasetId, (clave, estadoPaso) => {
-      setPasos((actual) => actual.map((p) => (p.clave === clave ? { ...p, estado: estadoPaso } : p)))
-    })
-    setResultado(res)
-
-    if (res.errorPanel) {
-      setError('No se pudo crear el dashboard inicial automáticamente. Puedes continuar en modo avanzado.')
-      setEstado('error')
-      return
-    }
-
+  const alPulsarCrear = async () => {
+    const res = await crear()
+    if (res.errorPanel) return
     const huboOmitidos = res.metricasFallidas.length > 0 || res.widgetsFallidos.length > 0
     if (!huboOmitidos && res.panelId !== null) {
       navigate(`/paneles/${res.panelId}/dashboard?inicial=1`)
-      return
     }
-    setEstado('creado')
   }
 
   if (estado === 'comprobando') {
@@ -123,7 +81,7 @@ export function DashboardInicialCta({ datasetId }: DashboardInicialCtaProps) {
   }
 
   return (
-    <button type="button" className="btn btnPrimary" onClick={crear}>
+    <button type="button" className="btn btnPrimary" onClick={alPulsarCrear}>
       Crear dashboard inicial
     </button>
   )

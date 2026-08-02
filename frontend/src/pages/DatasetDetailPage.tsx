@@ -15,6 +15,7 @@ import { ErrorBanner } from '../components/ErrorBanner'
 import { MetricaRowActions } from '../components/metrics/MetricaRowActions'
 import { PanelRowActions } from '../components/paneles/PanelRowActions'
 import { WidgetActual } from '../components/widgets/WidgetActual'
+import { DashboardInicialCard } from '../components/dashboard/DashboardInicialCard'
 import styles from './DatasetDetailPage.module.css'
 
 interface Recomendacion {
@@ -99,6 +100,8 @@ export function DatasetDetailPage() {
             <p className={styles.codigo}>{data.dataset.codigo}</p>
             {data.dataset.descripcion && <p>{data.dataset.descripcion}</p>}
             <p className="stateEmpty">Esta es una vista avanzada de configuración.</p>
+
+            {data.dataset.estadoDataset === 'ACTIVO' && <DashboardInicialCard datasetId={Number(datasetId)} />}
 
             <Card title="Siguiente paso recomendado" className={styles.recomendacion}>
               <p className={styles.recomendacionTitulo}>{recomendacion.titulo}</p>

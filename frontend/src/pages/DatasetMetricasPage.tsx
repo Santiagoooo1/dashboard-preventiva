@@ -11,6 +11,7 @@ import { Breadcrumbs } from '../components/Breadcrumbs'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { MetricaRowActions } from '../components/metrics/MetricaRowActions'
 import { WidgetActual } from '../components/widgets/WidgetActual'
+import { DashboardInicialCard } from '../components/dashboard/DashboardInicialCard'
 import styles from './DatasetMetricasPage.module.css'
 
 export function DatasetMetricasPage() {
@@ -67,6 +68,10 @@ export function DatasetMetricasPage() {
                 <Link className="btn btnPrimary" to={`/datasets/${datasetId}/metricas/nueva`}>
                   Nueva métrica
                 </Link>
+                <p className={styles.opcionAutomatica}>
+                  También puedes generar métricas iniciales automáticamente a partir de los campos importados.
+                </p>
+                <DashboardInicialCard datasetId={Number(datasetId)} />
               </div>
             ) : (
               <Card title="Métricas">
