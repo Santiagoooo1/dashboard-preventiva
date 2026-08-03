@@ -2,6 +2,11 @@
 
 Material para enseñar el producto de principio a fin en 5-10 minutos.
 
+Para contexto más allá de la demo: [`README.md`](../../README.md) principal (qué es y qué
+resuelve), [`docs/guia-usuario.md`](../guia-usuario.md) (cómo se usa paso a paso) y
+[`docs/guia-instalacion.md`](../guia-instalacion.md) (cómo arrancarlo). Este documento se centra
+solo en lo específico de la demo.
+
 ## Contenido de esta carpeta
 
 - `demo-mvp.md` — explicación del flujo principal (16 pasos, del alta al dashboard).
