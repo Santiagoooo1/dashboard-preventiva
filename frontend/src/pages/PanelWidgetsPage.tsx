@@ -4,6 +4,7 @@ import type {
   PanelMetricaConfiguracionWidgetRequestDto,
   PanelMetricaRequestDto,
   PanelMetricaResponseDto,
+  WidgetMetadataDto,
 } from '../api/types'
 import {
   actualizarConfiguracionWidget,
@@ -24,7 +25,25 @@ import { WidgetForm } from '../components/paneles/WidgetForm'
 import type { WidgetFormValores } from '../components/paneles/WidgetForm'
 import { WidgetConfigForm } from '../components/paneles/WidgetConfigForm'
 import { WidgetRowActions } from '../components/paneles/WidgetRowActions'
+import { ETIQUETA_VISUALIZACION_OFRECIDA, normalizarTipoVisualizacion } from '../components/dashboard/visualizacionesCompatibles'
 import styles from './PanelWidgetsPage.module.css'
+
+const ANCHO_ETIQUETA: Record<number, string> = { 3: 'Pequeño', 6: 'Medio', 12: 'Ancho completo' }
+
+/** "Cómo se calcula" este widget, en lenguaje de usuario — nunca el enum crudo. */
+function describirCalculo(meta: WidgetMetadataDto | undefined): string {
+  if (!meta) return '—'
+  const config = meta.configuracionWidgetActual
+  if (meta.tipoResultadoActual === 'COMPARATIVA' && config?.campoAgrupacion) {
+    return `Agrupado por ${config.campoAgrupacion}`
+  }
+  if (meta.tipoResultadoActual === 'SERIE_TEMPORAL') {
+    return config?.campoSegmentacion
+      ? `Evolución en el tiempo, por ${config.campoSegmentacion}`
+      : 'Evolución en el tiempo'
+  }
+  return 'Valor único'
+}
 
 type FormAbierto = { tipo: 'nuevo' } | { tipo: 'editar' | 'config'; panelMetricaId: number } | null
 
@@ -143,9 +162,11 @@ export function PanelWidgetsPage() {
               </div>
             </div>
             <p className={styles.explicacion}>
-              Aquí decides qué métricas aparecen en este panel y cómo se ve cada una (número, gráfico o
-              tabla), además de su tamaño y orden. Para cambios rápidos de visualización sin entrar aquí,
-              usa el selector "Vista" de cada widget directamente en el dashboard.
+              Aquí decides qué métricas aparecen en este panel, cómo se ve cada una (número, gráfico o
+              tabla) y si está agrupada o segmentada. Para cambios rápidos de visualización sin entrar
+              aquí, usa el selector "Vista" de cada widget directamente en el dashboard. Para crear una
+              métrica nueva ya lista para agrupar/segmentar y añadirla al dashboard en un solo paso, usa
+              "Nueva métrica" desde la pantalla de métricas del dataset.
             </p>
             <p className={styles.subtitulo}>
               Dataset: {data.metadata.dataset.nombre} ({data.metadata.dataset.codigo})
@@ -182,32 +203,26 @@ export function PanelWidgetsPage() {
               <Card title="Widgets del panel">
                 <DataTable
                   columns={[
-                    { key: 'orden', header: 'Orden' },
                     {
                       key: 'metrica',
                       header: 'Métrica',
                       render: (w) => w.tituloPersonalizado ?? w.metricaNombre,
                     },
                     {
-                      key: 'tipoMetrica',
-                      header: 'Tipo métrica',
-                      render: (w) =>
-                        data.metadata.widgets.find((m) => m.panelMetricaId === w.id)?.tipoMetrica ?? '—',
-                    },
-                    { key: 'tipoVisualizacion', header: 'Visualización' },
-                    {
-                      key: 'configurado',
-                      header: 'Resultado configurado',
-                      render: (w) =>
-                        w.tipoResultadoWidget ?? <span className={styles.automatico}>Automático</span>,
+                      key: 'vista',
+                      header: 'Vista',
+                      render: (w) => ETIQUETA_VISUALIZACION_OFRECIDA[normalizarTipoVisualizacion(w.tipoVisualizacion)],
                     },
                     {
-                      key: 'actual',
-                      header: 'Resultado actual',
-                      render: (w) =>
-                        data.metadata.widgets.find((m) => m.panelMetricaId === w.id)?.tipoResultadoActual ?? '—',
+                      key: 'calculo',
+                      header: 'Cómo se calcula',
+                      render: (w) => describirCalculo(data.metadata.widgets.find((m) => m.panelMetricaId === w.id)),
                     },
-                    { key: 'ancho', header: 'Ancho' },
+                    {
+                      key: 'ancho',
+                      header: 'Tamaño',
+                      render: (w) => ANCHO_ETIQUETA[w.ancho] ?? `${w.ancho} columnas`,
+                    },
                     {
                       key: 'acciones',
                       header: 'Acciones',

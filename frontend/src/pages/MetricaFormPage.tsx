@@ -4,16 +4,21 @@ import type {
   CampoMetricaMetadataDto,
   CatalogoFrontendResponseDto,
   ConfiguracionMetricaDto,
+  ConfiguracionWidgetDto,
   FiltroMetricaDto,
+  Granularidad,
   MetadataMetricasResponseDto,
   MetricaClinicaRequestDto,
   MetricaClinicaResponseDto,
   OperadorFiltroCatalogoDto,
+  PanelClinicoResponseDto,
   ResultadoMetricaResponseDto,
   TipoMetrica,
+  TipoVisualizacion,
 } from '../api/types'
 import { getCatalogo } from '../api/frontendCatalogApi'
 import { actualizarMetrica, crearMetrica, obtenerMetadataMetricas, obtenerMetrica, previewMetrica } from '../api/metricasApi'
+import { actualizarConfiguracionWidget, anadirWidget, listarPaneles } from '../api/panelesApi'
 import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
@@ -23,12 +28,15 @@ import { ErrorBanner } from '../components/ErrorBanner'
 import { avisoCodigo } from '../utils/validacion'
 import { MetricaConfigForm } from '../components/metrics/MetricaConfigForm'
 import { WidgetActual } from '../components/widgets/WidgetActual'
+import type { PlanResultado } from '../components/dashboard/visualizacionesCompatibles'
+import { visualizacionesSegunPlan } from '../components/dashboard/visualizacionesCompatibles'
 import styles from './MetricaFormPage.module.css'
 
 interface DatosFormulario {
   catalogo: CatalogoFrontendResponseDto
   metadata: MetadataMetricasResponseDto
   metricaExistente: MetricaClinicaResponseDto | null
+  paneles: PanelClinicoResponseDto[]
 }
 
 interface EstadoFormulario {
@@ -41,6 +49,12 @@ interface EstadoFormulario {
   orden: string
   configuracion: ConfiguracionMetricaDto
 }
+
+const ANCHOS = [
+  { valor: '3', etiqueta: 'Pequeño' },
+  { valor: '6', etiqueta: 'Medio' },
+  { valor: '12', etiqueta: 'Ancho completo' },
+]
 
 function configuracionBase(tipo: TipoMetrica): ConfiguracionMetricaDto {
   switch (tipo) {
@@ -108,12 +122,13 @@ export function MetricaFormPage() {
 
   const { data, loading, error } = useApiResource<DatosFormulario>(
     async (signal) => {
-      const [catalogo, metadata, metricaExistente] = await Promise.all([
+      const [catalogo, metadata, metricaExistente, paneles] = await Promise.all([
         getCatalogo(signal),
         obtenerMetadataMetricas(datasetId ?? '', signal),
         metricaId ? obtenerMetrica(metricaId, signal) : Promise.resolve(null),
+        listarPaneles(datasetId ?? '', signal),
       ])
-      return { catalogo, metadata, metricaExistente }
+      return { catalogo, metadata, metricaExistente, paneles }
     },
     [datasetId, metricaId],
   )
@@ -135,6 +150,20 @@ export function MetricaFormPage() {
   const [fechaHasta, setFechaHasta] = useState('')
   const [guardando, setGuardando] = useState(false)
 
+  // --- Paso "cómo quieres verlo" + "cómo se visualiza" + "añadir al dashboard" ---
+  // Solo aplica al crear una métrica nueva: al editar una ya existente puede
+  // estar en varios widgets/paneles a la vez, así que no tiene sentido pedir
+  // "en qué panel la añado" — eso se sigue haciendo desde "Configurar widgets".
+  const [modoResultado, setModoResultado] = useState<PlanResultado>('UNICO')
+  const [campoAgrupacionWidget, setCampoAgrupacionWidget] = useState('')
+  const [granularidadWidget, setGranularidadWidget] = useState('')
+  const [campoFechaWidget, setCampoFechaWidget] = useState('')
+  const [campoSegmentacionWidget, setCampoSegmentacionWidget] = useState('')
+  const [tipoVisualizacionElegida, setTipoVisualizacionElegida] = useState('')
+  const [panelIdElegido, setPanelIdElegido] = useState('')
+  const [anchoElegido, setAnchoElegido] = useState('3')
+  const [erroresPlan, setErroresPlan] = useState<Record<string, string>>({})
+
   useEffect(() => {
     const metrica = data?.metricaExistente
     if (metrica) {
@@ -152,9 +181,38 @@ export function MetricaFormPage() {
     }
   }, [data])
 
+  // Preselecciona un panel (el "dashboard inicial" si existe) en cuanto se
+  // conocen los paneles del dataset, para que el caso más común (añadir a un
+  // único dashboard ya existente) no exija ni un clic de más.
+  useEffect(() => {
+    if (esEdicion || !data || data.paneles.length === 0 || panelIdElegido !== '') return
+    const inicial = data.paneles.find((p) => p.codigo.startsWith('dashboard_inicial'))
+    setPanelIdElegido(String((inicial ?? data.paneles[0]).id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
+
+  // El modo "distribución" ya agrupa dentro de la propia métrica (campoAgrupacion
+  // de configuracionBase), así que el paso "cómo quieres verlo" (agrupar/segmentar
+  // a nivel de widget) no aplica — y tampoco lo admite el backend (ver
+  // MetricaAnaliticaServiceImpl.validarTipoPermitido).
+  const admiteAgruparOSegmentar = form.tipoMetrica !== 'DISTRIBUCION'
+  const modoEfectivo: PlanResultado = admiteAgruparOSegmentar ? modoResultado : 'AGRUPADO'
+  const opcionesVisualizacion = visualizacionesSegunPlan(modoEfectivo)
+
+  // Si cambia el modo (o el tipo de métrica cambia a DISTRIBUCION), la
+  // visualización elegida puede dejar de ser válida: se reinicia a la primera
+  // opción compatible en vez de dejar seleccionado algo que ya no aplica.
+  useEffect(() => {
+    if (!opcionesVisualizacion.some((o) => o.valor === tipoVisualizacionElegida)) {
+      setTipoVisualizacionElegida(opcionesVisualizacion[0]?.valor ?? '')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modoEfectivo])
+
   const cambiarTipo = (tipo: TipoMetrica) => {
     setForm((f) => ({ ...f, tipoMetrica: tipo, configuracion: configuracionBase(tipo) }))
     setResultadoPreview(null)
+    if (tipo === 'DISTRIBUCION') setModoResultado('UNICO')
   }
 
   const validar = (): Record<string, string> => {
@@ -204,6 +262,26 @@ export function MetricaFormPage() {
       validarFiltros(config.filtros ?? [], 'configuracion.filtros')
     }
 
+    return errores
+  }
+
+  const validarPlan = (): Record<string, string> => {
+    if (esEdicion) return {}
+    const errores: Record<string, string> = {}
+    if (admiteAgruparOSegmentar) {
+      if (modoResultado === 'AGRUPADO' && !campoAgrupacionWidget) {
+        errores['plan.agrupacion'] = 'Selecciona por qué campo quieres agrupar.'
+      }
+      if (modoResultado === 'SERIE' && !granularidadWidget) {
+        errores['plan.granularidad'] = 'Selecciona cada cuánto tiempo agrupar (mes, trimestre o año).'
+      }
+    }
+    if (!tipoVisualizacionElegida) {
+      errores['plan.visualizacion'] = 'Selecciona cómo quieres verlo.'
+    }
+    if ((data?.paneles.length ?? 0) > 0 && !panelIdElegido) {
+      errores['plan.panel'] = 'Selecciona en qué dashboard quieres añadirlo.'
+    }
     return errores
   }
 
@@ -257,7 +335,9 @@ export function MetricaFormPage() {
     }
   }
 
-  const guardar = async () => {
+  // Edición: se mantiene exactamente el comportamiento de siempre (solo
+  // actualiza la métrica; los widgets que ya la muestran no se tocan aquí).
+  const guardarEdicion = async () => {
     setErrorBackend(null)
     const errores = validar()
     setErroresForm(errores)
@@ -265,11 +345,7 @@ export function MetricaFormPage() {
 
     setGuardando(true)
     try {
-      if (esEdicion && metricaId) {
-        await actualizarMetrica(metricaId, construirPayload())
-      } else {
-        await crearMetrica(datasetId ?? '', construirPayload())
-      }
+      await actualizarMetrica(metricaId ?? '', construirPayload())
       navigate(`/datasets/${datasetId}/metricas`)
     } catch (err) {
       setErrorBackend(err instanceof Error ? err.message : 'Error al guardar la métrica.')
@@ -277,7 +353,64 @@ export function MetricaFormPage() {
     }
   }
 
+  // Creación: crea la métrica y, en el mismo paso, el widget que la muestra
+  // en el dashboard elegido — con la agrupación/segmentación ya aplicada si
+  // se pidió. Reutiliza únicamente endpoints que ya existían (crear métrica,
+  // añadir widget, configurar resultado del widget): nada de esto es nuevo
+  // en el backend, solo estaba repartido en tres pantallas distintas.
+  const guardarYAnadir = async () => {
+    setErrorBackend(null)
+    const erroresBase = validar()
+    const erroresPlanActual = validarPlan()
+    setErroresForm(erroresBase)
+    setErroresPlan(erroresPlanActual)
+    if (Object.keys(erroresBase).length > 0 || Object.keys(erroresPlanActual).length > 0) return
+
+    setGuardando(true)
+    try {
+      const metricaCreada = await crearMetrica(datasetId ?? '', construirPayload())
+
+      if (!panelIdElegido) {
+        // No hay ningún panel en el dataset todavía: la métrica queda creada,
+        // sin añadirla a ningún dashboard (no hay dónde).
+        navigate(`/datasets/${datasetId}/metricas`)
+        return
+      }
+
+      const widgetCreado = await anadirWidget(panelIdElegido, {
+        metricaId: metricaCreada.id,
+        tipoVisualizacion: tipoVisualizacionElegida as TipoVisualizacion,
+        ancho: Number(anchoElegido),
+        orden: null,
+      })
+
+      if (admiteAgruparOSegmentar && modoResultado !== 'UNICO') {
+        const configuracionWidget: ConfiguracionWidgetDto =
+          modoResultado === 'AGRUPADO'
+            ? { campoAgrupacion: campoAgrupacionWidget, granularidad: null, campoFecha: null, campoSegmentacion: null }
+            : {
+                granularidad: granularidadWidget as Granularidad,
+                campoFecha: campoFechaWidget || null,
+                campoSegmentacion: campoSegmentacionWidget || null,
+                campoAgrupacion: null,
+              }
+
+        await actualizarConfiguracionWidget(panelIdElegido, widgetCreado.id, {
+          tipoResultado: modoResultado === 'AGRUPADO' ? 'COMPARATIVA' : 'SERIE_TEMPORAL',
+          configuracionWidget,
+        })
+      }
+
+      navigate(`/paneles/${panelIdElegido}/dashboard`)
+    } catch (err) {
+      setErrorBackend(err instanceof Error ? err.message : 'Error al guardar y añadir al dashboard.')
+      setGuardando(false)
+    }
+  }
+
   const ayudaTipoMetrica = data?.catalogo.tipoMetricas.find((t) => t.codigo === form.tipoMetrica)?.descripcion
+  const camposAgrupables = (data?.metadata.campos ?? []).filter((c) => c.utilizableComoCampoAgrupacion)
+  const camposFecha = (data?.metadata.campos ?? []).filter((c) => c.utilizableComoCampoFecha)
 
   return (
     <div className={styles.page}>
@@ -299,7 +432,10 @@ export function MetricaFormPage() {
 
             <ErrorBanner mensaje={errorBackend} />
 
-            <Card title="Datos generales">
+            <Card title={esEdicion ? 'Datos generales' : 'Paso 1 — Qué quieres medir'}>
+              {!esEdicion && (
+                <p className={styles.introPaso}>Define qué indicador quieres calcular sobre tus datos clínicos.</p>
+              )}
               <div className={styles.formGrid}>
                 <FormField
                   label="Código interno de la métrica"
@@ -333,14 +469,16 @@ export function MetricaFormPage() {
                     onChange={(e) => setForm({ ...form, decimales: e.target.value })}
                   />
                 </FormField>
-                <FormField label="Orden">
-                  <input
-                    type="number"
-                    step={1}
-                    value={form.orden}
-                    onChange={(e) => setForm({ ...form, orden: e.target.value })}
-                  />
-                </FormField>
+                {esEdicion && (
+                  <FormField label="Orden">
+                    <input
+                      type="number"
+                      step={1}
+                      value={form.orden}
+                      onChange={(e) => setForm({ ...form, orden: e.target.value })}
+                    />
+                  </FormField>
+                )}
                 <div className={styles.descripcion}>
                   <FormField label="Descripción">
                     <textarea
@@ -353,7 +491,10 @@ export function MetricaFormPage() {
               </div>
             </Card>
 
-            <Card title="Configuración">
+            <Card title={esEdicion ? 'Configuración' : 'Filtros (opcional)'}>
+              {!esEdicion && (
+                <p className={styles.introPaso}>Puedes limitar el cálculo a un subconjunto de registros.</p>
+              )}
               <MetricaConfigForm
                 tipoMetrica={form.tipoMetrica}
                 configuracion={form.configuracion}
@@ -363,6 +504,115 @@ export function MetricaFormPage() {
                 errores={erroresForm}
               />
             </Card>
+
+            {!esEdicion && admiteAgruparOSegmentar && (
+              <Card title="Paso 2 — ¿Cómo quieres verlo?">
+                <p className={styles.introPaso}>
+                  Puedes ver un único valor, desglosarlo por una categoría (por ejemplo "por sexo", "por
+                  procedimiento" o "por ASA"), o seguir su evolución en el tiempo (por ejemplo "por mes",
+                  opcionalmente separado "por mes y sexo").
+                </p>
+                <div className={styles.opcionesModo}>
+                  <label className={styles.opcionModo}>
+                    <input
+                      type="radio"
+                      name="modoResultado"
+                      checked={modoResultado === 'UNICO'}
+                      onChange={() => setModoResultado('UNICO')}
+                    />
+                    Un solo valor
+                  </label>
+                  <label className={styles.opcionModo}>
+                    <input
+                      type="radio"
+                      name="modoResultado"
+                      checked={modoResultado === 'AGRUPADO'}
+                      onChange={() => setModoResultado('AGRUPADO')}
+                    />
+                    Agrupado por categoría
+                  </label>
+                  <label className={styles.opcionModo}>
+                    <input
+                      type="radio"
+                      name="modoResultado"
+                      checked={modoResultado === 'SERIE'}
+                      onChange={() => setModoResultado('SERIE')}
+                    />
+                    Evolución en el tiempo
+                  </label>
+                </div>
+
+                {modoResultado === 'AGRUPADO' && (
+                  <>
+                    <FormField
+                      label="Agrupar por"
+                      help="El resultado se calculará una vez por cada valor de este campo."
+                      error={erroresPlan['plan.agrupacion']}
+                    >
+                      <select value={campoAgrupacionWidget} onChange={(e) => setCampoAgrupacionWidget(e.target.value)}>
+                        <option value="">— seleccionar campo —</option>
+                        {camposAgrupables.map((c) => (
+                          <option key={c.codigo} value={c.codigo}>
+                            {c.etiqueta}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                    <p className={styles.avisoPreviewAgrupado}>
+                      La vista previa de abajo muestra el valor sin agrupar. La versión agrupada estará
+                      disponible al ver el dashboard, después de guardar.
+                    </p>
+                  </>
+                )}
+
+                {modoResultado === 'SERIE' && (
+                  <>
+                    <div className={styles.formGrid}>
+                      <FormField
+                        label="Cada cuánto tiempo"
+                        error={erroresPlan['plan.granularidad']}
+                      >
+                        <select value={granularidadWidget} onChange={(e) => setGranularidadWidget(e.target.value)}>
+                          <option value="">— seleccionar —</option>
+                          {data.catalogo.granularidades.map((g) => (
+                            <option key={g.codigo} value={g.codigo}>
+                              {g.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </FormField>
+                      <FormField label="Campo de fecha (opcional)">
+                        <select value={campoFechaWidget} onChange={(e) => setCampoFechaWidget(e.target.value)}>
+                          <option value="">— por defecto —</option>
+                          {camposFecha.map((c) => (
+                            <option key={c.codigo} value={c.codigo}>
+                              {c.etiqueta}
+                            </option>
+                          ))}
+                        </select>
+                      </FormField>
+                      <FormField
+                        label="Separar series por (opcional)"
+                        help='Ejemplo: "por mes y sexo" — una línea distinta para cada sexo.'
+                      >
+                        <select value={campoSegmentacionWidget} onChange={(e) => setCampoSegmentacionWidget(e.target.value)}>
+                          <option value="">— sin separar —</option>
+                          {camposAgrupables.map((c) => (
+                            <option key={c.codigo} value={c.codigo}>
+                              {c.etiqueta}
+                            </option>
+                          ))}
+                        </select>
+                      </FormField>
+                    </div>
+                    <p className={styles.avisoPreviewAgrupado}>
+                      La vista previa de abajo muestra el valor sin agrupar. La evolución en el tiempo estará
+                      disponible al ver el dashboard, después de guardar.
+                    </p>
+                  </>
+                )}
+              </Card>
+            )}
 
             <p className={styles.ayudaPreview}>Previsualiza el resultado antes de guardar la métrica.</p>
             <div className={styles.fechasPreview}>
@@ -376,18 +626,93 @@ export function MetricaFormPage() {
               <button type="button" className="btn btnSecondary" onClick={previsualizar}>
                 Previsualizar
               </button>
-              <button type="button" className="btn btnPrimary" disabled={guardando} onClick={guardar}>
-                {esEdicion ? 'Guardar cambios' : 'Crear métrica'}
-              </button>
-              <Link className="btn btnSecondary" to={`/datasets/${datasetId}/metricas`}>
-                Cancelar
-              </Link>
+              {!esEdicion && (
+                <Link className="btn btnSecondary" to={`/datasets/${datasetId}/metricas`}>
+                  Cancelar
+                </Link>
+              )}
             </div>
 
             {resultadoPreview && (
               <Card title="Previsualización" subtitle={`${resultadoPreview.tipoMetrica}`}>
                 <WidgetActual resultado={resultadoPreview} />
               </Card>
+            )}
+
+            {!esEdicion && (
+              <Card title="Paso 3 — Cómo se visualiza">
+                <p className={styles.introPaso}>Elige cómo quieres que se vea este indicador en el dashboard.</p>
+                {erroresPlan['plan.visualizacion'] && (
+                  <p className={styles.errorPlan}>{erroresPlan['plan.visualizacion']}</p>
+                )}
+                <div className={styles.opcionesModo}>
+                  {opcionesVisualizacion.map((o) => (
+                    <label key={o.valor} className={styles.opcionModo}>
+                      <input
+                        type="radio"
+                        name="tipoVisualizacion"
+                        checked={tipoVisualizacionElegida === o.valor}
+                        onChange={() => setTipoVisualizacionElegida(o.valor)}
+                      />
+                      {o.etiqueta}
+                    </label>
+                  ))}
+                </div>
+              </Card>
+            )}
+
+            {!esEdicion && (
+              <Card title="Paso 4 — Añadir al dashboard">
+                {data.paneles.length === 0 ? (
+                  <p className={styles.introPaso}>
+                    Este dataset todavía no tiene ningún dashboard. Se creará solo la métrica; podrás añadirla a un
+                    panel más adelante desde{' '}
+                    <Link to={`/datasets/${datasetId}/paneles`}>Paneles</Link>.
+                  </p>
+                ) : (
+                  <div className={styles.formGrid}>
+                    <FormField label="Dashboard" error={erroresPlan['plan.panel']}>
+                      <select value={panelIdElegido} onChange={(e) => setPanelIdElegido(e.target.value)}>
+                        <option value="">— seleccionar —</option>
+                        {data.paneles.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                    <FormField label="Tamaño del widget" help="Cuánto sitio ocupa en el dashboard.">
+                      <select value={anchoElegido} onChange={(e) => setAnchoElegido(e.target.value)}>
+                        {ANCHOS.map((a) => (
+                          <option key={a.valor} value={a.valor}>
+                            {a.etiqueta}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                  </div>
+                )}
+                <div className={styles.botones}>
+                  <button type="button" className="btn btnPrimary" disabled={guardando} onClick={guardarYAnadir}>
+                    {guardando
+                      ? 'Guardando…'
+                      : data.paneles.length === 0
+                        ? 'Crear métrica'
+                        : 'Crear y añadir al dashboard'}
+                  </button>
+                </div>
+              </Card>
+            )}
+
+            {esEdicion && (
+              <div className={styles.botones}>
+                <button type="button" className="btn btnPrimary" disabled={guardando} onClick={guardarEdicion}>
+                  Guardar cambios
+                </button>
+                <Link className="btn btnSecondary" to={`/datasets/${datasetId}/metricas`}>
+                  Cancelar
+                </Link>
+              </div>
             )}
           </>
         )}

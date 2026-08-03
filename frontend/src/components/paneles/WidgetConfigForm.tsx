@@ -8,6 +8,7 @@ import type {
   WidgetMetadataDto,
 } from '../../api/types'
 import { FormField } from '../FormField'
+import { ETIQUETA_TIPO_RESULTADO } from '../dashboard/visualizacionesCompatibles'
 import styles from './WidgetForm.module.css'
 
 const AUTOMATICO = '__AUTOMATICO__'
@@ -46,10 +47,10 @@ export function WidgetConfigForm({
   const enviar = () => {
     const nuevosErrores: Record<string, string> = {}
     if (mostrarSerie && !granularidad) {
-      nuevosErrores.granularidad = 'SERIE_TEMPORAL requiere una granularidad.'
+      nuevosErrores.granularidad = 'Para ver la evolución en el tiempo, selecciona una granularidad.'
     }
     if (mostrarComparativa && !campoAgrupacion) {
-      nuevosErrores.campoAgrupacion = 'COMPARATIVA requiere un campo de agrupación.'
+      nuevosErrores.campoAgrupacion = 'Para agrupar el resultado, selecciona un campo.'
     }
     setErrores(nuevosErrores)
     if (Object.keys(nuevosErrores).length > 0) return
@@ -78,16 +79,16 @@ export function WidgetConfigForm({
   return (
     <div className={styles.form}>
       <p className={styles.ayuda}>
-        Resultado actual del widget: <strong>{widget.tipoResultadoActual}</strong>
-        {widget.tipoResultadoWidgetConfigurado === null && ' (resuelto automáticamente)'}
+        Ahora mismo se muestra como: <strong>{ETIQUETA_TIPO_RESULTADO[widget.tipoResultadoActual] ?? widget.tipoResultadoActual}</strong>
+        {widget.tipoResultadoWidgetConfigurado === null && ' (decidido automáticamente según la visualización)'}
       </p>
       <div className={styles.grid}>
-        <FormField label="Tipo de resultado" help={ayudaTipoResultado}>
+        <FormField label="Agrupar o segmentar" help={ayudaTipoResultado}>
           <select value={tipoResultado} onChange={(e) => setTipoResultado(e.target.value)}>
-            <option value={AUTOMATICO}>— Automático (según visualización) —</option>
+            <option value={AUTOMATICO}>— Automático (según la visualización) —</option>
             {widget.tipoResultadosPermitidos.map((t) => (
               <option key={t} value={t}>
-                {t}
+                {ETIQUETA_TIPO_RESULTADO[t] ?? t}
               </option>
             ))}
           </select>
@@ -115,9 +116,9 @@ export function WidgetConfigForm({
                 ))}
               </select>
             </FormField>
-            <FormField label="Campo de segmentación (opcional)">
+            <FormField label="Separar series por (opcional)" help="Ejemplo: ver la evolución por mes, con una línea distinta para cada sexo.">
               <select value={campoSegmentacion} onChange={(e) => setCampoSegmentacion(e.target.value)}>
-                <option value="">— sin segmentar —</option>
+                <option value="">— sin separar —</option>
                 {camposAgrupacionPermitidos.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -129,7 +130,7 @@ export function WidgetConfigForm({
         )}
 
         {mostrarComparativa && (
-          <FormField label="Campo de agrupación" error={errores.campoAgrupacion}>
+          <FormField label="Agrupar por" help="Ejemplo: ver el resultado desglosado por sexo o por procedimiento." error={errores.campoAgrupacion}>
             <select value={campoAgrupacion} onChange={(e) => setCampoAgrupacion(e.target.value)}>
               <option value="">— seleccionar campo —</option>
               {camposAgrupacionPermitidos.map((c) => (

@@ -11,7 +11,11 @@ import { PieChartWidget } from './PieChartWidget'
 import { KpiWidget } from './KpiWidget'
 import { TableWidget } from './TableWidget'
 import { ChartEmptyState } from './ChartEmptyState'
-import { normalizarTipoVisualizacion, visualizacionesCompatibles } from './visualizacionesCompatibles'
+import {
+  ETIQUETA_TIPO_RESULTADO,
+  normalizarTipoVisualizacion,
+  visualizacionesCompatibles,
+} from './visualizacionesCompatibles'
 import styles from './DashboardWidgetRenderer.module.css'
 
 const MAX_SERIES_LINEA = 4
@@ -24,12 +28,6 @@ const ETIQUETA_VISUALIZACION: Record<string, string> = {
   LINEAS: 'Líneas',
   DONUT: 'Donut',
   PIE: 'Circular',
-}
-
-const ETIQUETA_RESULTADO: Record<string, string> = {
-  ACTUAL: 'Valor actual',
-  SERIE_TEMPORAL: 'Evolución temporal',
-  COMPARATIVA: 'Comparativa',
 }
 
 interface DashboardWidgetRendererProps {
@@ -156,7 +154,7 @@ export function DashboardWidgetRenderer({ widget, onCambiarVisualizacion }: Dash
           <div className={styles.cardHeaderText}>
             <h3 className={styles.cardTitle}>{widget.titulo}</h3>
             <p className={styles.cardMeta}>
-              {ETIQUETA_RESULTADO[widget.tipoResultado] ?? widget.tipoResultado}
+              {ETIQUETA_TIPO_RESULTADO[widget.tipoResultado] ?? widget.tipoResultado}
               {widget.descripcion && <span className={styles.cardDescripcion}> · {widget.descripcion}</span>}
             </p>
           </div>

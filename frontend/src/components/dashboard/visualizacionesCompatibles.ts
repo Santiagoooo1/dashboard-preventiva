@@ -80,3 +80,27 @@ export function normalizarTipoVisualizacion(actual: string): TipoVisualizacionOf
   }
   return 'TABLA'
 }
+
+/** Cómo se está calculando hoy un widget, en lenguaje de usuario (no el enum crudo ACTUAL/SERIE_TEMPORAL/COMPARATIVA). */
+export const ETIQUETA_TIPO_RESULTADO: Record<string, string> = {
+  ACTUAL: 'Valor único',
+  SERIE_TEMPORAL: 'Evolución en el tiempo',
+  COMPARATIVA: 'Agrupado por categoría',
+}
+
+export type PlanResultado = 'UNICO' | 'AGRUPADO' | 'SERIE'
+
+/**
+ * Misma idea que `visualizacionesCompatibles`, pero para cuando todavía no
+ * existe ningún widget que inspeccionar (se está creando uno desde cero, en
+ * el asistente de "Nueva métrica"): aquí no hay datos reales que mirar, así
+ * que se predice a partir de lo que el usuario ha elegido en el paso
+ * "¿Cómo quieres verlo?" (un valor único, agrupado por categoría, o una
+ * evolución en el tiempo). Las mismas reglas que `visualizacionesCompatibles`
+ * (sin donut para "agrupado": ver el porqué en ese comentario).
+ */
+export function visualizacionesSegunPlan(plan: PlanResultado): OpcionVisualizacion[] {
+  const valores: TipoVisualizacionOfrecido[] =
+    plan === 'UNICO' ? ['KPI', 'TABLA'] : plan === 'AGRUPADO' ? ['BARRAS', 'TABLA'] : ['LINEAS', 'BARRAS', 'TABLA']
+  return valores.map((valor) => ({ valor, etiqueta: ETIQUETA_VISUALIZACION_OFRECIDA[valor] }))
+}

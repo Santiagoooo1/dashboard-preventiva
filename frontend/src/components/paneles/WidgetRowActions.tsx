@@ -40,13 +40,13 @@ export function WidgetRowActions({
   return (
     <div className="rowActions">
       <button type="button" className="btn btnAction" onClick={onEditar}>
-        Editar widget
+        Editar visualización
       </button>
       <button type="button" className="btn btnAction" onClick={onConfigurar}>
-        Configurar resultado
+        Agrupar / segmentar
       </button>
       <button type="button" className="btn btnDanger" disabled={ocupado} onClick={quitar}>
-        Quitar
+        Quitar del dashboard
       </button>
     </div>
   )
