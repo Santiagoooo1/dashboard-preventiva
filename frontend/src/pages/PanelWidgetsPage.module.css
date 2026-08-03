@@ -19,6 +19,12 @@
   align-items: center;
 }
 
+.explicacion {
+  color: var(--color-text-muted);
+  max-width: 720px;
+  margin: 0;
+}
+
 .subtitulo {
   color: var(--color-text-muted);
   margin-top: calc(var(--spacing-xs) * -1);

@@ -14,20 +14,50 @@
   --spacing-md: 16px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
+  --spacing-2xl: 48px;
 
   --radius-sm: 4px;
   --radius-md: 8px;
+  /* Fase 6.9B.1: radios/sombras más amplios, de uso deliberado en el
+     dashboard (tarjetas KPI/widget), sin tocar --radius-md/--shadow-sm/-md
+     que ya usa el resto de la app (formularios, tablas admin...). */
+  --radius-lg: 16px;
+  --radius-xl: 22px;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px -8px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-lg-hover: 0 16px 40px -8px rgba(15, 23, 42, 0.2), 0 4px 10px rgba(15, 23, 42, 0.06);
 
   --max-width: 1200px;
+
+  /* Versiones "suaves" (fondo translúcido) de los colores semánticos, para
+     acentos de tarjeta (chip de tipo de KPI, franja lateral) sin recurrir a
+     colores planos saturados. */
+  --color-primary-soft: rgba(37, 99, 235, 0.1);
+  --color-primary-soft-border: rgba(37, 99, 235, 0.22);
+  --color-success-soft: rgba(22, 163, 74, 0.1);
+  --color-warning-soft: rgba(217, 119, 6, 0.1);
+  --color-error-soft: rgba(220, 38, 38, 0.08);
+
+  /* Tinte muy sutil de fondo para la página de dashboard (no el --color-bg
+     global): un degradado casi imperceptible da algo de profundidad sin
+     convertir el fondo en un color plano distinto en el resto de la app. */
+  --dashboard-bg-gradient: radial-gradient(
+      circle at 15% 0%,
+      rgba(37, 99, 235, 0.05),
+      transparent 45%
+    ),
+    radial-gradient(circle at 100% 0%, rgba(22, 163, 74, 0.04), transparent 40%), var(--color-bg);
 
   /* Paleta de gráficos: orden categórico fijo, nunca ciclado.
      Validada para superficie clara (banda de luminosidad, croma, separación
      CVD y visión normal en todos los pares). Magenta y ámbar quedan por
      debajo de 3:1 sobre el fondo, así que los gráficos que los usan llevan
-     siempre etiqueta directa o leyenda visible. */
+     siempre etiqueta directa o leyenda visible. No se amplía esta paleta en
+     6.9B.1 (añadir tonos nuevos sin repetir la validación de contraste/CVD
+     sería arriesgarlo a ciegas); el enriquecimiento visual de esta fase viene
+     de degradados y trazos, no de tonos nuevos.  */
   --chart-series-1: #2a78d6;
   --chart-series-2: #008300;
   --chart-series-3: #e87ba4;

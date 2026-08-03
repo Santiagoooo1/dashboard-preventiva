@@ -15,18 +15,27 @@ export function KpiWidget({ resultado, descripcion, compacto }: KpiWidgetProps) 
   }
 
   const tieneTotales = resultado.totalNumerador !== null && resultado.totalNumerador !== undefined
+  const proporcion =
+    tieneTotales && resultado.totalDenominador ? resultado.totalNumerador! / resultado.totalDenominador : null
 
   return (
     <div className={styles.kpi}>
-      {descripcion && <p className={styles.sub}>{descripcion}</p>}
       <p className={`${styles.valor} ${compacto ? styles.valorCompacto : ''}`}>
         {formatNumber(resultado.valor)}
         {resultado.unidad && <span className={styles.unidad}>{resultado.unidad}</span>}
       </p>
+      {descripcion && <p className={styles.sub}>{descripcion}</p>}
       {tieneTotales && (
-        <p className={styles.sub}>
-          {resultado.totalNumerador} de {resultado.totalDenominador}
-        </p>
+        <div className={styles.detalle}>
+          {proporcion !== null && (
+            <span className={styles.barra}>
+              <span className={styles.barraRelleno} style={{ width: `${Math.min(100, proporcion * 100)}%` }} />
+            </span>
+          )}
+          <span className={styles.detalleTexto}>
+            {resultado.totalNumerador} de {resultado.totalDenominador}
+          </span>
+        </div>
       )}
     </div>
   )

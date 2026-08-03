@@ -1,10 +1,22 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { formatNumber } from '../../utils/formatters'
 import { acortar, crearBandas, crearEscalaY } from './charts/escalas'
 import { ChartEmptyState } from './ChartEmptyState'
 import { ChartTooltip } from './ChartTooltip'
 import type { DatosTooltip } from './ChartTooltip'
 import styles from './Charts.module.css'
+
+/** Degradado vertical sutil sobre el mismo tono de la serie: mismo dato, más profundidad visual. */
+function GradienteBarra({ id }: { id: string }) {
+  return (
+    <defs>
+      <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="var(--chart-series-1)" stopOpacity={1} />
+        <stop offset="100%" stopColor="var(--chart-series-1)" stopOpacity={0.75} />
+      </linearGradient>
+    </defs>
+  )
+}
 
 export interface DatoBarra {
   etiqueta: string
@@ -26,6 +38,7 @@ function convieneHorizontal(datos: DatoBarra[]): boolean {
 
 export function BarChartWidget({ datos }: BarChartWidgetProps) {
   const [tooltip, setTooltip] = useState<DatosTooltip | null>(null)
+  const gradId = useId()
 
   const conValor = datos.filter((d) => d.valor !== null && d.valor !== undefined)
   if (conValor.length === 0) {
@@ -34,9 +47,9 @@ export function BarChartWidget({ datos }: BarChartWidgetProps) {
 
   const horizontal = convieneHorizontal(datos)
   return horizontal ? (
-    <BarrasHorizontales datos={datos} tooltip={tooltip} setTooltip={setTooltip} />
+    <BarrasHorizontales datos={datos} tooltip={tooltip} setTooltip={setTooltip} gradId={gradId} />
   ) : (
-    <BarrasVerticales datos={datos} tooltip={tooltip} setTooltip={setTooltip} />
+    <BarrasVerticales datos={datos} tooltip={tooltip} setTooltip={setTooltip} gradId={gradId} />
   )
 }
 
@@ -44,9 +57,10 @@ interface SubProps {
   datos: DatoBarra[]
   tooltip: DatosTooltip | null
   setTooltip: (t: DatosTooltip | null) => void
+  gradId: string
 }
 
-function BarrasVerticales({ datos, tooltip, setTooltip }: SubProps) {
+function BarrasVerticales({ datos, tooltip, setTooltip, gradId }: SubProps) {
   const margen = { top: 18, right: 12, bottom: 34, left: 44 }
   const anchoUtil = ANCHO - margen.left - margen.right
   const altoUtil = ALTO - margen.top - margen.bottom
@@ -62,6 +76,7 @@ function BarrasVerticales({ datos, tooltip, setTooltip }: SubProps) {
   return (
     <div className={styles.contenedor}>
       <svg className={styles.svg} viewBox={`0 0 ${ANCHO} ${ALTO}`} role="img">
+        <GradienteBarra id={gradId} />
         {escala.ticks.map((t) => (
           <g key={t}>
             <line
@@ -92,8 +107,8 @@ function BarrasVerticales({ datos, tooltip, setTooltip }: SubProps) {
                 y={y}
                 width={bandas.grosor}
                 height={alto}
-                rx={4}
-                fill="var(--chart-series-1)"
+                rx={6}
+                fill={`url(#${gradId})`}
                 onMouseEnter={() =>
                   setTooltip({
                     x: (bandas.centro(i) / ANCHO) * 100,
@@ -124,7 +139,7 @@ function BarrasVerticales({ datos, tooltip, setTooltip }: SubProps) {
   )
 }
 
-function BarrasHorizontales({ datos, tooltip, setTooltip }: SubProps) {
+function BarrasHorizontales({ datos, tooltip, setTooltip, gradId }: SubProps) {
   const margen = { top: 8, right: 48, bottom: 8, left: 110 }
   const altoFila = 26
   const alto = margen.top + margen.bottom + datos.length * altoFila
@@ -137,6 +152,7 @@ function BarrasHorizontales({ datos, tooltip, setTooltip }: SubProps) {
   return (
     <div className={styles.contenedor}>
       <svg className={styles.svg} viewBox={`0 0 ${ANCHO} ${alto}`} role="img">
+        <GradienteBarra id={gradId} />
         <line className={styles.eje} x1={margen.left} x2={margen.left} y1={margen.top} y2={alto - margen.bottom} />
         {datos.map((d, i) => {
           const yFila = margen.top + i * altoFila
@@ -154,8 +170,8 @@ function BarrasHorizontales({ datos, tooltip, setTooltip }: SubProps) {
                     y={yFila}
                     width={Math.max(1, x(d.valor) - margen.left)}
                     height={grosor}
-                    rx={4}
-                    fill="var(--chart-series-1)"
+                    rx={6}
+                    fill={`url(#${gradId})`}
                     onMouseEnter={() =>
                       setTooltip({
                         x: (x(d.valor!) / ANCHO) * 100,

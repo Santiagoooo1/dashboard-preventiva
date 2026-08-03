@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { formatNumber } from '../../utils/formatters'
 import { ChartEmptyState } from './ChartEmptyState'
 import { ChartTooltip } from './ChartTooltip'
@@ -16,8 +16,8 @@ interface PieChartWidgetProps {
 
 const ANCHO = 320
 const ALTO = 240
-const RADIO = 88
-const GROSOR = 30
+const RADIO = 92
+const GROSOR = 34
 const MAX_SECTORES = 4
 const COLORES = [
   'var(--chart-series-1)',
@@ -66,6 +66,7 @@ function prepararSectores(datos: SectorDonut[]) {
 
 export function PieChartWidget({ datos }: PieChartWidgetProps) {
   const [tooltip, setTooltip] = useState<DatosTooltip | null>(null)
+  const filtroId = useId()
 
   const sectores = prepararSectores(datos)
   const total = sectores.reduce((suma, s) => suma + s.valor, 0)
@@ -81,6 +82,12 @@ export function PieChartWidget({ datos }: PieChartWidgetProps) {
   return (
     <div className={styles.contenedor}>
       <svg className={styles.svg} viewBox={`0 0 ${ANCHO} ${ALTO}`} role="img">
+        <defs>
+          <filter id={filtroId} x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0f172a" floodOpacity="0.16" />
+          </filter>
+        </defs>
+        <g filter={`url(#${filtroId})`}>
         {sectores.map((s) => {
           const proporcion = s.valor / total
           const desde = angulo
@@ -122,6 +129,7 @@ export function PieChartWidget({ datos }: PieChartWidgetProps) {
             </g>
           )
         })}
+        </g>
         <text className={styles.donutTotal} x={cx} y={cy + 2}>
           {formatNumber(total)}
         </text>

@@ -49,64 +49,66 @@ export function DashboardFilters({
   const set = (cambios: Partial<ValoresFiltros>) => onChange({ ...valores, ...cambios })
 
   return (
-    <div>
+    <div className={styles.wrap}>
       <div className={styles.filtros}>
-        <div className={styles.campo}>
-          <label htmlFor="fechaDesde">Desde</label>
-          <input
-            id="fechaDesde"
-            type="date"
-            value={valores.fechaDesde}
-            onChange={(e) => set({ fechaDesde: e.target.value })}
-          />
-        </div>
-        <div className={styles.campo}>
-          <label htmlFor="fechaHasta">Hasta</label>
-          <input
-            id="fechaHasta"
-            type="date"
-            value={valores.fechaHasta}
-            onChange={(e) => set({ fechaHasta: e.target.value })}
-          />
-        </div>
-        <div className={styles.campo}>
-          <label htmlFor="granularidad">Granularidad</label>
-          <select
-            id="granularidad"
-            value={valores.granularidad}
-            onChange={(e) => set({ granularidad: e.target.value })}
-          >
-            <option value="">— sin especificar —</option>
-            {granularidades.map((g) => (
-              <option key={g.codigo} value={g.codigo}>
-                {g.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        {camposFechaPermitidos && camposFechaPermitidos.length > 0 && (
+        <div className={styles.campos}>
           <div className={styles.campo}>
-            <label htmlFor="campoFecha">Campo de fecha</label>
+            <label htmlFor="fechaDesde">Desde</label>
+            <input
+              id="fechaDesde"
+              type="date"
+              value={valores.fechaDesde}
+              onChange={(e) => set({ fechaDesde: e.target.value })}
+            />
+          </div>
+          <div className={styles.campo}>
+            <label htmlFor="fechaHasta">Hasta</label>
+            <input
+              id="fechaHasta"
+              type="date"
+              value={valores.fechaHasta}
+              onChange={(e) => set({ fechaHasta: e.target.value })}
+            />
+          </div>
+          <div className={styles.campo}>
+            <label htmlFor="granularidad">Granularidad</label>
             <select
-              id="campoFecha"
-              value={valores.campoFecha}
-              onChange={(e) => set({ campoFecha: e.target.value })}
+              id="granularidad"
+              value={valores.granularidad}
+              onChange={(e) => set({ granularidad: e.target.value })}
             >
-              <option value="">— por defecto —</option>
-              {camposFechaPermitidos.map((c) => (
-                <option key={c} value={c}>
-                  {c}
+              <option value="">— sin especificar —</option>
+              {granularidades.map((g) => (
+                <option key={g.codigo} value={g.codigo}>
+                  {g.nombre}
                 </option>
               ))}
             </select>
           </div>
-        )}
+          {camposFechaPermitidos && camposFechaPermitidos.length > 0 && (
+            <div className={styles.campo}>
+              <label htmlFor="campoFecha">Campo de fecha</label>
+              <select
+                id="campoFecha"
+                value={valores.campoFecha}
+                onChange={(e) => set({ campoFecha: e.target.value })}
+              >
+                <option value="">— por defecto —</option>
+                {camposFechaPermitidos.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
         <div className={styles.acciones}>
+          <button type="button" className="btn btnSecondary" disabled={cargando} onClick={onLimpiar}>
+            Limpiar
+          </button>
           <button type="button" className="btn btnPrimary" disabled={cargando} onClick={onAplicar}>
             {cargando ? 'Aplicando…' : 'Aplicar filtros'}
-          </button>
-          <button type="button" className="btn btnSecondary" disabled={cargando} onClick={onLimpiar}>
-            Limpiar filtros
           </button>
         </div>
       </div>

@@ -1,42 +1,27 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
+  /* Fase 6.9B.1: tinte de fondo muy sutil, exclusivo de esta página (no toca
+     el --color-bg global que usa el resto de la app). */
+  background: var(--dashboard-bg-gradient);
+  margin: calc(var(--spacing-lg) * -1);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
 }
 
-.cabecera {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--spacing-sm);
+.breadcrumbWrap {
+  opacity: 0.85;
 }
 
-.subtitle {
-  color: var(--color-text-muted);
-  margin-top: calc(var(--spacing-xs) * -1);
-}
-
-.avisoInicial {
-  background-color: rgba(37, 99, 235, 0.06);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-}
-
-.avisoInicial p {
-  margin: 0;
-}
-
-.avisoInicialTitulo {
-  font-weight: 600;
-  margin-bottom: var(--spacing-xs) !important;
+.filtrosCard {
+  padding: var(--spacing-md) var(--spacing-lg);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
   align-items: start;
 }
 
@@ -52,9 +37,16 @@
   }
 }
 
-/* Móvil: una columna. */
+/* Móvil: una columna. El margen negativo se mantiene en --spacing-lg (igual
+   que el padding de MainLayout .content) para seguir cancelándolo exactamente;
+   solo se reduce el padding interno de .page. */
 @media (max-width: 639px) {
+  .page {
+    padding: var(--spacing-md);
+  }
+
   .grid {
     grid-template-columns: 1fr;
+    gap: var(--spacing-md);
   }
 }

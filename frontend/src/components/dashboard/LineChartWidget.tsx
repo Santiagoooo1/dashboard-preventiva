@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { formatNumber } from '../../utils/formatters'
 import { acortar, crearEscalaY } from './charts/escalas'
 import { ChartEmptyState } from './ChartEmptyState'
@@ -42,14 +42,19 @@ function tramos(
   puntos: PuntoLinea[],
   x: (i: number) => number,
   y: (v: number) => number,
-): { lineas: string[]; aislados: number[] } {
+): { lineas: string[]; aislados: number[]; segmentos: { i: number; x: number; y: number }[][] } {
   const lineas: string[] = []
   const aislados: number[] = []
-  let actual: { d: string; i: number }[] = []
+  const segmentos: { i: number; x: number; y: number }[][] = []
+  let actual: { d: string; i: number; x: number; y: number }[] = []
 
   const cerrar = () => {
-    if (actual.length > 1) lineas.push(actual.map((t) => t.d).join(' '))
-    else if (actual.length === 1) aislados.push(actual[0].i)
+    if (actual.length > 1) {
+      lineas.push(actual.map((t) => t.d).join(' '))
+      segmentos.push(actual.map(({ i, x: px, y: py }) => ({ i, x: px, y: py })))
+    } else if (actual.length === 1) {
+      aislados.push(actual[0].i)
+    }
     actual = []
   }
 
@@ -58,14 +63,24 @@ function tramos(
       cerrar()
       return
     }
-    actual.push({ d: `${actual.length === 0 ? 'M' : 'L'}${x(i)},${y(p.valor)}`, i })
+    const px = x(i)
+    const py = y(p.valor)
+    actual.push({ d: `${actual.length === 0 ? 'M' : 'L'}${px},${py}`, i, x: px, y: py })
   })
   cerrar()
-  return { lineas, aislados }
+  return { lineas, aislados, segmentos }
+}
+
+/** Área rellena bajo un tramo de línea (solo con una única serie, para no solapar rellenos). */
+function areaDeTramo(segmento: { x: number; y: number }[], yBase: number): string {
+  const ida = segmento.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ')
+  const vuelta = `L${segmento[segmento.length - 1].x},${yBase} L${segmento[0].x},${yBase} Z`
+  return `${ida} ${vuelta}`
 }
 
 export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps) {
   const [tooltip, setTooltip] = useState<DatosTooltip | null>(null)
+  const gradId = useId()
 
   const hayDatos = series.some((s) => s.puntos.some((p) => p.valor !== null && p.valor !== undefined))
   if (!hayDatos) {
@@ -87,9 +102,17 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
   // Con muchos periodos se muestran etiquetas alternas para que no se solapen.
   const saltoEtiquetas = Math.ceil(n / 8)
 
+  const yBase = escala.y(Math.max(escala.min, 0))
+
   return (
     <div className={styles.contenedor}>
       <svg className={styles.svg} viewBox={`0 0 ${ANCHO} ${ALTO}`} role="img">
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={COLORES[0]} stopOpacity={0.28} />
+            <stop offset="100%" stopColor={COLORES[0]} stopOpacity={0} />
+          </linearGradient>
+        </defs>
         {escala.ticks.map((t) => (
           <g key={t}>
             <line
@@ -132,12 +155,16 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
             .map((p, i) => ({ p, i }))
             .reverse()
             .find(({ p }) => p.valor !== null && p.valor !== undefined)
-          const { lineas, aislados } = tramos(serie.puntos, x, escala.y)
+          const { lineas, aislados, segmentos } = tramos(serie.puntos, x, escala.y)
 
           return (
             <g key={serie.etiqueta}>
+              {series.length === 1 &&
+                segmentos.map((segmento, i) => (
+                  <path key={`area-${i}`} d={areaDeTramo(segmento, yBase)} fill={`url(#${gradId})`} stroke="none" />
+                ))}
               {lineas.map((d, i) => (
-                <path key={i} d={d} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" />
+                <path key={i} d={d} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
               ))}
               {aislados.map((i) => (
                 <circle key={`aislado-${i}`} cx={x(i)} cy={escala.y(serie.puntos[i].valor!)} r={3} fill={color} />

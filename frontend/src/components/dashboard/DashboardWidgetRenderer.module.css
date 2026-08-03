@@ -16,3 +16,125 @@
     grid-column: 1 / -1;
   }
 }
+
+/* Fase 6.9B.1: tarjeta de widget propia (antes se reutilizaba el <Card>
+   genérico, compartido con formularios/tablas admin). Vive solo aquí para no
+   afectar al aspecto de esas otras pantallas. */
+.card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.card:hover {
+  box-shadow: var(--shadow-lg);
+}
+
+.cardError {
+  border-color: var(--color-error-soft);
+  background-color: var(--color-error-soft);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-md) 0 var(--spacing-md);
+}
+
+.cardHeaderText {
+  min-width: 0;
+}
+
+.cardTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.cardMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin: 2px 0 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardDescripcion {
+  font-style: italic;
+}
+
+.badgeTipo {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+/* Selector "Vista": misma forma de píldora que .badgeTipo, pero interactivo. */
+.selectorVista {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 3px 6px 3px 10px;
+}
+
+.selectorVistaEtiqueta {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.selectVista {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 2px var(--spacing-sm);
+  cursor: pointer;
+}
+
+.selectVista:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.errorVista {
+  color: var(--color-error);
+  font-size: 0.78rem;
+  margin: 0;
+  padding: 0 var(--spacing-md);
+}
+
+.cardBody {
+  flex: 1;
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}

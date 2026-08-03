@@ -128,7 +128,7 @@ export function PanelWidgetsPage() {
               ]}
             />
             <div className={styles.cabecera}>
-              <h1>Widgets de {data.metadata.panel.nombre}</h1>
+              <h1>Cómo se visualiza cada métrica en «{data.metadata.panel.nombre}»</h1>
               <div className={styles.botonesCabecera}>
                 <button
                   type="button"
@@ -142,6 +142,11 @@ export function PanelWidgetsPage() {
                 </Link>
               </div>
             </div>
+            <p className={styles.explicacion}>
+              Aquí decides qué métricas aparecen en este panel y cómo se ve cada una (número, gráfico o
+              tabla), además de su tamaño y orden. Para cambios rápidos de visualización sin entrar aquí,
+              usa el selector "Vista" de cada widget directamente en el dashboard.
+            </p>
             <p className={styles.subtitulo}>
               Dataset: {data.metadata.dataset.nombre} ({data.metadata.dataset.codigo})
             </p>

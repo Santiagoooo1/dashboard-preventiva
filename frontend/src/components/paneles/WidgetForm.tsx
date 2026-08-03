@@ -48,12 +48,6 @@ export function WidgetForm({
     const nuevosErrores: Record<string, string> = {}
     if (!metricaId) nuevosErrores.metricaId = 'Selecciona una métrica.'
     if (!tipoVisualizacion) nuevosErrores.tipoVisualizacion = 'Selecciona el tipo de visualización.'
-    if (ancho !== '') {
-      const anchoNum = Number(ancho)
-      if (!Number.isInteger(anchoNum) || anchoNum < 1 || anchoNum > 12) {
-        nuevosErrores.ancho = 'El ancho debe ser un entero entre 1 y 12.'
-      }
-    }
     setErrores(nuevosErrores)
     if (Object.keys(nuevosErrores).length > 0) return
 
@@ -88,7 +82,7 @@ export function WidgetForm({
         </FormField>
         <FormField
           label="Tipo de visualización"
-          help="Define cómo se presentará la métrica. En esta fase se renderiza en tarjetas/tablas; los gráficos llegarán más adelante."
+          help="Cómo se muestra esta métrica en el dashboard: como número (indicador), gráfico o tabla. Puedes cambiarlo también directamente desde el propio dashboard, en cada widget."
           error={errores.tipoVisualizacion}
         >
           <select value={tipoVisualizacion} onChange={(e) => setTipoVisualizacion(e.target.value)}>
@@ -106,15 +100,15 @@ export function WidgetForm({
         <FormField label="Descripción personalizada">
           <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
         </FormField>
-        <FormField label="Orden">
+        <FormField label="Orden" help="Posición del widget dentro del panel: los números más bajos van primero.">
           <input type="number" step={1} value={orden} onChange={(e) => setOrden(e.target.value)} />
         </FormField>
-        <FormField
-          label="Ancho"
-          help="Ancho del widget en una cuadrícula de 12 columnas. Recomendados: 3, 4, 6 o 12."
-          error={errores.ancho}
-        >
-          <input type="number" step={1} min={1} max={12} value={ancho} onChange={(e) => setAncho(e.target.value)} />
+        <FormField label="Tamaño" help="Cuánto sitio ocupa el widget en el dashboard." error={errores.ancho}>
+          <select value={ancho} onChange={(e) => setAncho(e.target.value)}>
+            <option value="3">Pequeño</option>
+            <option value="6">Medio</option>
+            <option value="12">Ancho completo</option>
+          </select>
         </FormField>
       </div>
       <div className={styles.botones}>

@@ -1,6 +1,6 @@
-import type { DashboardWidgetDto } from '../../api/types'
-import { Card } from '../Card'
-import cardStyles from '../Card.module.css'
+import { useId, useState } from 'react'
+import type { ChangeEvent } from 'react'
+import type { DashboardWidgetDto, TipoVisualizacion } from '../../api/types'
 import { clampAncho } from '../../utils/formatters'
 import { WidgetError } from '../widgets/WidgetError'
 import { BarChartWidget } from './BarChartWidget'
@@ -11,12 +11,35 @@ import { PieChartWidget } from './PieChartWidget'
 import { KpiWidget } from './KpiWidget'
 import { TableWidget } from './TableWidget'
 import { ChartEmptyState } from './ChartEmptyState'
+import { normalizarTipoVisualizacion, visualizacionesCompatibles } from './visualizacionesCompatibles'
 import styles from './DashboardWidgetRenderer.module.css'
 
 const MAX_SERIES_LINEA = 4
 
+const ETIQUETA_VISUALIZACION: Record<string, string> = {
+  KPI: 'Indicador',
+  TARJETA: 'Tarjeta',
+  TABLA: 'Tabla',
+  BARRAS: 'Barras',
+  LINEAS: 'Líneas',
+  DONUT: 'Donut',
+  PIE: 'Circular',
+}
+
+const ETIQUETA_RESULTADO: Record<string, string> = {
+  ACTUAL: 'Valor actual',
+  SERIE_TEMPORAL: 'Evolución temporal',
+  COMPARATIVA: 'Comparativa',
+}
+
 interface DashboardWidgetRendererProps {
   widget: DashboardWidgetDto
+  /**
+   * Ausente en contextos de solo lectura (no aplica aquí, pero deja la puerta
+   * abierta). Cuando está presente, el widget ofrece el selector "Vista" para
+   * cambiar tipoVisualizacion y persiste el cambio a través de esta función.
+   */
+  onCambiarVisualizacion?: (panelMetricaId: number, nuevoTipo: TipoVisualizacion) => Promise<void>
 }
 
 /** Categorías (etiqueta/valor) disponibles en el widget, vengan de donde vengan. */
@@ -62,7 +85,7 @@ function cuerpoWidget(widget: DashboardWidgetDto) {
       return <TableWidget widget={widget} />
 
     case 'TARJETA':
-      if (tieneValorSimple) return <KpiWidget resultado={actual} descripcion={widget.descripcion} />
+      if (tieneValorSimple) return <KpiWidget resultado={actual} />
       return <TableWidget widget={widget} />
 
     case 'TABLA':
@@ -103,16 +126,72 @@ function cuerpoWidget(widget: DashboardWidgetDto) {
   }
 }
 
-export function DashboardWidgetRenderer({ widget }: DashboardWidgetRendererProps) {
+export function DashboardWidgetRenderer({ widget, onCambiarVisualizacion }: DashboardWidgetRendererProps) {
+  const conError = widget.estado === 'ERROR'
+  const [guardando, setGuardando] = useState(false)
+  const [errorVista, setErrorVista] = useState<string | null>(null)
+  const selectId = useId()
+
+  const opciones = onCambiarVisualizacion ? visualizacionesCompatibles(widget) : []
+  const puedeElegirVista = opciones.length > 0
+
+  const alCambiarVista = async (e: ChangeEvent<HTMLSelectElement>) => {
+    if (!onCambiarVisualizacion) return
+    const nuevoTipo = e.target.value as TipoVisualizacion
+    setGuardando(true)
+    setErrorVista(null)
+    try {
+      await onCambiarVisualizacion(widget.panelMetricaId, nuevoTipo)
+    } catch (err) {
+      setErrorVista(err instanceof Error ? err.message : 'No se pudo cambiar la visualización.')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   return (
     <div className={styles.widget} style={{ ['--span' as string]: clampAncho(widget.ancho) }}>
-      <Card
-        title={widget.titulo}
-        subtitle={`${widget.tipoVisualizacion} · ${widget.tipoResultado}`}
-        className={widget.estado === 'ERROR' ? cardStyles.cardError : cardStyles.cardOk}
-      >
-        {cuerpoWidget(widget)}
-      </Card>
+      <div className={`${styles.card} ${conError ? styles.cardError : ''}`}>
+        <div className={styles.cardHeader}>
+          <div className={styles.cardHeaderText}>
+            <h3 className={styles.cardTitle}>{widget.titulo}</h3>
+            <p className={styles.cardMeta}>
+              {ETIQUETA_RESULTADO[widget.tipoResultado] ?? widget.tipoResultado}
+              {widget.descripcion && <span className={styles.cardDescripcion}> · {widget.descripcion}</span>}
+            </p>
+          </div>
+          {puedeElegirVista ? (
+            <label className={styles.selectorVista}>
+              <span className={styles.selectorVistaEtiqueta} id={`${selectId}-label`}>
+                Vista
+              </span>
+              <select
+                className={styles.selectVista}
+                aria-labelledby={`${selectId}-label`}
+                value={normalizarTipoVisualizacion(widget.tipoVisualizacion)}
+                disabled={guardando}
+                onChange={alCambiarVista}
+              >
+                {opciones.map((o) => (
+                  <option key={o.valor} value={o.valor}>
+                    {o.etiqueta}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <span className={styles.badgeTipo}>
+              {ETIQUETA_VISUALIZACION[widget.tipoVisualizacion] ?? widget.tipoVisualizacion}
+            </span>
+          )}
+        </div>
+        {errorVista && (
+          <p className={styles.errorVista} role="alert">
+            {errorVista}
+          </p>
+        )}
+        <div className={styles.cardBody}>{cuerpoWidget(widget)}</div>
+      </div>
     </div>
   )
 }

@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
-import type { CatalogoFrontendResponseDto, DashboardPanelResponseDto } from '../api/types'
+import type {
+  CatalogoFrontendResponseDto,
+  DashboardPanelResponseDto,
+  PanelMetricaResponseDto,
+  TipoVisualizacion,
+} from '../api/types'
 import { ejecutarDashboard } from '../api/dashboardApi'
-import { obtenerDashboardMetadata } from '../api/panelesApi'
+import { actualizarWidget, listarWidgets, obtenerDashboardMetadata } from '../api/panelesApi'
 import { getCatalogo } from '../api/frontendCatalogApi'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
@@ -11,6 +16,7 @@ import { ErrorBanner } from '../components/ErrorBanner'
 import { DashboardFilters, FILTROS_VACIOS, aRequest } from '../components/dashboard/DashboardFilters'
 import type { ValoresFiltros } from '../components/dashboard/DashboardFilters'
 import { DashboardWidgetRenderer } from '../components/dashboard/DashboardWidgetRenderer'
+import { DashboardHeader } from '../components/dashboard/DashboardHeader'
 import styles from './PanelDashboardPage.module.css'
 
 export function PanelDashboardPage() {
@@ -28,6 +34,13 @@ export function PanelDashboardPage() {
   const [errorMetadata, setErrorMetadata] = useState<string | null>(null)
 
   const [filtros, setFiltros] = useState<ValoresFiltros>(FILTROS_VACIOS)
+
+  // Definición "en crudo" de cada widget (metricaId, título/descripción
+  // personalizados, orden, ancho): la necesitamos completa para poder hacer
+  // PUT al cambiar solo tipoVisualizacion, porque el backend espera el objeto
+  // entero (ver PanelMetricaServiceImpl.actualizar) y DashboardWidgetDto solo
+  // trae los valores ya resueltos para pintar, no los campos en crudo.
+  const [widgetsRaw, setWidgetsRaw] = useState<PanelMetricaResponseDto[]>([])
 
   const cargarDashboard = useCallback(
     async (valores: ValoresFiltros, inicial: boolean) => {
@@ -67,6 +80,13 @@ export function PanelDashboardPage() {
           setErrorMetadata(err instanceof Error ? err.message : 'error desconocido')
         }
       })
+    listarWidgets(panelId ?? '', controller.signal)
+      .then(setWidgetsRaw)
+      .catch(() => {
+        // Si falla, el selector de vista simplemente no se ofrece (ver
+        // DashboardWidgetRenderer: sin onCambiarVisualizacion no hay riesgo,
+        // solo se pierde la posibilidad de cambiar la vista hasta recargar).
+      })
     return () => controller.abort()
   }, [panelId])
 
@@ -75,44 +95,55 @@ export function PanelDashboardPage() {
     cargarDashboard(FILTROS_VACIOS, false)
   }
 
+  // Cambia solo tipoVisualizacion de un widget, conservando el resto de su
+  // configuración (metricaId, título/descripción, orden, ancho) tal cual
+  // estaba. No crea ni duplica nada: reutiliza el mismo panelMetricaId.
+  const cambiarVisualizacionWidget = async (panelMetricaId: number, nuevoTipo: TipoVisualizacion) => {
+    const actual = widgetsRaw.find((w) => w.id === panelMetricaId)
+    if (!actual) {
+      throw new Error('No se encontró la configuración de este widget. Recarga la página e inténtalo de nuevo.')
+    }
+    const actualizado = await actualizarWidget(panelId ?? '', panelMetricaId, {
+      metricaId: actual.metricaId,
+      tituloPersonalizado: actual.tituloPersonalizado,
+      descripcionPersonalizada: actual.descripcionPersonalizada,
+      tipoVisualizacion: nuevoTipo,
+      orden: actual.orden,
+      ancho: actual.ancho,
+    })
+    setWidgetsRaw((filas) => filas.map((w) => (w.id === panelMetricaId ? actualizado : w)))
+    await cargarDashboard(filtros, false)
+  }
+
   return (
     <div className={styles.page}>
       <StateContainer loading={cargandoInicial} error={errorCarga && !datos ? errorCarga : null} empty={datos === null}>
         {datos && (
           <>
-            <Breadcrumbs
-              items={[
-                { label: 'Datasets', to: '/datasets' },
-                { label: datos.dataset.codigo, to: `/datasets/${datos.dataset.id}` },
-                { label: 'Paneles', to: `/datasets/${datos.dataset.id}/paneles` },
-                { label: `Dashboard de ${datos.panel.codigo}` },
-              ]}
-            />
-            <div className={styles.cabecera}>
-              <h1>{datos.panel.nombre}</h1>
-              <Link
-                className="btn btnSecondary"
-                to={`/datasets/${datos.dataset.id}/paneles/${datos.panel.id}/widgets`}
-              >
-                Configurar widgets
-              </Link>
+            <div className={styles.breadcrumbWrap}>
+              <Breadcrumbs
+                items={[
+                  { label: 'Datasets', to: '/datasets' },
+                  { label: datos.dataset.codigo, to: `/datasets/${datos.dataset.id}` },
+                  { label: 'Paneles', to: `/datasets/${datos.dataset.id}/paneles` },
+                  { label: `Dashboard de ${datos.panel.codigo}` },
+                ]}
+              />
             </div>
-            <p className={styles.subtitle}>
-              {datos.dataset.nombre} · {datos.resumen.widgetsOk} OK / {datos.resumen.widgetsConError} con error de{' '}
-              {datos.resumen.totalWidgets} widgets
-            </p>
 
-            {esDashboardInicial && (
-              <div className={styles.avisoInicial}>
-                <p className={styles.avisoInicialTitulo}>Dashboard inicial generado</p>
-                <p>
-                  Estos indicadores se han creado automáticamente a partir de las columnas detectadas. Puedes
-                  modificarlos después desde la gestión avanzada.
-                </p>
-              </div>
-            )}
+            <DashboardHeader
+              panelNombre={datos.panel.nombre}
+              panelCodigo={datos.panel.codigo}
+              datasetNombre={datos.dataset.nombre}
+              datasetId={datos.dataset.id}
+              totalWidgets={datos.resumen.totalWidgets}
+              widgetsOk={datos.resumen.widgetsOk}
+              widgetsConError={datos.resumen.widgetsConError}
+              esDashboardInicial={esDashboardInicial}
+              configurarWidgetsHref={`/datasets/${datos.dataset.id}/paneles/${datos.panel.id}/widgets`}
+            />
 
-            <Card title="Filtros del dashboard">
+            <Card title="Periodo y granularidad" className={styles.filtrosCard}>
               <DashboardFilters
                 valores={filtros}
                 onChange={setFiltros}
@@ -142,7 +173,11 @@ export function PanelDashboardPage() {
             ) : (
               <div className={`${styles.grid} ${aplicando ? styles.gridCargando : ''}`}>
                 {datos.widgets.map((widget) => (
-                  <DashboardWidgetRenderer key={widget.panelMetricaId} widget={widget} />
+                  <DashboardWidgetRenderer
+                    key={widget.panelMetricaId}
+                    widget={widget}
+                    onCambiarVisualizacion={cambiarVisualizacionWidget}
+                  />
                 ))}
               </div>
             )}
