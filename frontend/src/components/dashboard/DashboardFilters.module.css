@@ -1,21 +1,21 @@
 .wrap {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
 }
 
-.filtros {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--spacing-lg);
-}
+/* --- Nivel 1: exploración rápida --- */
 
+.filaPrincipal,
+.filaSecundaria,
 .campos {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md) var(--spacing-lg);
+}
+
+.filaPrincipal {
+  align-items: flex-start;
 }
 
 .campo {
@@ -23,7 +23,13 @@
   flex-direction: column;
   gap: 6px;
   font-size: 0.85rem;
-  min-width: 150px;
+  min-width: 160px;
+}
+
+/* El selector de paciente manda en la primera fila, pero sin ocupar todo. */
+.campoPaciente {
+  flex: 1 1 320px;
+  max-width: 420px;
 }
 
 .campo label {
@@ -49,13 +55,240 @@
 .campo select:focus {
   outline: none;
   border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
 }
+
+.ayudaCampo {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+/* --- Nivel 2: exploración avanzada (plegable) --- */
+
+.avanzados {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg);
+}
+
+.avanzadosResumen {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius-md);
+  transition: background-color 0.15s;
+}
+
+/* Oculta el triángulo nativo (Chrome/Safari y Firefox) para usar el propio. */
+.avanzadosResumen::-webkit-details-marker {
+  display: none;
+}
+
+.avanzadosResumen::marker {
+  content: '';
+}
+
+.avanzadosResumen:hover {
+  background-color: var(--color-primary-soft);
+}
+
+.avanzadosResumen:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.avanzadosFlecha {
+  width: 0;
+  height: 0;
+  flex-shrink: 0;
+  border-left: 6px solid var(--color-primary);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  transition: transform 0.15s;
+}
+
+.avanzados[open] .avanzadosFlecha {
+  transform: rotate(90deg);
+}
+
+.avanzadosTexto {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.avanzadosTitulo {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--color-primary);
+}
+
+.avanzadosSubtitulo {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.avanzadosContador {
+  margin-left: auto;
+  flex-shrink: 0;
+  background-color: var(--color-primary);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px var(--spacing-sm);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.avanzadosCuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+}
+
+/* --- Acciones --- */
 
 .acciones {
   display: flex;
   gap: var(--spacing-sm);
   align-items: center;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* La acción principal debe leerse como tal: más alta y con más aire que el
+   resto de botones de la app, sin tocar los estilos globales de .btnPrimary. */
+.botonAplicar {
+  padding: 11px var(--spacing-lg);
+  font-size: 0.95rem;
+}
+
+.avisoSinAplicar {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+/* --- Filtros aplicados (chips) --- */
+
+.aplicadosBloque {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding-top: var(--spacing-sm);
+  border-top: 1px dashed var(--color-border);
+}
+
+.aplicadosTitulo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px var(--spacing-sm);
+  border: 1px solid var(--color-primary-soft-border);
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.4;
+  transition: filter 0.15s;
+}
+
+.chip:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.chip:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.chip span {
+  font-weight: 700;
+}
+
+.limpiarTodos {
+  background: none;
+  border: none;
+  padding: 5px var(--spacing-xs);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.limpiarTodos:hover:not(:disabled) {
+  color: var(--color-error);
+}
+
+.limpiarTodos:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.limpiarTodos:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* --- Avisos --- */
+
+.avisoPaciente {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-primary-soft);
+  border: 1px solid var(--color-primary-soft-border);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.avisoPacienteQuitar {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.avisoPacienteQuitar:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .avisoMetadata {
@@ -65,10 +298,8 @@
 }
 
 @media (max-width: 639px) {
-  .filtros {
-    align-items: stretch;
-  }
-
+  .filaPrincipal,
+  .filaSecundaria,
   .campos {
     gap: var(--spacing-md);
   }
@@ -78,11 +309,28 @@
     flex: 1 1 45%;
   }
 
+  .campoPaciente {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
   .acciones {
     width: 100%;
   }
 
+  /* En móvil las acciones ocupan el ancho para que "Aplicar filtros" nunca
+     quede fuera del viewport ni compita por el espacio. */
   .acciones .btn {
-    flex: 1;
+    flex: 1 1 45%;
+  }
+
+  .avanzadosContador {
+    margin-left: 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  .avanzadosResumen {
+    flex-wrap: wrap;
   }
 }

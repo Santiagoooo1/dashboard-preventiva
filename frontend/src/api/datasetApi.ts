@@ -103,3 +103,15 @@ export function obtenerFrontendMetadata(
 ): Promise<DatasetFrontendMetadataResponseDto> {
   return apiGet<DatasetFrontendMetadataResponseDto>(`/datasets-clinicos/${datasetId}/frontend-metadata`, signal)
 }
+
+/** Valores distintos ya presentes en los registros del dataset para un campo (para poblar selectores de filtro). */
+export function listarValoresUnicosDeCampo(
+  datasetId: string | number,
+  codigoCampo: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  return apiGet<string[]>(
+    `/datasets-clinicos/${datasetId}/campos/${encodeURIComponent(codigoCampo)}/valores`,
+    signal,
+  )
+}

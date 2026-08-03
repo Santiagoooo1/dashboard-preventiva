@@ -56,14 +56,33 @@ table {
   color: var(--color-error);
 }
 
-/* Botones comunes: aplicables a <button> y a <Link> por igual. */
+/* Botones comunes: aplicables a <button> y a <Link> por igual.
+   Fase 6.9G.1: se añaden peso tipográfico y estados hover/focus/active. Antes
+   un .btnSecondary era `background: none` + borde casi invisible, así que
+   acciones reales ("Configurar widgets", "Limpiar filtros") se leían como
+   texto suelto. Solo se añaden estados y peso: los paddings y tamaños no
+   cambian, para no alterar el layout de ninguna pantalla existente. */
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
+  font-weight: 600;
+  line-height: 1.3;
   text-decoration: none;
   text-align: center;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .btn:disabled {
@@ -76,29 +95,56 @@ table {
   color: #fff;
   border: none;
   padding: var(--spacing-sm) var(--spacing-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background-color: #1d4ed8;
+  box-shadow: var(--shadow-md);
+}
+
+.btnPrimary:active:not(:disabled) {
+  background-color: #1e40af;
+  box-shadow: none;
 }
 
 .btnSecondary {
-  background: none;
-  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-text-muted);
   color: var(--color-text);
   padding: var(--spacing-sm) var(--spacing-md);
 }
 
+.btnSecondary:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background-color: var(--color-primary-soft);
+}
+
 .btnAction {
-  background: none;
+  background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   color: var(--color-primary);
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: 0.85rem;
 }
 
+.btnAction:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-soft);
+}
+
 .btnDanger {
-  background: none;
+  background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   color: var(--color-error);
   padding: var(--spacing-xs) var(--spacing-sm);
   font-size: 0.85rem;
+}
+
+.btnDanger:hover:not(:disabled) {
+  border-color: var(--color-error);
+  background-color: var(--color-error-soft);
 }
 
 .rowActions {

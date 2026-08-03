@@ -3,21 +3,58 @@ import { Link, useParams, useSearchParams } from 'react-router'
 import type {
   CatalogoFrontendResponseDto,
   DashboardPanelResponseDto,
+  DashboardWidgetDto,
   PanelMetricaResponseDto,
   TipoVisualizacion,
 } from '../api/types'
 import { ejecutarDashboard } from '../api/dashboardApi'
 import { actualizarWidget, listarWidgets, obtenerDashboardMetadata } from '../api/panelesApi'
 import { getCatalogo } from '../api/frontendCatalogApi'
+import { listarValoresUnicosDeCampo, obtenerFrontendMetadata } from '../api/datasetApi'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { DashboardFilters, FILTROS_VACIOS, aRequest } from '../components/dashboard/DashboardFilters'
 import type { ValoresFiltros } from '../components/dashboard/DashboardFilters'
+import { clasificarCampos } from '../components/dashboard/camposFiltroDashboard'
+import type { CampoFiltroCategoria, CamposClasificados } from '../components/dashboard/camposFiltroDashboard'
 import { DashboardWidgetRenderer } from '../components/dashboard/DashboardWidgetRenderer'
 import { DashboardHeader } from '../components/dashboard/DashboardHeader'
 import styles from './PanelDashboardPage.module.css'
+
+const CAMPOS_FECHA_O_NUMERICOS_EXCLUIDOS = new Set(['FECHA', 'ENTERO', 'DECIMAL'])
+const SIN_CAMPOS: CamposClasificados = { principales: [], avanzados: [] }
+
+/** Un widget se considera "sin resultados" si, con los filtros activos, no aporta ningún dato. */
+function widgetSinResultados(widget: DashboardWidgetDto): boolean {
+  if (widget.estado !== 'OK') return false
+
+  if (widget.resultadoActual) {
+    const r = widget.resultadoActual
+    const sinItems = !r.items || r.items.length === 0
+    const sinTotales = !r.totalDenominador && !r.totalNumerador
+    return sinItems && sinTotales && (r.valor === null || r.valor === 0)
+  }
+
+  if (widget.comparativa) {
+    return widget.comparativa.items.length === 0
+  }
+
+  if (widget.serieTemporal) {
+    const s = widget.serieTemporal
+    if (s.series) return s.series.every((serie) => serie.puntos.every((p) => !p.valor))
+    if (s.puntos) return s.puntos.every((p) => !p.valor)
+  }
+
+  return false
+}
+
+function hayFiltrosActivos(valores: ValoresFiltros): boolean {
+  return (
+    Boolean(valores.paciente.trim()) || Object.values(valores.camposCategoria).some((v) => Boolean(v))
+  )
+}
 
 export function PanelDashboardPage() {
   const { panelId } = useParams<{ panelId: string }>()
@@ -33,7 +70,17 @@ export function PanelDashboardPage() {
   const [camposFecha, setCamposFecha] = useState<string[] | null>(null)
   const [errorMetadata, setErrorMetadata] = useState<string | null>(null)
 
+  const [tienePaciente, setTienePaciente] = useState(false)
+  const [valoresPaciente, setValoresPaciente] = useState<string[]>([])
+  const [campos, setCampos] = useState<CamposClasificados>(SIN_CAMPOS)
+  const [errorCamposCategoria, setErrorCamposCategoria] = useState<string | null>(null)
+
+  // `filtros` es lo que el usuario está editando en el formulario;
+  // `filtrosAplicados` es lo que realmente se envió al backend y por tanto lo
+  // que describe el dashboard que se está viendo. Separarlos evita presentar
+  // como "activo" un valor que el usuario aún no ha aplicado.
   const [filtros, setFiltros] = useState<ValoresFiltros>(FILTROS_VACIOS)
+  const [filtrosAplicados, setFiltrosAplicados] = useState<ValoresFiltros>(FILTROS_VACIOS)
 
   // Definición "en crudo" de cada widget (metricaId, título/descripción
   // personalizados, orden, ancho): la necesitamos completa para poder hacer
@@ -49,6 +96,7 @@ export function PanelDashboardPage() {
       setErrorCarga(null)
       try {
         setDatos(await ejecutarDashboard(panelId ?? '', aRequest(valores)))
+        setFiltrosAplicados(valores)
       } catch (err) {
         setErrorCarga(err instanceof Error ? err.message : 'Error al cargar el dashboard.')
         if (inicial) setDatos(null)
@@ -74,7 +122,43 @@ export function PanelDashboardPage() {
         if (!controller.signal.aborted) setCatalogo(null)
       })
     obtenerDashboardMetadata(panelId ?? '', controller.signal)
-      .then((m) => setCamposFecha(m.camposFechaPermitidos))
+      .then(async (m) => {
+        setCamposFecha(m.camposFechaPermitidos)
+
+        try {
+          const datasetId = m.dataset.id
+          const fm = await obtenerFrontendMetadata(datasetId, controller.signal)
+
+          const categoricos = fm.campos.filter(
+            (c) =>
+              c.activo &&
+              c.roles.filtrable &&
+              c.codigo !== 'pacienteCodigo' &&
+              !CAMPOS_FECHA_O_NUMERICOS_EXCLUIDOS.has(c.tipoDato),
+          )
+          const conValores: CampoFiltroCategoria[] = await Promise.all(
+            categoricos.map(async (c) => ({
+              codigo: c.codigo,
+              etiqueta: c.etiqueta,
+              tipoDato: c.tipoDato,
+              valores: await listarValoresUnicosDeCampo(datasetId, c.codigo, controller.signal),
+            })),
+          )
+          // Solo se ofrecen campos que realmente tengan valores en los datos:
+          // un selector vacío no aporta nada y suma ruido.
+          setCampos(clasificarCampos(conValores.filter((c) => c.valores.length > 0)))
+
+          const paciente = fm.campos.find((c) => c.codigo === 'pacienteCodigo' && c.activo && c.roles.filtrable)
+          if (paciente) {
+            setTienePaciente(true)
+            setValoresPaciente(await listarValoresUnicosDeCampo(datasetId, 'pacienteCodigo', controller.signal))
+          }
+        } catch (err) {
+          if (!controller.signal.aborted) {
+            setErrorCamposCategoria(err instanceof Error ? err.message : 'error desconocido')
+          }
+        }
+      })
       .catch((err: unknown) => {
         if (!controller.signal.aborted) {
           setErrorMetadata(err instanceof Error ? err.message : 'error desconocido')
@@ -93,6 +177,13 @@ export function PanelDashboardPage() {
   const limpiar = () => {
     setFiltros(FILTROS_VACIOS)
     cargarDashboard(FILTROS_VACIOS, false)
+  }
+
+  // Aplica un conjunto concreto de filtros al instante (quitar una chip, quitar
+  // el paciente), sin esperar a que el usuario pulse "Aplicar filtros".
+  const aplicarValores = (nuevosValores: ValoresFiltros) => {
+    setFiltros(nuevosValores)
+    cargarDashboard(nuevosValores, false)
   }
 
   // Cambia solo tipoVisualizacion de un widget, conservando el resto de su
@@ -143,20 +234,44 @@ export function PanelDashboardPage() {
               configurarWidgetsHref={`/datasets/${datos.dataset.id}/paneles/${datos.panel.id}/widgets`}
             />
 
-            <Card title="Periodo y granularidad" className={styles.filtrosCard}>
+            <Card title="Filtrar el análisis" className={styles.filtrosCard}>
               <DashboardFilters
                 valores={filtros}
+                aplicados={filtrosAplicados}
                 onChange={setFiltros}
                 onAplicar={() => cargarDashboard(filtros, false)}
                 onLimpiar={limpiar}
+                onAplicarValores={aplicarValores}
                 granularidades={catalogo?.granularidades ?? []}
                 camposFechaPermitidos={camposFecha}
                 errorMetadata={errorMetadata}
                 cargando={aplicando}
+                tienePaciente={tienePaciente}
+                valoresPaciente={valoresPaciente}
+                camposPrincipales={campos.principales}
+                camposAvanzados={campos.avanzados}
+                errorCamposCategoria={errorCamposCategoria}
               />
             </Card>
 
             {errorCarga && <ErrorBanner mensaje={errorCarga} />}
+
+            {datos.widgets.length > 0 &&
+              !aplicando &&
+              hayFiltrosActivos(filtrosAplicados) &&
+              datos.widgets.every(widgetSinResultados) && (
+                <div className={styles.sinResultados}>
+                  <h2 className={styles.sinResultadosTitulo}>
+                    No hay registros para los filtros seleccionados.
+                  </h2>
+                  <p className={styles.sinResultadosTexto}>
+                    Prueba a quitar algún filtro o restablecer el análisis completo.
+                  </p>
+                  <button type="button" className="btn btnPrimary" onClick={limpiar}>
+                    Limpiar filtros
+                  </button>
+                </div>
+              )}
 
             {datos.widgets.length === 0 ? (
               <div>

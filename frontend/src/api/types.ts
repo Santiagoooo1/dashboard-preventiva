@@ -550,12 +550,14 @@ export interface DashboardPanelRequestDto {
   fechaHasta?: string | null
   granularidad?: Granularidad | null
   campoFecha?: string | null
+  filtros?: FiltroMetricaDto[] | null
 }
 
 export interface DashboardFiltrosAplicadosDto {
   fechaDesde: string | null
   fechaHasta: string | null
   granularidad: string | null
+  filtros: FiltroMetricaDto[] | null
 }
 
 export interface DashboardPanelResumenDto {

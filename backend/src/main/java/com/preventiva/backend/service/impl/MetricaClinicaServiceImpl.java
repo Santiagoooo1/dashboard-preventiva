@@ -130,8 +130,9 @@ public class MetricaClinicaServiceImpl implements MetricaClinicaService {
         MetricaClinica metrica = obtenerMetricaOLanzar(id);
         LocalDate fechaDesde = request != null ? request.getFechaDesde() : null;
         LocalDate fechaHasta = request != null ? request.getFechaHasta() : null;
+        List<FiltroMetricaDto> filtrosGlobales = request != null ? request.getFiltrosGlobales() : null;
 
-        return calcular(metrica, fechaDesde, fechaHasta);
+        return calcular(metrica, fechaDesde, fechaHasta, filtrosGlobales);
     }
 
     @Override
@@ -155,18 +156,23 @@ public class MetricaClinicaServiceImpl implements MetricaClinicaService {
                 .activa(true)
                 .build();
 
-        return calcular(metricaTemporal, request.getFechaDesde(), request.getFechaHasta());
+        return calcular(metricaTemporal, request.getFechaDesde(), request.getFechaHasta(), null);
     }
 
-    private ResultadoMetricaResponseDto calcular(MetricaClinica metrica, LocalDate fechaDesde, LocalDate fechaHasta) {
+    private ResultadoMetricaResponseDto calcular(
+            MetricaClinica metrica, LocalDate fechaDesde, LocalDate fechaHasta,
+            List<FiltroMetricaDto> filtrosGlobales) {
         Long datasetId = metrica.getDataset().getId();
+        Map<String, CampoClinico> camposPorCodigo = obtenerCamposActivosPorCodigo(datasetId);
+        Function<String, CampoClinico> resolverCampo = camposPorCodigo::get;
+        List<FiltroMetricaDto> filtrosGlobalesEfectivos = filtrosONull(filtrosGlobales);
+
         List<RegistroClinicoGenerico> registros = registroClinicoGenericoRepository.findByDatasetId(datasetId)
                 .stream()
                 .filter(r -> cumpleRangoFecha(r, fechaDesde, fechaHasta))
+                .filter(r -> FiltroMetricaEvaluator.cumpleTodos(r, filtrosGlobalesEfectivos, resolverCampo))
                 .toList();
 
-        Map<String, CampoClinico> camposPorCodigo = obtenerCamposActivosPorCodigo(datasetId);
-        Function<String, CampoClinico> resolverCampo = camposPorCodigo::get;
         ConfiguracionMetricaDto config = metrica.getConfiguracion();
 
         return switch (metrica.getTipoMetrica()) {

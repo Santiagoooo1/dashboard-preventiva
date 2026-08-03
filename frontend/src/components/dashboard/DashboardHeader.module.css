@@ -75,8 +75,15 @@
   margin: 0 var(--spacing-xs);
 }
 
+/* Sigue siendo secundaria respecto al análisis, pero con presencia de botón:
+   antes heredaba el .btnSecondary translúcido y se leía como texto suelto. */
 .actionSecondary {
   flex-shrink: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-color: var(--color-primary-soft-border);
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary);
+  white-space: nowrap;
 }
 
 .stats {

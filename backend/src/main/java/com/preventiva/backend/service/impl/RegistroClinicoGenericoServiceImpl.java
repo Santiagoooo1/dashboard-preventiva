@@ -2,19 +2,23 @@ package com.preventiva.backend.service.impl;
 
 import com.preventiva.backend.dto.RegistroClinicoGenericoRequestDto;
 import com.preventiva.backend.dto.RegistroClinicoGenericoResponseDto;
+import com.preventiva.backend.entity.CampoClinico;
 import com.preventiva.backend.entity.DatasetClinico;
 import com.preventiva.backend.entity.Hospital;
 import com.preventiva.backend.entity.RegistroClinicoGenerico;
+import com.preventiva.backend.repository.CampoClinicoRepository;
 import com.preventiva.backend.repository.DatasetClinicoRepository;
 import com.preventiva.backend.repository.HospitalRepository;
 import com.preventiva.backend.repository.RegistroClinicoGenericoRepository;
 import com.preventiva.backend.service.interfaces.RegistroClinicoGenericoService;
+import com.preventiva.backend.util.RegistroClinicoGenericoValueReader;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +27,7 @@ public class RegistroClinicoGenericoServiceImpl implements RegistroClinicoGeneri
     private final RegistroClinicoGenericoRepository registroClinicoGenericoRepository;
     private final DatasetClinicoRepository datasetClinicoRepository;
     private final HospitalRepository hospitalRepository;
+    private final CampoClinicoRepository campoClinicoRepository;
 
     @Override
     public RegistroClinicoGenericoResponseDto crear(RegistroClinicoGenericoRequestDto request) {
@@ -65,6 +70,26 @@ public class RegistroClinicoGenericoServiceImpl implements RegistroClinicoGeneri
     public RegistroClinicoGenericoResponseDto obtenerPorId(Long id) {
         return mapToDto(registroClinicoGenericoRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("No existe el registro con id: " + id)));
+    }
+
+    @Override
+    public List<String> listarValoresUnicos(Long datasetId, String codigoCampo) {
+        datasetClinicoRepository.findById(datasetId)
+                .orElseThrow(() -> new IllegalArgumentException("No existe el dataset con id: " + datasetId));
+
+        CampoClinico campo = campoClinicoRepository.findByDatasetIdAndCodigoIgnoreCase(datasetId, codigoCampo)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "El campo '" + codigoCampo + "' no existe en este dataset."));
+
+        return registroClinicoGenericoRepository.findByDatasetId(datasetId)
+                .stream()
+                .map(r -> RegistroClinicoGenericoValueReader.leerValorCrudo(r, campo))
+                .map(v -> RegistroClinicoGenericoValueReader.coercionar(v, campo.getTipoDato()))
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .distinct()
+                .sorted()
+                .toList();
     }
 
     private Hospital resolverHospital(Long hospitalId) {

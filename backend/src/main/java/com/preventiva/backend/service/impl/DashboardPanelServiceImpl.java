@@ -88,6 +88,7 @@ public class DashboardPanelServiceImpl implements DashboardPanelService {
                         .fechaDesde(filtros.getFechaDesde())
                         .fechaHasta(filtros.getFechaHasta())
                         .granularidad(filtros.getGranularidad() != null ? filtros.getGranularidad().name() : null)
+                        .filtros(filtros.getFiltros())
                         .build())
                 .widgets(widgets)
                 .resumen(resumen)
@@ -157,6 +158,7 @@ public class DashboardPanelServiceImpl implements DashboardPanelService {
         EjecucionMetricaRequestDto request = new EjecucionMetricaRequestDto();
         request.setFechaDesde(filtros.getFechaDesde());
         request.setFechaHasta(filtros.getFechaHasta());
+        request.setFiltrosGlobales(filtros.getFiltros());
 
         return metricaClinicaService.ejecutar(metricaId, request);
     }
@@ -184,6 +186,7 @@ public class DashboardPanelServiceImpl implements DashboardPanelService {
         request.setGranularidad(granularidad);
         request.setCampoFecha(campoFecha);
         request.setCampoSegmentacion(config != null ? config.getCampoSegmentacion() : null);
+        request.setFiltrosGlobales(filtros.getFiltros());
 
         return metricaAnaliticaService.serieTemporal(metrica.getId(), request);
     }
@@ -202,6 +205,7 @@ public class DashboardPanelServiceImpl implements DashboardPanelService {
         request.setFechaDesde(filtros.getFechaDesde());
         request.setFechaHasta(filtros.getFechaHasta());
         request.setCampoAgrupacion(campoAgrupacion);
+        request.setFiltrosGlobales(filtros.getFiltros());
 
         return metricaAnaliticaService.comparativa(metrica.getId(), request);
     }

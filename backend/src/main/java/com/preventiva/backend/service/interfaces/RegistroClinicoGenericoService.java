@@ -12,4 +12,6 @@ public interface RegistroClinicoGenericoService {
     List<RegistroClinicoGenericoResponseDto> listarPorDataset(Long datasetId);
 
     RegistroClinicoGenericoResponseDto obtenerPorId(Long id);
+
+    List<String> listarValoresUnicos(Long datasetId, String codigoCampo);
 }

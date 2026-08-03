@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 
 @Getter
@@ -16,4 +17,5 @@ public class DashboardPanelRequestDto {
     private Granularidad granularidad;
     private String campoFecha;
     private Map<String, String> variables;
+    private List<FiltroMetricaDto> filtros;
 }

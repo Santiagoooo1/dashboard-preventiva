@@ -7,6 +7,7 @@ import com.preventiva.backend.dto.DatasetClinicoResponseDto;
 import com.preventiva.backend.dto.ReanudarBorradorDatasetDto;
 import com.preventiva.backend.service.interfaces.CampoClinicoService;
 import com.preventiva.backend.service.interfaces.DatasetClinicoService;
+import com.preventiva.backend.service.interfaces.RegistroClinicoGenericoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ public class DatasetClinicoController {
 
     private final DatasetClinicoService datasetClinicoService;
     private final CampoClinicoService campoClinicoService;
+    private final RegistroClinicoGenericoService registroClinicoGenericoService;
 
     @GetMapping
     public List<DatasetClinicoResponseDto> listar(
@@ -95,5 +97,12 @@ public class DatasetClinicoController {
             @PathVariable("id") Long id,
             @PathVariable("campoId") Long campoId) {
         campoClinicoService.desactivar(id, campoId);
+    }
+
+    @GetMapping("/{id}/campos/{codigo}/valores")
+    public List<String> listarValoresUnicosDeCampo(
+            @PathVariable("id") Long id,
+            @PathVariable("codigo") String codigo) {
+        return registroClinicoGenericoService.listarValoresUnicos(id, codigo);
     }
 }

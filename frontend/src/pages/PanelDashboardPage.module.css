@@ -18,6 +18,30 @@
   padding: var(--spacing-md) var(--spacing-lg);
 }
 
+.sinResultados {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-warning);
+  background-color: var(--color-warning-soft);
+  border-radius: var(--radius-lg);
+}
+
+.sinResultadosTitulo {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sinResultadosTexto {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(12, 1fr);

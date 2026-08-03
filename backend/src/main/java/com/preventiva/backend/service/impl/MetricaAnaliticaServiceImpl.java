@@ -2,6 +2,7 @@ package com.preventiva.backend.service.impl;
 
 import com.preventiva.backend.dto.ComparativaRequestDto;
 import com.preventiva.backend.dto.ComparativaResponseDto;
+import com.preventiva.backend.dto.FiltroMetricaDto;
 import com.preventiva.backend.dto.ItemComparativaDto;
 import com.preventiva.backend.dto.PanelMetricaSerieDto;
 import com.preventiva.backend.dto.PanelSerieTemporalResponseDto;
@@ -22,6 +23,7 @@ import com.preventiva.backend.repository.PanelClinicoRepository;
 import com.preventiva.backend.repository.PanelMetricaRepository;
 import com.preventiva.backend.repository.RegistroClinicoGenericoRepository;
 import com.preventiva.backend.service.interfaces.MetricaAnaliticaService;
+import com.preventiva.backend.util.FiltroMetricaEvaluator;
 import com.preventiva.backend.util.MetricaCalculoBasico;
 import com.preventiva.backend.util.PeriodoTemporalUtil;
 import com.preventiva.backend.util.PeriodoTemporalUtil.Periodo;
@@ -113,8 +115,12 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
             throw new IllegalArgumentException("El campo '" + codigoCampoFecha + "' debe ser de tipo FECHA.");
         }
 
+        Function<String, CampoClinico> resolverCampo = camposPorCodigo::get;
+        List<FiltroMetricaDto> filtrosGlobales = filtrosONull(request.getFiltrosGlobales());
+
         List<RegistroConFecha> registrosConFecha = registroClinicoGenericoRepository.findByDatasetId(datasetId)
                 .stream()
+                .filter(r -> FiltroMetricaEvaluator.cumpleTodos(r, filtrosGlobales, resolverCampo))
                 .map(r -> new RegistroConFecha(r, leerFecha(r, campoFecha)))
                 .filter(rf -> rf.fecha() != null)
                 .toList();
@@ -131,8 +137,6 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
         if (periodos.isEmpty()) {
             return respuestaSerieVacia(metrica, request);
         }
-
-        Function<String, CampoClinico> resolverCampo = camposPorCodigo::get;
 
         if (request.getCampoSegmentacion() == null || request.getCampoSegmentacion().isBlank()) {
             Map<String, List<RegistroClinicoGenerico>> registrosPorPeriodo = registrosConFecha.stream()
@@ -194,10 +198,12 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
         Map<String, CampoClinico> camposPorCodigo = obtenerCamposActivosPorCodigo(datasetId);
         CampoClinico campoAgrupacion = obtenerCampoOLanzar(request.getCampoAgrupacion(), camposPorCodigo);
         Function<String, CampoClinico> resolverCampo = camposPorCodigo::get;
+        List<FiltroMetricaDto> filtrosGlobales = filtrosONull(request.getFiltrosGlobales());
 
         List<RegistroClinicoGenerico> registros = registroClinicoGenericoRepository.findByDatasetId(datasetId)
                 .stream()
                 .filter(r -> cumpleRangoFechaEvento(r, request.getFechaDesde(), request.getFechaHasta()))
+                .filter(r -> FiltroMetricaEvaluator.cumpleTodos(r, filtrosGlobales, resolverCampo))
                 .toList();
 
         Map<String, List<RegistroClinicoGenerico>> porGrupo = registros.stream()
@@ -318,6 +324,10 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
         Object valor = RegistroClinicoGenericoValueReader.coercionar(valorCrudo, campo.getTipoDato());
 
         return valor != null ? String.valueOf(valor) : "Sin dato";
+    }
+
+    private List<FiltroMetricaDto> filtrosONull(List<FiltroMetricaDto> filtros) {
+        return filtros != null ? filtros : List.of();
     }
 
     private Map<String, CampoClinico> obtenerCamposActivosPorCodigo(Long datasetId) {
