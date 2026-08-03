@@ -1,7 +1,8 @@
 # Arquitectura técnica
 
 Resumen para quien vaya a mantener o ampliar el proyecto. Monorepo con dos apps que solo se
-comunican por HTTP: `backend/` (Spring Boot) y `frontend/` (React + Vite).
+comunican por HTTP: `backend/` (Spring Boot) y `frontend/` (React + Vite). Diagrama de
+arquitectura/ER: [`docs/Diagrama.png`](Diagrama.png).
 
 ## Backend
 

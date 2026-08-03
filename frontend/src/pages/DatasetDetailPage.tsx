@@ -25,7 +25,9 @@ interface Recomendacion {
   textoBoton: string
 }
 
-function siguientePaso(datasetId: string, resumen: ResumenConfiguracionDatasetDto): Recomendacion {
+// `avisoDashboardInicial` solo debe usarse cuando la card DashboardInicialCard
+// se muestra de verdad encima (dataset ACTIVO): si no, "arriba" no referiría a nada.
+function siguientePaso(datasetId: string, resumen: ResumenConfiguracionDatasetDto, estaActivo: boolean): Recomendacion {
   if (resumen.totalCampos === 0) {
     return {
       titulo: 'Define los campos del dataset',
@@ -47,7 +49,10 @@ function siguientePaso(datasetId: string, resumen: ResumenConfiguracionDatasetDt
   if (resumen.totalMetricas === 0) {
     return {
       titulo: 'Crea la primera métrica',
-      descripcion: 'Ya hay campos definidos. El siguiente paso es crear un indicador clínico: conteo, tasa, promedio…',
+      descripcion: estaActivo
+        ? 'Ya hay campos definidos. Puedes crear un indicador clínico a mano (conteo, tasa, promedio…), o usar ' +
+          '"Crear dashboard inicial" arriba para generar varios de golpe a partir de los campos importados.'
+        : 'Ya hay campos definidos. El siguiente paso es crear un indicador clínico: conteo, tasa, promedio…',
       to: `/datasets/${datasetId}/metricas/nueva`,
       textoBoton: 'Nueva métrica',
     }
@@ -55,7 +60,9 @@ function siguientePaso(datasetId: string, resumen: ResumenConfiguracionDatasetDt
   if (resumen.totalPaneles === 0) {
     return {
       titulo: 'Crea el primer panel',
-      descripcion: 'Ya hay métricas. Agrúpalas en un panel clínico para construir el dashboard.',
+      descripcion: estaActivo
+        ? 'Ya hay métricas. Agrúpalas en un panel clínico para construir el dashboard, o usa "Crear dashboard inicial" arriba si todavía no lo has hecho.'
+        : 'Ya hay métricas. Agrúpalas en un panel clínico para construir el dashboard.',
       to: `/datasets/${datasetId}/paneles/nuevo`,
       textoBoton: 'Nuevo panel',
     }
@@ -86,7 +93,9 @@ export function DatasetDetailPage() {
     setUltimoResultado({ metrica, resultado })
   }
 
-  const recomendacion = data ? siguientePaso(datasetId ?? '', data.resumenConfiguracion) : null
+  const recomendacion = data
+    ? siguientePaso(datasetId ?? '', data.resumenConfiguracion, data.dataset.estadoDataset === 'ACTIVO')
+    : null
 
   return (
     <div className={styles.page}>

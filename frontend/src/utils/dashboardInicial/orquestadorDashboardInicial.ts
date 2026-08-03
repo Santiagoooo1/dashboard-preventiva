@@ -136,7 +136,7 @@ export async function crearDashboardInicial(
       })
       idsPorCodigo.set(propuesta.codigo, metrica.id)
       resultado.metricasCreadas += 1
-    } catch (err) {
+    } catch {
       resultado.metricasFallidas.push(propuesta.nombre)
     }
   }
@@ -184,7 +184,7 @@ export async function crearDashboardInicial(
         await actualizarConfiguracionWidget(panelId, widget.id, payload)
       }
       resultado.widgetsCreados += 1
-    } catch (err) {
+    } catch {
       resultado.widgetsFallidos.push(propuesta.nombre)
     }
     orden += 1

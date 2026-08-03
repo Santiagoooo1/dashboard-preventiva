@@ -12,7 +12,7 @@ The repo is a monorepo with two top-level apps that currently only communicate o
 - `backend/` — Spring Boot 3.5 (Java 21) REST API. This is where essentially all the code lives today.
 - `frontend/` — empty placeholder directory; no frontend has been scaffolded yet.
 - `docker-compose.yml` — runs only the Postgres database used by the backend.
-- `doc/Diagrama.png` — architecture/ER diagram.
+- `docs/Diagrama.png` — architecture/ER diagram.
 
 Core domain: hospitals import Excel/CSV exports of surgical records per `Servicio` (surgical
 department — e.g. Trauma, Neurocirugía, Cesáreas). Each import is validated, mapped column-by-column
