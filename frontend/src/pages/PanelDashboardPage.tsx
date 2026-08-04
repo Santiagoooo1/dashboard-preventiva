@@ -25,7 +25,12 @@ import type {
   CamposClasificados,
 } from '../components/dashboard/camposFiltroDashboard'
 import { widgetSinDatos, widgetTodoCero } from '../components/dashboard/exploracionWidget'
-import { alternarSeleccion, combinarFiltros, validarIntegridadCruce } from '../components/dashboard/seleccionGrafica'
+import {
+  CAMPO_FECHA_POR_DEFECTO,
+  alternarSeleccion,
+  combinarFiltros,
+  validarIntegridadCruce,
+} from '../components/dashboard/seleccionGrafica'
 import type { SeleccionGrafica } from '../components/dashboard/seleccionGrafica'
 import { SeleccionGraficaPanel } from '../components/dashboard/SeleccionGraficaPanel'
 import { listarMetricas } from '../api/metricasApi'
@@ -62,6 +67,8 @@ export function PanelDashboardPage() {
   const [errorCamposCategoria, setErrorCamposCategoria] = useState<string | null>(null)
   /** Campo que identifica al individuo (paciente/HC) en este dataset, si existe. */
   const [campoIndividuo, setCampoIndividuo] = useState<CampoIndividuo | null>(null)
+  /** código → etiqueta de TODOS los campos, incluidos los de tipo FECHA. */
+  const [etiquetasCampos, setEtiquetasCampos] = useState<Record<string, string>>({})
   /** Config persistida de cada widget, necesaria para reejecutar series temporales. */
   const [configPorWidget, setConfigPorWidget] = useState<Record<number, ConfiguracionWidgetDto | null>>({})
 
@@ -149,6 +156,7 @@ export function PanelDashboardPage() {
         try {
           const datasetId = m.dataset.id
           const fm = await obtenerFrontendMetadata(datasetId, controller.signal)
+          setEtiquetasCampos(Object.fromEntries(fm.campos.map((c) => [c.codigo, c.etiqueta])))
 
           // El identificador de individuo se resuelve aparte de los campos de
           // agrupación: agrupar por HC daría una categoría por paciente, que
@@ -359,6 +367,16 @@ export function PanelDashboardPage() {
     return resueltos
   }, [datos, datosCruzados, seleccionGrafica])
 
+  /**
+   * Nombre legible del campo de fecha para el chip temporal. Se busca entre los
+   * campos reales del dataset; si no aparece (los campos FECHA se excluyen de
+   * `camposAgrupables`), se usa el código, nunca un texto inventado.
+   */
+  const etiquetaDeCampoFecha = (codigoConfigurado: string | null) => {
+    const codigo = codigoConfigurado ?? CAMPO_FECHA_POR_DEFECTO
+    return etiquetasCampos[codigo] ?? codigo
+  }
+
   const individuoGlobal = useMemo(() => {
     if (!campoIndividuo) return null
     const filtro = filtrosGlobalesAplicados.find((f) => f.campo === campoIndividuo.codigo)
@@ -473,6 +491,10 @@ export function PanelDashboardPage() {
                     individuoGlobal={individuoGlobal}
                     seleccionGrafica={seleccionGrafica}
                     campoAgrupacionMetrica={campoAgrupacionPorMetrica[widget.metricaId] ?? null}
+                    camposFechaPermitidos={camposFecha ?? []}
+                    etiquetaCampoFecha={etiquetaDeCampoFecha(
+                      configPorWidget[widget.panelMetricaId]?.campoFecha ?? null,
+                    )}
                     onSeleccionar={(nueva) => setSeleccionGrafica((actual) => alternarSeleccion(actual, nueva))}
                     onSeleccionInvalidada={(origenId) =>
                       setSeleccionGrafica((actual) => (actual?.widgetOrigenId === origenId ? null : actual))

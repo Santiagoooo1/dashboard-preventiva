@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DashboardWidgetDto, FiltroMetricaDto, TipoVisualizacion } from '../../api/types'
 import { clampAncho } from '../../utils/formatters'
 import { WidgetError } from '../widgets/WidgetError'
 import { BarChartWidget } from './BarChartWidget'
 import type { DatoBarra, SeleccionChart } from './BarChartWidget'
 import { LineChartWidget } from './LineChartWidget'
-import type { SerieLinea } from './LineChartWidget'
+import type { SeleccionTemporalChart, SerieLinea } from './LineChartWidget'
 import { PieChartWidget } from './PieChartWidget'
 import { KpiWidget } from './KpiWidget'
 import { TableWidget } from './TableWidget'
@@ -26,7 +26,7 @@ import {
   widgetTodoCero,
 } from './exploracionWidget'
 import { WidgetExploracionControls } from './WidgetExploracionControls'
-import { resolverSeleccionWidget } from './seleccionGrafica'
+import { resolverRangoTemporal, resolverSeleccionTemporalWidget, resolverSeleccionWidget } from './seleccionGrafica'
 import type { SeleccionGrafica } from './seleccionGrafica'
 import type { CampoFiltroCategoria, CampoIndividuo } from './camposFiltroDashboard'
 import { formatearEtiquetaCategoria } from './camposFiltroDashboard'
@@ -66,6 +66,10 @@ interface DashboardWidgetRendererProps {
   seleccionGrafica?: SeleccionGrafica | null
   /** `configuracion.campoAgrupacion` de la métrica: única fuente para DISTRIBUCION. */
   campoAgrupacionMetrica?: string | null
+  /** Campos FECHA reales del dataset: valida el campoFecha antes de usarlo. */
+  camposFechaPermitidos?: string[]
+  /** Nombre legible del campo de fecha, para el chip ("Fecha de cirugía"). */
+  etiquetaCampoFecha?: string | null
   onSeleccionar?: (seleccion: SeleccionGrafica) => void
   /** Aviso de que la semántica del origen cambió y la selección ya no vale. */
   onSeleccionInvalidada?: (widgetOrigenId: number) => void
@@ -94,15 +98,24 @@ function categorias(widget: DashboardWidgetDto): DatoBarra[] | null {
 function seriesTemporales(widget: DashboardWidgetDto): SerieLinea[] | null {
   const serie = widget.serieTemporal
   if (!serie) return null
+  // fechaInicio/fechaFin se arrastran tal cual: son el rango real del periodo
+  // calculado por el backend, y evitan recalcularlo (y equivocarse) aquí.
+  const aPunto = (p: { periodo: string; valor: number | null; fechaInicio: string; fechaFin: string }) => ({
+    periodo: p.periodo,
+    valor: p.valor,
+    fechaInicio: p.fechaInicio,
+    fechaFin: p.fechaFin,
+  })
+
   if (serie.series) {
     return serie.series.map((s) => ({
       etiqueta: formatearEtiquetaCategoria(s.etiqueta),
       valorOriginal: s.etiqueta,
-      puntos: s.puntos.map((p) => ({ periodo: p.periodo, valor: p.valor })),
+      puntos: s.puntos.map(aPunto),
     }))
   }
   if (serie.puntos) {
-    return [{ etiqueta: widget.titulo, puntos: serie.puntos.map((p) => ({ periodo: p.periodo, valor: p.valor })) }]
+    return [{ etiqueta: widget.titulo, puntos: serie.puntos.map(aPunto) }]
   }
   return null
 }
@@ -118,7 +131,11 @@ function seRenderizaComoKpi(widget: DashboardWidgetDto): boolean {
   return tieneValorSimple && (widget.tipoVisualizacion === 'KPI' || widget.tipoVisualizacion === 'TARJETA')
 }
 
-function cuerpoWidget(widget: DashboardWidgetDto, seleccion?: SeleccionChart) {
+function cuerpoWidget(
+  widget: DashboardWidgetDto,
+  seleccion?: SeleccionChart,
+  seleccionTemporal?: SeleccionTemporalChart,
+) {
   if (widget.estado === 'ERROR') {
     return <WidgetError widget={widget} />
   }
@@ -155,7 +172,25 @@ function cuerpoWidget(widget: DashboardWidgetDto, seleccion?: SeleccionChart) {
         // Una serie temporal en barras se representa por periodo; con varios
         // segmentos las barras se solaparían, así que cae a tabla.
         if (series.length === 1) {
-          return <BarChartWidget datos={series[0].puntos.map((p) => ({ etiqueta: p.periodo, valor: p.valor }))} />
+          // Barras TEMPORALES: cada barra es un periodo, no una categoría. Se
+          // reutiliza BarChartWidget, pero `valorOriginal` lleva el periodo
+          // técnico y el handler crea una selección temporal, no categórica.
+          return (
+            <BarChartWidget
+              datos={series[0].puntos.map((p) => ({
+                etiqueta: seleccionTemporal?.resolverPeriodo(p.periodo)?.etiquetaVisible ?? p.periodo,
+                valor: p.valor,
+                valorOriginal: seleccionTemporal?.resolverPeriodo(p.periodo) ? p.periodo : undefined,
+              }))}
+              seleccion={
+                seleccionTemporal && {
+                  etiquetaCampo: seleccionTemporal.etiquetaCampo,
+                  valorSeleccionado: seleccionTemporal.periodoSeleccionado,
+                  onSeleccionar: (periodo) => seleccionTemporal.onSeleccionarPeriodo(periodo),
+                }
+              }
+            />
+          )
         }
         return <TableWidget widget={widget} nota="incompatible" />
       }
@@ -167,7 +202,13 @@ function cuerpoWidget(widget: DashboardWidgetDto, seleccion?: SeleccionChart) {
         if (series.length > MAX_SERIES_LINEA) {
           return <TableWidget widget={widget} nota="incompatible" />
         }
-        return <LineChartWidget series={series} mostrarLeyenda={series.length > 1} />
+        return (
+          <LineChartWidget
+            series={series}
+            mostrarLeyenda={series.length > 1}
+            seleccionTemporal={seleccionTemporal}
+          />
+        )
       }
       return <TableWidget widget={widget} nota="incompatible" />
 
@@ -197,6 +238,8 @@ export function DashboardWidgetRenderer({
   individuoGlobal = null,
   seleccionGrafica = null,
   campoAgrupacionMetrica = null,
+  camposFechaPermitidos = [],
+  etiquetaCampoFecha = null,
   onSeleccionar,
   onSeleccionInvalidada,
 }: DashboardWidgetRendererProps) {
@@ -379,11 +422,85 @@ export function DashboardWidgetRenderer({
   const campoSeleccionable = capacidadSeleccion.campo
   useEffect(() => {
     if (!esOrigen || !onSeleccionInvalidada || !seleccionGrafica) return
+    if (seleccionGrafica.tipo !== 'CATEGORIA') return
     if (!capacidadSeleccion.seleccionable || campoSeleccionable !== seleccionGrafica.campo) {
       onSeleccionInvalidada(widget.panelMetricaId)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [esOrigen, capacidadSeleccion.seleccionable, campoSeleccionable])
+
+  // Capacidad TEMPORAL: separada de la categórica porque un periodo no es un
+  // valor, es un rango. campoFecha viene de la config del widget (o del default
+  // del backend, validado); la granularidad, de la respuesta.
+  const capacidadTemporal = resolverSeleccionTemporalWidget(mostrado, modo, campoFecha, camposFechaPermitidos)
+
+  /** Índice periodo → rango real que envió el backend. Nunca se recalcula. */
+  const rangosPorPeriodo = useMemo(() => {
+    const mapa = new Map<string, { fechaInicio: string; fechaFin: string }>()
+    const serie = mostrado.serieTemporal
+    if (!serie) return mapa
+    const puntos = serie.puntos ?? serie.series?.flatMap((s) => s.puntos) ?? []
+    for (const p of puntos) {
+      if (p.fechaInicio && p.fechaFin) mapa.set(p.periodo, { fechaInicio: p.fechaInicio, fechaFin: p.fechaFin })
+    }
+    return mapa
+  }, [mostrado])
+
+  const resolverPeriodo = (periodo: string) => {
+    if (!capacidadTemporal.seleccionable || !capacidadTemporal.granularidad) return null
+    const rango = rangosPorPeriodo.get(periodo)
+    return resolverRangoTemporal(periodo, capacidadTemporal.granularidad, rango?.fechaInicio, rango?.fechaFin)
+  }
+
+  // La selección TEMPORAL deja de valer si cambia el campo de fecha, la
+  // granularidad, o el periodo desaparece de la serie. Cambiar solo entre
+  // Línea y Barras no la invalida: campoFecha, granularidad y periodo siguen
+  // siendo los mismos.
+  const claveTemporal = `${capacidadTemporal.seleccionable}|${capacidadTemporal.campoFecha}|${capacidadTemporal.granularidad}`
+  const periodoActivo = seleccionGrafica?.tipo === 'TEMPORAL' ? seleccionGrafica.periodoOriginal : null
+  const periodoSigueExistiendo = periodoActivo !== null && rangosPorPeriodo.has(periodoActivo)
+
+  useEffect(() => {
+    if (!esOrigen || !onSeleccionInvalidada || seleccionGrafica?.tipo !== 'TEMPORAL') return
+    const mismoCampoYGranularidad =
+      capacidadTemporal.seleccionable &&
+      capacidadTemporal.campoFecha === seleccionGrafica.campoFecha &&
+      capacidadTemporal.granularidad === seleccionGrafica.granularidad
+
+    if (!mismoCampoYGranularidad || !periodoSigueExistiendo) {
+      onSeleccionInvalidada(widget.panelMetricaId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esOrigen, claveTemporal, periodoSigueExistiendo])
+
+  const seleccionTemporalChart: SeleccionTemporalChart | undefined =
+    capacidadTemporal.seleccionable && capacidadTemporal.campoFecha && onSeleccionar
+      ? {
+          etiquetaCampo: etiquetaCampoFecha ?? capacidadTemporal.campoFecha,
+          periodoSeleccionado:
+            esOrigen && seleccionGrafica?.tipo === 'TEMPORAL' ? seleccionGrafica.periodoOriginal : null,
+          resolverPeriodo: (periodo) => {
+            const r = resolverPeriodo(periodo)
+            return r ? { etiquetaVisible: r.etiquetaVisible } : null
+          },
+          onSeleccionarPeriodo: (periodo) => {
+            const rango = resolverPeriodo(periodo)
+            // Periodo no interpretable → no se construye filtro ni petición.
+            if (!rango) return
+            onSeleccionar({
+              tipo: 'TEMPORAL',
+              widgetOrigenId: widget.panelMetricaId,
+              campoFecha: capacidadTemporal.campoFecha!,
+              granularidad: capacidadTemporal.granularidad!,
+              periodoOriginal: periodo,
+              fechaDesde: rango.fechaDesde,
+              fechaHasta: rango.fechaHasta,
+              etiquetaVisible: rango.etiquetaVisible,
+              etiquetaCampo: etiquetaCampoFecha ?? capacidadTemporal.campoFecha!,
+            })
+          },
+        }
+      : undefined
 
   const seleccionChart: SeleccionChart | undefined =
     capacidadSeleccion.seleccionable && capacidadSeleccion.campo && onSeleccionar
@@ -391,9 +508,11 @@ export function DashboardWidgetRenderer({
           etiquetaCampo: capacidadSeleccion.etiquetaCampo ?? capacidadSeleccion.campo,
           // Solo el widget de ORIGEN resalta/atenúa: los demás muestran su
           // resultado ya filtrado, sin marcar nada.
-          valorSeleccionado: esOrigen ? (seleccionGrafica?.valorOriginal ?? null) : null,
+          valorSeleccionado:
+            esOrigen && seleccionGrafica?.tipo === 'CATEGORIA' ? seleccionGrafica.valorOriginal : null,
           onSeleccionar: (valorOriginal, etiquetaVisible) =>
             onSeleccionar({
+              tipo: 'CATEGORIA',
               widgetOrigenId: widget.panelMetricaId,
               campo: capacidadSeleccion.campo!,
               operador: 'EQ',
@@ -483,7 +602,7 @@ export function DashboardWidgetRenderer({
           </button>
         </div>
       ) : (
-        cuerpoWidget(mostrado, seleccionChart)
+        cuerpoWidget(mostrado, seleccionChart, seleccionTemporalChart)
       )}
     </div>
   )

@@ -107,3 +107,9 @@
 .errorTexto {
   font-weight: 600;
 }
+
+/* Detalle del rango real bajo el chip temporal. */
+.rango {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}

@@ -9,6 +9,9 @@ import styles from './Charts.module.css'
 export interface PuntoLinea {
   periodo: string
   valor: number | null
+  /** Rango real del periodo, tal como lo calcula el backend. No se recalcula aquí. */
+  fechaInicio?: string
+  fechaFin?: string
 }
 
 export interface SerieLinea {
@@ -19,10 +22,25 @@ export interface SerieLinea {
   valorOriginal?: string
 }
 
+/**
+ * Selección TEMPORAL (6.9H.2). El objetivo interactivo es el PERIODO, no cada
+ * punto: en una serie segmentada por sexo, pulsar el punto de HOMBRE en enero
+ * selecciona enero, nunca HOMBRE.
+ */
+export interface SeleccionTemporalChart {
+  etiquetaCampo: string
+  /** periodoOriginal actualmente seleccionado, si el origen es este widget. */
+  periodoSeleccionado: string | null
+  /** Devuelve null si el periodo no es interpretable: entonces no es pulsable. */
+  resolverPeriodo: (periodo: string) => { etiquetaVisible: string } | null
+  onSeleccionarPeriodo: (periodo: string) => void
+}
+
 interface LineChartWidgetProps {
   series: SerieLinea[]
   /** Con una sola serie no hace falta leyenda: el título ya la nombra. */
   mostrarLeyenda: boolean
+  seleccionTemporal?: SeleccionTemporalChart
 }
 
 const ANCHO = 520
@@ -81,7 +99,7 @@ function areaDeTramo(segmento: { x: number; y: number }[], yBase: number): strin
   return `${ida} ${vuelta}`
 }
 
-export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps) {
+export function LineChartWidget({ series, mostrarLeyenda, seleccionTemporal }: LineChartWidgetProps) {
   const [tooltip, setTooltip] = useState<DatosTooltip | null>(null)
   const gradId = useId()
 
@@ -169,6 +187,53 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
           ) : null,
         )}
 
+        {/* Bandas de periodo: UN solo objetivo interactivo por periodo, que
+            cubre todas las series. Evita crear un tab stop por cada punto
+            (HOMBRE y MUJER de enero serían dos focos para la misma selección)
+            y deja claro que lo que se selecciona es el periodo, no la serie.
+            Se pintan antes que las líneas para quedar por debajo. */}
+        {seleccionTemporal &&
+          periodos.map((periodo, i) => {
+            const resuelto = seleccionTemporal.resolverPeriodo(periodo)
+            if (!resuelto) return null
+
+            const activa = seleccionTemporal.periodoSeleccionado === periodo
+            const mitad = n === 1 ? anchoUtil / 2 : anchoUtil / (n - 1) / 2
+            const xIni = Math.max(margen.left, x(i) - mitad)
+            const xFin = Math.min(ANCHO - margen.right, x(i) + mitad)
+            const valores = series
+              .map((s) => `${s.etiqueta}: ${formatNumber(s.puntos[i]?.valor)}`)
+              .join('. ')
+
+            return (
+              <rect
+                key={`banda-${periodo}`}
+                className={`${styles.bandaPeriodo} ${activa ? styles.bandaPeriodoActiva : ''}`}
+                x={xIni}
+                y={margen.top}
+                width={Math.max(1, xFin - xIni)}
+                height={ALTO - margen.top - margen.bottom}
+                role="button"
+                tabIndex={0}
+                aria-pressed={activa}
+                aria-label={
+                  activa
+                    ? `${resuelto.etiquetaVisible} seleccionado. Pulsar para quitar.`
+                    : `Seleccionar ${resuelto.etiquetaVisible}. ${valores}.`
+                }
+                onClick={() => seleccionTemporal.onSeleccionarPeriodo(periodo)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    seleccionTemporal.onSeleccionarPeriodo(periodo)
+                  }
+                }}
+              >
+                <title>{`${resuelto.etiquetaVisible}. ${valores}`}</title>
+              </rect>
+            )
+          })}
+
         {series.map((serie, indiceSerie) => {
           const color = COLORES[indiceSerie % COLORES.length]
           const ultimoConValor = [...serie.puntos]
@@ -203,8 +268,22 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
                   <title>{`${serie.puntos[i].periodo}: ${formatNumber(serie.puntos[i].valor)}`}</title>
                 </circle>
               ))}
-              {serie.puntos.map((p, i) =>
-                p.valor === null || p.valor === undefined ? null : (
+              {serie.puntos.map((p, i) => {
+                if (p.valor === null || p.valor === undefined) return null
+                // Punto del periodo seleccionado: se marca en TODAS las series,
+                // porque la selección es del periodo, no de una serie.
+                const enPeriodoActivo = seleccionTemporal?.periodoSeleccionado === p.periodo
+                return (
+                  <g key={`g-${serie.etiqueta}-${p.periodo}`}>
+                    {enPeriodoActivo && (
+                      <circle
+                        className={styles.puntoPeriodoActivo}
+                        cx={x(i)}
+                        cy={escala.y(p.valor)}
+                        r={6}
+                        fill={color}
+                      />
+                    )}
                   <circle
                     key={`${serie.etiqueta}-${p.periodo}`}
                     className={styles.marcaHover}
@@ -229,8 +308,9 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
                       setTooltip(null)
                     }}
                   />
-                ),
-              )}
+                  </g>
+                )
+              })}
               {ultimoConValor && (
                 <text
                   className={styles.etiquetaDirecta}
