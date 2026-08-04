@@ -84,6 +84,33 @@
   gap: 6px;
 }
 
+/* Entrada de leyenda pulsable: hereda el aspecto de .leyendaItem para que un
+   <button> no se distinga visualmente de un <span>. */
+.leyendaItemSeleccionable {
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  margin: -2px 0;
+  font: inherit;
+  color: inherit;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.leyendaItemSeleccionable:hover {
+  background-color: var(--color-selection-soft);
+}
+
+.leyendaItemSeleccionable:focus-visible {
+  outline: 2px solid var(--color-selection);
+  outline-offset: 1px;
+}
+
+.leyendaItemActiva {
+  color: var(--color-selection);
+  font-weight: 700;
+}
+
 .leyendaMarca {
   width: 9px;
   height: 9px;
@@ -102,6 +129,61 @@
   color: var(--color-text-muted);
   font-size: 0.8rem;
   margin: 0 0 var(--spacing-sm) 0;
+}
+
+/* --- Cross-filtering (6.9H.1): marcas seleccionables --- */
+
+.marcaSeleccionable {
+  cursor: pointer;
+  transition: opacity 0.15s, filter 0.15s;
+}
+
+.marcaSeleccionable:hover {
+  /* Hover deliberadamente distinto del estado seleccionado: sugiere que se
+     puede pulsar, sin fingir que ya está activo. */
+  filter: brightness(1.08);
+  opacity: 1;
+}
+
+.marcaSeleccionable:focus-visible {
+  outline: 2px solid var(--color-selection);
+  outline-offset: 2px;
+}
+
+.marcaSeleccionada {
+  opacity: 1;
+  stroke: var(--color-selection);
+  stroke-width: 2;
+  /* El borde acompaña al color: la selección no se comunica solo por tono. */
+}
+
+/* Categorías no seleccionadas del gráfico de ORIGEN: siguen visibles y
+   pulsables — el origen conserva su contexto completo. */
+.marcaAtenuada {
+  opacity: 0.4;
+}
+
+.marcaAtenuada:hover {
+  opacity: 0.75;
+}
+
+.filaSeleccionable {
+  cursor: pointer;
+}
+
+.filaSeleccionable:hover {
+  background-color: var(--color-selection-soft);
+}
+
+.filaSeleccionable:focus-visible {
+  outline: 2px solid var(--color-selection);
+  outline-offset: -2px;
+}
+
+.filaSeleccionada {
+  background-color: var(--color-selection-soft);
+  box-shadow: inset 3px 0 0 var(--color-selection);
+  font-weight: 600;
 }
 
 /* Todo a cero: informativo, no advertencia. Azul muy suave del ámbito local

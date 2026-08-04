@@ -43,6 +43,14 @@
   background-color: var(--color-error-soft);
 }
 
+/* Widget ORIGEN de la selección gráfica: indicador discreto. Los demás widgets
+   se recalculan pero NO se tiñen de turquesa — el color marca de dónde salió
+   la selección, no quién la sufre. */
+.cardOrigen {
+  border-color: var(--color-selection-border);
+  box-shadow: var(--shadow-md), inset 0 2px 0 var(--color-selection);
+}
+
 /* Altura mínima reservada para título + contexto: con títulos clínicos de una
    o dos líneas ("% de infección de localización quirúrgica"), las tarjetas de
    una misma fila desalineaban el valor. Es min-height, no height fija: un

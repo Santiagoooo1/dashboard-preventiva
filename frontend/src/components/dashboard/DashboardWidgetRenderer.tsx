@@ -3,7 +3,7 @@ import type { DashboardWidgetDto, FiltroMetricaDto, TipoVisualizacion } from '..
 import { clampAncho } from '../../utils/formatters'
 import { WidgetError } from '../widgets/WidgetError'
 import { BarChartWidget } from './BarChartWidget'
-import type { DatoBarra } from './BarChartWidget'
+import type { DatoBarra, SeleccionChart } from './BarChartWidget'
 import { LineChartWidget } from './LineChartWidget'
 import type { SerieLinea } from './LineChartWidget'
 import { PieChartWidget } from './PieChartWidget'
@@ -26,6 +26,8 @@ import {
   widgetTodoCero,
 } from './exploracionWidget'
 import { WidgetExploracionControls } from './WidgetExploracionControls'
+import { resolverSeleccionWidget } from './seleccionGrafica'
+import type { SeleccionGrafica } from './seleccionGrafica'
 import type { CampoFiltroCategoria, CampoIndividuo } from './camposFiltroDashboard'
 import { formatearEtiquetaCategoria } from './camposFiltroDashboard'
 import styles from './DashboardWidgetRenderer.module.css'
@@ -58,6 +60,15 @@ interface DashboardWidgetRendererProps {
    * los filtros APLICADOS, no desde el formulario sin aplicar.
    */
   individuoGlobal?: string | null
+
+  // --- Cross-filtering (6.9H.1) ---
+  /** Selección gráfica activa en todo el dashboard, si la hay. */
+  seleccionGrafica?: SeleccionGrafica | null
+  /** `configuracion.campoAgrupacion` de la métrica: única fuente para DISTRIBUCION. */
+  campoAgrupacionMetrica?: string | null
+  onSeleccionar?: (seleccion: SeleccionGrafica) => void
+  /** Aviso de que la semántica del origen cambió y la selección ya no vale. */
+  onSeleccionInvalidada?: (widgetOrigenId: number) => void
 }
 
 /**
@@ -107,7 +118,7 @@ function seRenderizaComoKpi(widget: DashboardWidgetDto): boolean {
   return tieneValorSimple && (widget.tipoVisualizacion === 'KPI' || widget.tipoVisualizacion === 'TARJETA')
 }
 
-function cuerpoWidget(widget: DashboardWidgetDto) {
+function cuerpoWidget(widget: DashboardWidgetDto, seleccion?: SeleccionChart) {
   if (widget.estado === 'ERROR') {
     return <WidgetError widget={widget} />
   }
@@ -128,18 +139,18 @@ function cuerpoWidget(widget: DashboardWidgetDto) {
   switch (widget.tipoVisualizacion) {
     case 'KPI':
       if (tieneValorSimple) return <KpiWidget resultado={actual} />
-      return <TableWidget widget={widget} />
+      return <TableWidget widget={widget} seleccion={seleccion} />
 
     case 'TARJETA':
       if (tieneValorSimple) return <KpiWidget resultado={actual} />
-      return <TableWidget widget={widget} />
+      return <TableWidget widget={widget} seleccion={seleccion} />
 
     case 'TABLA':
       if (tieneValorSimple) return <KpiWidget resultado={actual} compacto />
-      return <TableWidget widget={widget} />
+      return <TableWidget widget={widget} seleccion={seleccion} />
 
     case 'BARRAS':
-      if (cats) return <BarChartWidget datos={cats} />
+      if (cats) return <BarChartWidget datos={cats} seleccion={seleccion} />
       if (series) {
         // Una serie temporal en barras se representa por periodo; con varios
         // segmentos las barras se solaparían, así que cae a tabla.
@@ -162,13 +173,13 @@ function cuerpoWidget(widget: DashboardWidgetDto) {
 
     case 'PIE':
     case 'DONUT':
-      if (cats) return <PieChartWidget datos={cats} />
+      if (cats) return <PieChartWidget datos={cats} seleccion={seleccion} />
       if (series) return <TableWidget widget={widget} nota="incompatible" />
       if (tieneValorSimple) return <KpiWidget resultado={actual} />
       return <ChartEmptyState motivo="sin-datos" />
 
     default:
-      return <TableWidget widget={widget} />
+      return <TableWidget widget={widget} seleccion={seleccion} />
   }
 }
 
@@ -184,6 +195,10 @@ export function DashboardWidgetRenderer({
   campoSegmentacion = null,
   campoAgrupacionPersistido = null,
   individuoGlobal = null,
+  seleccionGrafica = null,
+  campoAgrupacionMetrica = null,
+  onSeleccionar,
+  onSeleccionInvalidada,
 }: DashboardWidgetRendererProps) {
   const [guardando, setGuardando] = useState(false)
   const [errorVista, setErrorVista] = useState<string | null>(null)
@@ -348,6 +363,47 @@ export function DashboardWidgetRenderer({
   const sinDatosLocal = resultadoLocal !== null && !cargandoLocal && widgetSinDatos(resultadoLocal)
   const esKpi = seRenderizaComoKpi(mostrado)
 
+  // --- Cross-filtering ---
+  const capacidadSeleccion = resolverSeleccionWidget(
+    mostrado,
+    modo,
+    campoAgrupacion,
+    campoAgrupacionMetrica,
+    camposAgrupables,
+  )
+  const esOrigen = seleccionGrafica?.widgetOrigenId === widget.panelMetricaId
+
+  // Si el origen deja de poder sostener la selección (cambió el campo, pasó a
+  // modo Paciente, dejó de estar desglosado…), se avisa al estado central para
+  // que no quede un chip que ya no corresponde a lo que muestra el widget.
+  const campoSeleccionable = capacidadSeleccion.campo
+  useEffect(() => {
+    if (!esOrigen || !onSeleccionInvalidada || !seleccionGrafica) return
+    if (!capacidadSeleccion.seleccionable || campoSeleccionable !== seleccionGrafica.campo) {
+      onSeleccionInvalidada(widget.panelMetricaId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [esOrigen, capacidadSeleccion.seleccionable, campoSeleccionable])
+
+  const seleccionChart: SeleccionChart | undefined =
+    capacidadSeleccion.seleccionable && capacidadSeleccion.campo && onSeleccionar
+      ? {
+          etiquetaCampo: capacidadSeleccion.etiquetaCampo ?? capacidadSeleccion.campo,
+          // Solo el widget de ORIGEN resalta/atenúa: los demás muestran su
+          // resultado ya filtrado, sin marcar nada.
+          valorSeleccionado: esOrigen ? (seleccionGrafica?.valorOriginal ?? null) : null,
+          onSeleccionar: (valorOriginal, etiquetaVisible) =>
+            onSeleccionar({
+              widgetOrigenId: widget.panelMetricaId,
+              campo: capacidadSeleccion.campo!,
+              operador: 'EQ',
+              valorOriginal,
+              etiquetaVisible,
+              etiquetaCampo: capacidadSeleccion.etiquetaCampo ?? capacidadSeleccion.campo!,
+            }),
+        }
+      : undefined
+
   // Un KPI desglosado deja de ser un número y pasa a ser una comparativa: en
   // una columna estrecha crecería a lo alto y rompería la fila. Mientras dura
   // la exploración ocupa el ancho completo de la rejilla; al volver a Actual o
@@ -427,7 +483,7 @@ export function DashboardWidgetRenderer({
           </button>
         </div>
       ) : (
-        cuerpoWidget(mostrado)
+        cuerpoWidget(mostrado, seleccionChart)
       )}
     </div>
   )
@@ -437,7 +493,7 @@ export function DashboardWidgetRenderer({
       className={`${styles.widget} ${expandido ? styles.widgetExploracionExpandida : ''}`}
       style={{ ['--span' as string]: clampAncho(widget.ancho) }}
     >
-      <div className={`${styles.card} ${conError ? styles.cardError : ''}`}>
+      <div className={`${styles.card} ${conError ? styles.cardError : ''} ${esOrigen ? styles.cardOrigen : ''}`}>
         <div className={styles.cardHeader}>
           <h3 className={styles.cardTitle}>{widget.titulo}</h3>
           {/* Una sola frase de contexto: durante la exploración manda esta;

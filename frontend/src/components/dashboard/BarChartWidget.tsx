@@ -31,8 +31,61 @@ export interface DatoBarra {
   valorOriginal?: string
 }
 
+/** Interacción de cross-filtering. Ausente = gráfico puramente informativo. */
+export interface SeleccionChart {
+  /** Nombre legible del campo, para los textos accesibles. */
+  etiquetaCampo: string
+  /** valorOriginal actualmente seleccionado en este gráfico, si lo hay. */
+  valorSeleccionado: string | null
+  onSeleccionar: (valorOriginal: string, etiquetaVisible: string) => void
+}
+
 interface BarChartWidgetProps {
   datos: DatoBarra[]
+  seleccion?: SeleccionChart
+}
+
+/**
+ * Props comunes de un elemento seleccionable dentro de un SVG. Solo se aplican
+ * cuando el dato tiene `valorOriginal`: sin valor técnico no se puede construir
+ * un filtro fiable, así que ese elemento no se vuelve interactivo.
+ */
+function propsSeleccion(
+  dato: DatoBarra,
+  seleccion: SeleccionChart | undefined,
+  valorFormateado: string,
+) {
+  if (!seleccion || !dato.valorOriginal) return { interactivo: false as const, activa: false }
+
+  const activa = seleccion.valorSeleccionado === dato.valorOriginal
+  return {
+    interactivo: true as const,
+    activa,
+    props: {
+      role: 'button',
+      tabIndex: 0,
+      'aria-pressed': activa,
+      'aria-label': activa
+        ? `${seleccion.etiquetaCampo}: ${dato.etiqueta} seleccionado. Pulsar para quitar.`
+        : `Seleccionar ${seleccion.etiquetaCampo}: ${dato.etiqueta}. Total: ${valorFormateado}.`,
+      onClick: () => seleccion.onSeleccionar(dato.valorOriginal!, dato.etiqueta),
+      onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          seleccion.onSeleccionar(dato.valorOriginal!, dato.etiqueta)
+        }
+      },
+    },
+  }
+}
+
+/** Clase de la marca según su estado dentro del gráfico de origen. */
+function claseMarca(interactivo: boolean, activa: boolean, haySeleccion: boolean): string {
+  if (!interactivo) return styles.marcaHover
+  if (activa) return `${styles.marcaSeleccionable} ${styles.marcaSeleccionada}`
+  // Atenuada, pero sigue siendo interactiva: el origen conserva todas sus
+  // categorías para no perder el contexto desde el que se navegó.
+  return `${styles.marcaSeleccionable} ${haySeleccion ? styles.marcaAtenuada : ''}`
 }
 
 const ANCHO = 480
@@ -44,7 +97,7 @@ function convieneHorizontal(datos: DatoBarra[]): boolean {
   return datos.length > 6 || datos.some((d) => d.etiqueta.length > 12)
 }
 
-export function BarChartWidget({ datos }: BarChartWidgetProps) {
+export function BarChartWidget({ datos, seleccion }: BarChartWidgetProps) {
   const [tooltip, setTooltip] = useState<DatosTooltip | null>(null)
   const gradId = useId()
 
@@ -54,11 +107,8 @@ export function BarChartWidget({ datos }: BarChartWidgetProps) {
   }
 
   const horizontal = convieneHorizontal(datos)
-  return horizontal ? (
-    <BarrasHorizontales datos={datos} tooltip={tooltip} setTooltip={setTooltip} gradId={gradId} />
-  ) : (
-    <BarrasVerticales datos={datos} tooltip={tooltip} setTooltip={setTooltip} gradId={gradId} />
-  )
+  const sub = { datos, tooltip, setTooltip, gradId, seleccion }
+  return horizontal ? <BarrasHorizontales {...sub} /> : <BarrasVerticales {...sub} />
 }
 
 interface SubProps {
@@ -66,9 +116,10 @@ interface SubProps {
   tooltip: DatosTooltip | null
   setTooltip: (t: DatosTooltip | null) => void
   gradId: string
+  seleccion?: SeleccionChart
 }
 
-function BarrasVerticales({ datos, tooltip, setTooltip, gradId }: SubProps) {
+function BarrasVerticales({ datos, tooltip, setTooltip, gradId, seleccion }: SubProps) {
   const margen = { top: 18, right: 12, bottom: 34, left: 44 }
   const anchoUtil = ANCHO - margen.left - margen.right
   const altoUtil = ALTO - margen.top - margen.bottom
@@ -107,16 +158,18 @@ function BarrasVerticales({ datos, tooltip, setTooltip, gradId }: SubProps) {
           const y = Math.min(yValor, yCero)
           const alto = Math.max(1, Math.abs(yCero - yValor))
           const x = bandas.centro(i) - bandas.grosor / 2
+          const sel = propsSeleccion(d, seleccion, formatNumber(d.valor))
           return (
             <g key={`${d.etiqueta}-${i}`}>
               <rect
-                className={styles.marcaHover}
+                className={claseMarca(sel.interactivo, sel.activa, Boolean(seleccion?.valorSeleccionado))}
                 x={x}
                 y={y}
                 width={bandas.grosor}
                 height={alto}
                 rx={6}
-                fill={`url(#${gradId})`}
+                fill={sel.activa ? 'var(--color-selection)' : `url(#${gradId})`}
+                {...(sel.props ?? {})}
                 onMouseEnter={() =>
                   setTooltip({
                     x: (bandas.centro(i) / ANCHO) * 100,
@@ -154,7 +207,7 @@ function BarrasVerticales({ datos, tooltip, setTooltip, gradId }: SubProps) {
   )
 }
 
-function BarrasHorizontales({ datos, tooltip, setTooltip, gradId }: SubProps) {
+function BarrasHorizontales({ datos, tooltip, setTooltip, gradId, seleccion }: SubProps) {
   const margen = { top: 8, right: 48, bottom: 8, left: 110 }
   // Con una sola categoría (cohorte de un paciente, por ejemplo) una fila de
   // 26px en un lienzo alto deja la tarjeta casi vacía: se engorda la fila para
@@ -175,6 +228,7 @@ function BarrasHorizontales({ datos, tooltip, setTooltip, gradId }: SubProps) {
         {datos.map((d, i) => {
           const yFila = margen.top + i * altoFila
           const grosor = altoFila - 8
+          const sel = propsSeleccion(d, seleccion, formatNumber(d.valor))
           return (
             <g key={`${d.etiqueta}-${i}`}>
               <text
@@ -190,13 +244,14 @@ function BarrasHorizontales({ datos, tooltip, setTooltip, gradId }: SubProps) {
               {d.valor !== null && d.valor !== undefined && (
                 <>
                   <rect
-                    className={styles.marcaHover}
+                    className={claseMarca(sel.interactivo, sel.activa, Boolean(seleccion?.valorSeleccionado))}
                     x={margen.left}
                     y={yFila}
                     width={Math.max(1, x(d.valor) - margen.left)}
                     height={grosor}
                     rx={6}
-                    fill={`url(#${gradId})`}
+                    fill={sel.activa ? 'var(--color-selection)' : `url(#${gradId})`}
+                    {...(sel.props ?? {})}
                     onMouseEnter={() =>
                       setTooltip({
                         x: (x(d.valor!) / ANCHO) * 100,

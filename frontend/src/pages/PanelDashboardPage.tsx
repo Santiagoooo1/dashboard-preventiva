@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import type {
   CatalogoFrontendResponseDto,
   ConfiguracionWidgetDto,
   DashboardPanelResponseDto,
+  DashboardWidgetDto,
   PanelMetricaResponseDto,
   TipoVisualizacion,
 } from '../api/types'
@@ -24,6 +25,10 @@ import type {
   CamposClasificados,
 } from '../components/dashboard/camposFiltroDashboard'
 import { widgetSinDatos, widgetTodoCero } from '../components/dashboard/exploracionWidget'
+import { alternarSeleccion, combinarFiltros, validarIntegridadCruce } from '../components/dashboard/seleccionGrafica'
+import type { SeleccionGrafica } from '../components/dashboard/seleccionGrafica'
+import { SeleccionGraficaPanel } from '../components/dashboard/SeleccionGraficaPanel'
+import { listarMetricas } from '../api/metricasApi'
 import { DashboardWidgetRenderer } from '../components/dashboard/DashboardWidgetRenderer'
 import { DashboardHeader } from '../components/dashboard/DashboardHeader'
 import styles from './PanelDashboardPage.module.css'
@@ -66,6 +71,21 @@ export function PanelDashboardPage() {
   // como "activo" un valor que el usuario aún no ha aplicado.
   const [filtros, setFiltros] = useState<ValoresFiltros>(FILTROS_VACIOS)
   const [filtrosAplicados, setFiltrosAplicados] = useState<ValoresFiltros>(FILTROS_VACIOS)
+
+  // --- Cross-filtering (nivel 3) ---
+  // Una única selección activa en todo el dashboard. `datos` es el resultado
+  // BASE (solo filtros globales) y `datosCruzados` el resultado con la
+  // selección aplicada: el widget de origen sigue pintándose con el base para
+  // conservar todas sus categorías, y el resto usa el cruzado.
+  const [seleccionGrafica, setSeleccionGrafica] = useState<SeleccionGrafica | null>(null)
+  const [datosCruzados, setDatosCruzados] = useState<DashboardPanelResponseDto | null>(null)
+  const [cruzando, setCruzando] = useState(false)
+  const [errorCruce, setErrorCruce] = useState<string | null>(null)
+  const [reintentoCruce, setReintentoCruce] = useState(0)
+  /** Descarta respuestas de selecciones ya superadas por otra más reciente. */
+  const peticionCruceRef = useRef(0)
+  /** `configuracion.campoAgrupacion` por métrica: única fuente para DISTRIBUCION. */
+  const [campoAgrupacionPorMetrica, setCampoAgrupacionPorMetrica] = useState<Record<number, string | null>>({})
 
   // Definición "en crudo" de cada widget (metricaId, título/descripción
   // personalizados, orden, ancho): la necesitamos completa para poder hacer
@@ -112,6 +132,19 @@ export function PanelDashboardPage() {
         setConfigPorWidget(
           Object.fromEntries(m.widgets.map((w) => [w.panelMetricaId, w.configuracionWidgetActual])),
         )
+
+        // Las métricas DISTRIBUCION llevan su campo de agrupación en la propia
+        // definición de la métrica, no en el resultado: sin esto no se puede
+        // saber qué campo representa cada categoría de esos widgets.
+        listarMetricas(m.dataset.id, controller.signal)
+          .then((metricas) =>
+            setCampoAgrupacionPorMetrica(
+              Object.fromEntries(metricas.map((mt) => [mt.id, mt.configuracion?.campoAgrupacion ?? null])),
+            ),
+          )
+          .catch(() => {
+            // Sin esto, las distribuciones simplemente no serán seleccionables.
+          })
 
         try {
           const datasetId = m.dataset.id
@@ -170,7 +203,70 @@ export function PanelDashboardPage() {
     return () => controller.abort()
   }, [panelId])
 
+  /**
+   * IDs de los widgets que el dashboard base está mostrando ahora mismo: el
+   * conjunto que la respuesta cruzada tiene que cubrir por completo.
+   * Referencia estable mientras `datos` no cambie, para no reejecutar el cruce.
+   */
+  const idsWidgetsBase = useMemo(() => (datos?.widgets ?? []).map((w) => w.panelMetricaId), [datos])
+
+  // Recalcula el dashboard CRUZADO (globales AND selección). El base se
+  // conserva intacto: el widget de origen sigue mostrando todas sus categorías.
+  useEffect(() => {
+    if (!seleccionGrafica) {
+      setDatosCruzados(null)
+      setErrorCruce(null)
+      return
+    }
+
+    const controller = new AbortController()
+    const idPeticion = ++peticionCruceRef.current
+    setCruzando(true)
+    setErrorCruce(null)
+
+    const request = aRequest(filtrosAplicados)
+    ejecutarDashboard(
+      panelId ?? '',
+      { ...request, filtros: combinarFiltros(request.filtros ?? [], seleccionGrafica) },
+      controller.signal,
+    )
+      .then((respuesta) => {
+        // Un clic rápido en otra categoría no debe dejar que la respuesta
+        // anterior sobrescriba la selección actual.
+        if (idPeticion !== peticionCruceRef.current) return
+
+        // All-or-nothing: o se aplican todos los widgets recalculados, o
+        // ninguno. Rellenar los que falten con su resultado base mezclaría dos
+        // poblaciones distintas en la misma pantalla.
+        const integridad = validarIntegridadCruce(idsWidgetsBase, respuesta.widgets)
+        if (!integridad.completa) {
+          setErrorCruce('No se pudieron actualizar todos los indicadores.')
+          setDatosCruzados(null)
+          return
+        }
+
+        setDatosCruzados(respuesta)
+      })
+      .catch(() => {
+        if (idPeticion === peticionCruceRef.current && !controller.signal.aborted) {
+          setErrorCruce('No se pudieron actualizar los indicadores.')
+          // Sin mezcla parcial: se vuelve al dashboard base completo.
+          setDatosCruzados(null)
+        }
+      })
+      .finally(() => {
+        if (idPeticion === peticionCruceRef.current) setCruzando(false)
+      })
+
+    return () => controller.abort()
+  }, [seleccionGrafica, filtrosAplicados, panelId, reintentoCruce, idsWidgetsBase])
+
+  const quitarSeleccion = () => setSeleccionGrafica(null)
+
   const limpiar = () => {
+    // Cambiar el contexto global cambia la población base: la selección
+    // anterior puede referirse a un valor que ya no existe.
+    setSeleccionGrafica(null)
     setFiltros(FILTROS_VACIOS)
     cargarDashboard(FILTROS_VACIOS, false)
   }
@@ -178,8 +274,14 @@ export function PanelDashboardPage() {
   // Aplica un conjunto concreto de filtros al instante (quitar una chip, quitar
   // el paciente), sin esperar a que el usuario pulse "Aplicar filtros".
   const aplicarValores = (nuevosValores: ValoresFiltros) => {
+    setSeleccionGrafica(null)
     setFiltros(nuevosValores)
     cargarDashboard(nuevosValores, false)
+  }
+
+  const aplicarFiltrosGlobales = () => {
+    setSeleccionGrafica(null)
+    cargarDashboard(filtros, false)
   }
 
   // Cambia solo tipoVisualizacion de un widget, conservando el resto de su
@@ -220,6 +322,43 @@ export function PanelDashboardPage() {
   // Individuo fijado por el contexto global, si lo hay. Se lee de los filtros
   // APLICADOS (no del formulario) y se compara con el código de campo realmente
   // detectado, no con un "pacienteCodigo" asumido.
+  /**
+   * Widgets que se pintan, resueltos de una sola vez:
+   *  - sin selección o sin cruce válido → TODOS del dashboard base;
+   *  - con cruce válido → el de origen en base (conserva sus categorías) y el
+   *    resto cruzados.
+   *
+   * Se itera siempre sobre `datos.widgets`, así que el conjunto y el orden los
+   * fija el base: un widget inesperado en la respuesta cruzada queda fuera sin
+   * alterar nada.
+   *
+   * Si al montar la lista faltara cualquier cruzado, se devuelve el base
+   * ENTERO: nunca se rellena hueco a hueco. `validarIntegridadCruce` ya lo
+   * impide antes de guardar el estado, así que esta rama es una segunda
+   * barrera — pero se escribe como all-or-nothing y no como fallback por
+   * widget, porque un fallback individual mezclaría dos poblaciones distintas
+   * en la misma pantalla.
+   */
+  const widgetsAMostrar = useMemo(() => {
+    const base = datos?.widgets ?? []
+    if (!seleccionGrafica || !datosCruzados) return base
+
+    const cruzados = new Map(datosCruzados.widgets.map((w) => [w.panelMetricaId, w]))
+    const resueltos: DashboardWidgetDto[] = []
+
+    for (const w of base) {
+      if (w.panelMetricaId === seleccionGrafica.widgetOrigenId) {
+        resueltos.push(w)
+        continue
+      }
+      const cruzado = cruzados.get(w.panelMetricaId)
+      if (!cruzado) return base
+      resueltos.push(cruzado)
+    }
+
+    return resueltos
+  }, [datos, datosCruzados, seleccionGrafica])
+
   const individuoGlobal = useMemo(() => {
     if (!campoIndividuo) return null
     const filtro = filtrosGlobalesAplicados.find((f) => f.campo === campoIndividuo.codigo)
@@ -262,7 +401,7 @@ export function PanelDashboardPage() {
                 valores={filtros}
                 aplicados={filtrosAplicados}
                 onChange={setFiltros}
-                onAplicar={() => cargarDashboard(filtros, false)}
+                onAplicar={aplicarFiltrosGlobales}
                 onLimpiar={limpiar}
                 onAplicarValores={aplicarValores}
                 granularidades={catalogo?.granularidades ?? []}
@@ -276,6 +415,14 @@ export function PanelDashboardPage() {
                 errorCamposCategoria={errorCamposCategoria}
               />
             </Card>
+
+            <SeleccionGraficaPanel
+              seleccion={seleccionGrafica}
+              cargando={cruzando}
+              error={errorCruce}
+              onQuitar={quitarSeleccion}
+              onReintentar={() => setReintentoCruce((r) => r + 1)}
+            />
 
             {errorCarga && <ErrorBanner mensaje={errorCarga} />}
 
@@ -309,8 +456,8 @@ export function PanelDashboardPage() {
                 </Link>
               </div>
             ) : (
-              <div className={`${styles.grid} ${aplicando ? styles.gridCargando : ''}`}>
-                {datos.widgets.map((widget) => (
+              <div className={`${styles.grid} ${aplicando || cruzando ? styles.gridCargando : ''}`}>
+                {widgetsAMostrar.map((widget) => (
                   <DashboardWidgetRenderer
                     key={widget.panelMetricaId}
                     widget={widget}
@@ -324,6 +471,12 @@ export function PanelDashboardPage() {
                     campoSegmentacion={configPorWidget[widget.panelMetricaId]?.campoSegmentacion ?? null}
                     campoAgrupacionPersistido={configPorWidget[widget.panelMetricaId]?.campoAgrupacion ?? null}
                     individuoGlobal={individuoGlobal}
+                    seleccionGrafica={seleccionGrafica}
+                    campoAgrupacionMetrica={campoAgrupacionPorMetrica[widget.metricaId] ?? null}
+                    onSeleccionar={(nueva) => setSeleccionGrafica((actual) => alternarSeleccion(actual, nueva))}
+                    onSeleccionInvalidada={(origenId) =>
+                      setSeleccionGrafica((actual) => (actual?.widgetOrigenId === origenId ? null : actual))
+                    }
                   />
                 ))}
               </div>

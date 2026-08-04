@@ -3,15 +3,19 @@ import { formatNumber } from '../../utils/formatters'
 import { ChartEmptyState } from './ChartEmptyState'
 import { ChartTooltip } from './ChartTooltip'
 import type { DatosTooltip } from './ChartTooltip'
+import type { SeleccionChart } from './BarChartWidget'
 import styles from './Charts.module.css'
 
 export interface SectorDonut {
   etiqueta: string
   valor: number | null
+  /** Valor técnico del backend. Sin él, el sector no es seleccionable. */
+  valorOriginal?: string
 }
 
 interface PieChartWidgetProps {
   datos: SectorDonut[]
+  seleccion?: SeleccionChart
 }
 
 const ANCHO = 320
@@ -52,7 +56,10 @@ function arco(cx: number, cy: number, rExt: number, rInt: number, desde: number,
  */
 function prepararSectores(datos: SectorDonut[]) {
   const validos = datos
-    .filter((d): d is { etiqueta: string; valor: number } => d.valor !== null && d.valor !== undefined && d.valor > 0)
+    .filter(
+      (d): d is { etiqueta: string; valor: number; valorOriginal?: string } =>
+        d.valor !== null && d.valor !== undefined && d.valor > 0,
+    )
     .sort((a, b) => b.valor - a.valor)
 
   if (validos.length <= MAX_SECTORES) {
@@ -61,10 +68,56 @@ function prepararSectores(datos: SectorDonut[]) {
 
   const principales = validos.slice(0, MAX_SECTORES).map((d, i) => ({ ...d, color: COLORES[i] }))
   const resto = validos.slice(MAX_SECTORES).reduce((suma, d) => suma + d.valor, 0)
-  return [...principales, { etiqueta: 'Otros', valor: resto, color: 'var(--chart-neutral)' }]
+  // "Otros" agrega varias categorías: no representa un valor técnico único, así
+  // que se deja SIN `valorOriginal` y por tanto no es seleccionable. Filtrar
+  // por "Otros" no significaría nada para el backend.
+  return [...principales, { etiqueta: 'Otros', valor: resto, color: 'var(--chart-neutral)', valorOriginal: undefined }]
 }
 
-export function PieChartWidget({ datos }: PieChartWidgetProps) {
+interface SectorPreparado {
+  etiqueta: string
+  valor: number
+  color: string
+  valorOriginal?: string
+}
+
+/** Mismo contrato que en barras: sin `valorOriginal`, el sector no es interactivo. */
+function propsSeleccionSector(
+  sector: SectorPreparado,
+  seleccion: SeleccionChart | undefined,
+  valorFormateado: string,
+) {
+  if (!seleccion || !sector.valorOriginal) return { interactivo: false as const, activa: false }
+
+  const activa = seleccion.valorSeleccionado === sector.valorOriginal
+  return {
+    interactivo: true as const,
+    activa,
+    props: {
+      role: 'button',
+      tabIndex: 0,
+      'aria-pressed': activa,
+      'aria-label': activa
+        ? `${seleccion.etiquetaCampo}: ${sector.etiqueta} seleccionado. Pulsar para quitar.`
+        : `Seleccionar ${seleccion.etiquetaCampo}: ${sector.etiqueta}. Total: ${valorFormateado}.`,
+      onClick: () => seleccion.onSeleccionar(sector.valorOriginal!, sector.etiqueta),
+      onKeyDown: (e: { key: string; preventDefault: () => void }) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          seleccion.onSeleccionar(sector.valorOriginal!, sector.etiqueta)
+        }
+      },
+    },
+  }
+}
+
+function claseSector(interactivo: boolean, activa: boolean, haySeleccion: boolean): string {
+  if (!interactivo) return styles.marcaHover
+  if (activa) return `${styles.marcaSeleccionable} ${styles.marcaSeleccionada}`
+  return `${styles.marcaSeleccionable} ${haySeleccion ? styles.marcaAtenuada : ''}`
+}
+
+export function PieChartWidget({ datos, seleccion }: PieChartWidgetProps) {
   const [tooltip, setTooltip] = useState<DatosTooltip | null>(null)
   const filtroId = useId()
 
@@ -100,12 +153,15 @@ export function PieChartWidget({ datos }: PieChartWidgetProps) {
           const posEtiqueta = punto(cx, cy, RADIO + 14, medio)
           const porcentaje = (proporcion * 100).toFixed(proporcion < 0.1 ? 1 : 0)
 
+          const sel = propsSeleccionSector(s, seleccion, `${formatNumber(s.valor)} (${porcentaje}%)`)
+
           return (
             <g key={s.etiqueta}>
               <path
-                className={styles.marcaHover}
+                className={claseSector(sel.interactivo, sel.activa, Boolean(seleccion?.valorSeleccionado))}
                 d={d}
-                fill={s.color}
+                fill={sel.activa ? 'var(--color-selection)' : s.color}
+                {...(sel.props ?? {})}
                 onMouseEnter={() =>
                   setTooltip({
                     x: (punto(cx, cy, RADIO, medio).x / ANCHO) * 100,
@@ -115,7 +171,9 @@ export function PieChartWidget({ datos }: PieChartWidgetProps) {
                   })
                 }
                 onMouseLeave={() => setTooltip(null)}
-              />
+              >
+                <title>{`${s.etiqueta}: ${formatNumber(s.valor)} (${porcentaje}%)`}</title>
+              </path>
               {proporcion >= 0.06 && (
                 <text
                   className={styles.etiquetaDirecta}
@@ -138,13 +196,42 @@ export function PieChartWidget({ datos }: PieChartWidgetProps) {
         </text>
       </svg>
       <ChartTooltip datos={tooltip} />
+      {/* Leyenda sincronizada: pulsar una entrada produce exactamente la misma
+          selección que pulsar su sector. */}
       <div className={styles.leyenda}>
-        {sectores.map((s) => (
-          <span key={s.etiqueta} className={styles.leyendaItem}>
-            <span className={styles.leyendaMarca} style={{ backgroundColor: s.color }} />
-            {s.etiqueta} · {formatNumber(s.valor)}
-          </span>
-        ))}
+        {sectores.map((s) => {
+          const sel = propsSeleccionSector(s, seleccion, formatNumber(s.valor))
+          const contenido = (
+            <>
+              <span
+                className={styles.leyendaMarca}
+                style={{ backgroundColor: sel.activa ? 'var(--color-selection)' : s.color }}
+              />
+              {s.etiqueta} · {formatNumber(s.valor)}
+            </>
+          )
+
+          if (!sel.interactivo) {
+            return (
+              <span key={s.etiqueta} className={styles.leyendaItem}>
+                {contenido}
+              </span>
+            )
+          }
+
+          return (
+            <button
+              key={s.etiqueta}
+              type="button"
+              className={`${styles.leyendaItem} ${styles.leyendaItemSeleccionable} ${
+                sel.activa ? styles.leyendaItemActiva : ''
+              }`}
+              {...sel.props}
+            >
+              {contenido}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
