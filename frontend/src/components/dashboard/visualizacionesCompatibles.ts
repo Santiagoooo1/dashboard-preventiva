@@ -52,7 +52,13 @@ export function visualizacionesCompatibles(widget: DashboardWidgetDto): OpcionVi
 
   let valores: TipoVisualizacionOfrecido[] = []
   if (valorUnico) {
-    valores = ['KPI', 'TABLA']
+    // Solo KPI. "Tabla" figuraba aquí como segunda opción, pero para un valor
+    // escalar NO produce una tabla: `cuerpoWidget` renderiza el mismo
+    // <KpiWidget> (con `compacto`), y la vista de respaldo `WidgetActual`
+    // tampoco pinta filas cuando no hay `items` — imprime el mismo número.
+    // Eran dos etiquetas para una única representación, y por eso los KPI
+    // seguían mostrando el selector "Gráfico" sin ofrecer ninguna alternativa.
+    valores = ['KPI']
   } else if (itemsDistribucion) {
     valores = ['BARRAS']
     if (itemsDistribucion.length <= MAX_CATEGORIAS_DONUT) valores.push('DONUT')
@@ -64,6 +70,30 @@ export function visualizacionesCompatibles(widget: DashboardWidgetDto): OpcionVi
   }
 
   return valores.map((valor) => ({ valor, etiqueta: ETIQUETA_VISUALIZACION_OFRECIDA[valor] }))
+}
+
+/**
+ * Opciones realmente distintas entre sí. `visualizacionesCompatibles` ya
+ * construye la lista sin repetir, pero esta función es la única fuente de
+ * verdad para "¿hay una decisión que tomar aquí?": deduplica por código
+ * normalizado y descarta vacíos, de modo que el selector "Gráfico" solo se
+ * pinte cuando existan >= 2 alternativas reales. Sin esto, un KPI mostraba
+ * "Gráfico: [Indicador]" — un desplegable con una sola opción, que aparenta
+ * una elección inexistente.
+ */
+export function visualizacionesUnicas(opciones: OpcionVisualizacion[]): OpcionVisualizacion[] {
+  const vistas = new Set<string>()
+  const unicas: OpcionVisualizacion[] = []
+
+  for (const opcion of opciones) {
+    if (!opcion?.valor) continue
+    const clave = normalizarTipoVisualizacion(opcion.valor)
+    if (vistas.has(clave)) continue
+    vistas.add(clave)
+    unicas.push(opcion)
+  }
+
+  return unicas
 }
 
 /**

@@ -40,6 +40,67 @@
   --color-warning-soft: rgba(217, 119, 6, 0.1);
   --color-error-soft: rgba(220, 38, 38, 0.08);
 
+  /* ---------------------------------------------------------------------
+     Fase 6.9G.2.1 — sistema de color SEMÁNTICO por ámbito de acción.
+     El color responde a "¿a qué afecta esto?", no a decoración. Sin él, un
+     filtro global y un control local del widget se pintaban igual (ambos
+     azules) y nada indicaba que uno recalcula todo el dashboard y el otro
+     solo una tarjeta.
+
+       Azul     → ámbito GLOBAL: afecta a todo el dashboard.
+       Violeta  → ámbito LOCAL: afecta solo a este widget.
+       Turquesa → reservado a la selección desde gráficas (Fase 6.9H).
+       Verde / Ámbar / Rojo → estado, nunca adorno.
+       Gris     → neutro, inactivo, secundario.
+     --------------------------------------------------------------------- */
+
+  /* Ámbito global — azul cobalto. */
+  --color-context-global: #2563eb;
+  --color-context-global-hover: #1d4ed8;
+  --color-context-global-soft: #eff6ff;
+  --color-context-global-border: #bfdbfe;
+
+  /* Exploración local de un widget — azul cielo. Sustituye al violeta de
+     6.9G.2.1: mantenía la distinción de ámbito, pero rompía el registro
+     clínico del producto. El azul cielo sigue siendo inequívocamente distinto
+     del cobalto global y encaja con la paleta hospitalaria. */
+  --color-exploration: #0284c7;
+  --color-exploration-hover: #0369a1;
+  --color-exploration-soft: #f0f9ff;
+  --color-exploration-border: #bae6fd;
+
+  /* Selección procedente de una gráfica — verde azulado. Declarado para que
+     6.9H no tenga que inventar un tono a última hora; NADA lo usa todavía, y
+     no debe usarse hasta que exista una selección real que comunicar. */
+  --color-selection: #0f766e;
+  --color-selection-hover: #115e59;
+  --color-selection-soft: #f0fdfa;
+  --color-selection-border: #99f6e4;
+
+  /* Estados. Alias de los semánticos ya validados, para poder nombrarlos por
+     función desde los componentes nuevos. */
+  --color-danger: var(--color-error);
+  --color-danger-soft: var(--color-error-soft);
+  --color-neutral: var(--color-text-muted);
+  --color-neutral-soft: var(--color-bg);
+
+  /* ---------------------------------------------------------------------
+     PREPARACIÓN PARA MODO OSCURO — no implementado todavía.
+     Todo el color del dashboard sale de estos tokens; no hay hex sueltos en
+     componentes ni en JSX. Activar un tema oscuro consistirá en redefinir
+     este bloque bajo `:root[data-theme="dark"]`, sin tocar componentes.
+
+     Pendiente de revisar cuando se aborde (necesitan valores propios, no solo
+     una inversión automática):
+       - SVG de gráficas: --chart-series-1..4 están validadas para superficie
+         CLARA (contraste y separación CVD). En oscuro hay que revalidarlas.
+       - Ejes y rejilla: --chart-axis / --chart-grid.
+       - Tooltips: fondo y sombra.
+       - Inputs y selects: fondo --color-surface + borde --color-border.
+       - Sombras: --shadow-* usan negro translúcido, invisible sobre oscuro.
+       - Estados vacíos y bloques soft (*-soft son claros casi blancos).
+     --------------------------------------------------------------------- */
+
   /* Tinte muy sutil de fondo para la página de dashboard (no el --color-bg
      global): un degradado casi imperceptible da algo de profundidad sin
      convertir el fondo en un color plano distinto en el resto de la app. */

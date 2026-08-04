@@ -1,6 +1,7 @@
 import type { ResultadoMetricaResponseDto } from '../../api/types'
 import { DataTable } from '../DataTable'
 import { formatNumber } from '../../utils/formatters'
+import { formatearEtiquetaCategoria } from '../dashboard/camposFiltroDashboard'
 
 interface WidgetActualProps {
   resultado: ResultadoMetricaResponseDto
@@ -11,7 +12,7 @@ export function WidgetActual({ resultado }: WidgetActualProps) {
     return (
       <DataTable
         columns={[
-          { key: 'etiqueta', header: 'Etiqueta' },
+          { key: 'etiqueta', header: 'Etiqueta', render: (i) => formatearEtiquetaCategoria(i.etiqueta) },
           { key: 'valor', header: 'Valor' },
         ]}
         rows={resultado.items}

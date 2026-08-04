@@ -29,6 +29,9 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   transition: box-shadow 0.15s, transform 0.15s;
+  /* Las franjas de exploración y de estado llegan a los bordes de la tarjeta;
+     sin esto asomarían por fuera del radio. */
+  overflow: hidden;
 }
 
 .card:hover {
@@ -40,29 +43,29 @@
   background-color: var(--color-error-soft);
 }
 
+/* Altura mínima reservada para título + contexto: con títulos clínicos de una
+   o dos líneas ("% de infección de localización quirúrgica"), las tarjetas de
+   una misma fila desalineaban el valor. Es min-height, no height fija: un
+   título largo crece, nunca se trunca de forma agresiva. */
 .cardHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md) var(--spacing-md) 0 var(--spacing-md);
-}
-
-.cardHeaderText {
   min-width: 0;
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm) var(--spacing-md);
+  min-height: 68px;
 }
 
+/* El título pesa claramente más que cualquier label de control. */
 .cardTitle {
-  font-size: 0.95rem;
+  font-size: 1.02rem;
   font-weight: 700;
+  line-height: 1.25;
   margin: 0;
   color: var(--color-text);
 }
 
 .cardMeta {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  margin: 2px 0 0 0;
+  font-size: 0.78rem;
+  color: var(--color-neutral);
+  margin: 3px 0 0 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -72,64 +75,139 @@
   font-style: italic;
 }
 
-.badgeTipo {
-  flex-shrink: 0;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-muted);
-  background-color: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 3px 9px;
-  white-space: nowrap;
-}
-
-/* Selector "Vista": misma forma de píldora que .badgeTipo, pero interactivo. */
-.selectorVista {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background-color: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 3px 6px 3px 10px;
-}
-
-.selectorVistaEtiqueta {
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.selectVista {
-  font-size: 0.75rem;
+/* Contexto de la exploración activa dentro del subtítulo ("· agrupado por
+   Infección"), para que el título siga describiendo lo que se está viendo. */
+.cardContexto {
+  color: var(--color-exploration);
   font-weight: 600;
-  color: var(--color-primary);
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  padding: 2px var(--spacing-sm);
-  cursor: pointer;
 }
 
-.selectVista:disabled {
-  opacity: 0.6;
-  cursor: default;
+/* Un KPI desglosado pasa a ser una comparativa: ocupa el ancho completo
+   mientras dura la exploración. Es solo presentación — el `ancho` guardado en
+   PanelMetrica no cambia y se recupera al volver a Actual. */
+.widgetExploracionExpandida {
+  grid-column: 1 / -1;
 }
 
 .errorVista {
-  color: var(--color-error);
+  color: var(--color-danger);
   font-size: 0.78rem;
   margin: 0;
-  padding: 0 var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background-color: var(--color-danger-soft);
 }
 
+/* Franja de estado local al pie: lo que se ve NO es la configuración guardada.
+   En azul cielo, igual que los controles, porque el ámbito es el mismo widget. */
+.vistaLocal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  padding: 6px var(--spacing-md);
+  background-color: var(--color-exploration-soft);
+  border-top: 1px solid var(--color-exploration-border);
+  font-size: 0.78rem;
+  color: var(--color-exploration);
+}
+
+.vistaLocalTexto {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.restablecer {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-exploration);
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.restablecer:focus-visible {
+  outline: 2px solid var(--color-exploration);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.restablecer:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.cargandoLocal {
+  margin: 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* Estados locales (error / sin datos) dentro de la propia tarjeta: nunca
+   escalan a error global del dashboard. El color lo aporta el texto, no un
+   fondo saturado — es un estado recuperable, no una alarma. */
+.bloqueLocal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  text-align: center;
+  padding: var(--spacing-sm) 0;
+}
+
+.bloqueLocalTitulo {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+/* Un fallo de ejecución sí es error, no advertencia. */
+.bloqueLocal[role='alert'] .bloqueLocalTitulo {
+  color: var(--color-danger);
+}
+
+/* Estado guiado: falta configuración, no ha fallado nada. Ámbar, nunca rojo. */
+.bloqueGuiado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  text-align: center;
+  padding: var(--spacing-md) var(--spacing-sm);
+  background-color: var(--color-warning-soft);
+  border: 1px dashed var(--color-warning);
+  border-radius: var(--radius-md);
+}
+
+.bloqueGuiadoTitulo {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.bloqueLocalTexto {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.bloqueLocalAcciones {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Área del dato: superficie limpia, sin tinte, máximo contraste. */
 .cardBody {
   flex: 1;
   padding: var(--spacing-md);
@@ -137,4 +215,31 @@
   flex-direction: column;
   justify-content: center;
   min-width: 0;
+  background-color: var(--color-surface);
+}
+
+/* En un KPI el número ya es el protagonista: no necesita relleno vertical
+   extra, que solo separaría el valor de su propio título. La altura mínima
+   alinea los valores entre tarjetas de la misma fila, y `margin-top: auto` en
+   los controles los deja siempre pegados abajo aunque el título ocupe una o
+   dos líneas. */
+.cardBodyKpi {
+  padding: var(--spacing-xs) var(--spacing-md) var(--spacing-sm) var(--spacing-md);
+  flex: 0 0 auto;
+  min-height: 72px;
+  justify-content: flex-start;
+}
+
+/* Los controles compactos del KPI se anclan al pie de la tarjeta: sin esto, al
+   desaparecer el selector "Gráfico" quedaba un hueco entre el valor y los
+   botones en las tarjetas de título más corto. */
+.cardBodyKpi + * {
+  margin-top: auto;
+}
+
+/* La rejilla estira las tarjetas de una fila a la misma altura (align-items:
+   start en el contenedor deja cada una a su aire), de modo que los tres KPI
+   comparten eje superior e inferior. */
+.widget {
+  align-self: stretch;
 }

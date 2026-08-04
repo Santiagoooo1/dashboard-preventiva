@@ -19,8 +19,16 @@ function GradienteBarra({ id }: { id: string }) {
 }
 
 export interface DatoBarra {
+  /** Texto ya formateado para mostrar (booleanos como Sí/No). */
   etiqueta: string
   valor: number | null
+  /**
+   * Valor técnico tal como lo devolvió el backend ("true", "false", el código
+   * real de la categoría). Se conserva sin traducir porque es el que deberán
+   * usar los filtros y la selección gráfica de 6.9H: el texto mostrado nunca
+   * debe viajar como valor.
+   */
+  valorOriginal?: string
 }
 
 interface BarChartWidgetProps {
@@ -118,7 +126,9 @@ function BarrasVerticales({ datos, tooltip, setTooltip, gradId }: SubProps) {
                   })
                 }
                 onMouseLeave={() => setTooltip(null)}
-              />
+              >
+                <title>{`${d.etiqueta}: ${formatNumber(d.valor)}`}</title>
+              </rect>
               <text className={styles.etiquetaDirecta} x={bandas.centro(i)} y={y - 5} textAnchor="middle">
                 {formatNumber(d.valor)}
               </text>
@@ -127,7 +137,12 @@ function BarrasVerticales({ datos, tooltip, setTooltip, gradId }: SubProps) {
                 x={bandas.centro(i)}
                 y={ALTO - margen.bottom + 14}
                 textAnchor="middle"
+                aria-label={d.etiqueta}
               >
+                {/* <title> hijo = tooltip nativo del navegador sobre el texto
+                    recortado; el valor completo nunca se pierde (lo necesitará
+                    la selección gráfica de 6.9H). */}
+                <title>{d.etiqueta}</title>
                 {acortar(d.etiqueta, 10)}
               </text>
             </g>
@@ -141,7 +156,10 @@ function BarrasVerticales({ datos, tooltip, setTooltip, gradId }: SubProps) {
 
 function BarrasHorizontales({ datos, tooltip, setTooltip, gradId }: SubProps) {
   const margen = { top: 8, right: 48, bottom: 8, left: 110 }
-  const altoFila = 26
+  // Con una sola categoría (cohorte de un paciente, por ejemplo) una fila de
+  // 26px en un lienzo alto deja la tarjeta casi vacía: se engorda la fila para
+  // que la barra siga siendo legible sin inventar categorías que no existen.
+  const altoFila = datos.length === 1 ? 56 : 26
   const alto = margen.top + margen.bottom + datos.length * altoFila
   const anchoUtil = ANCHO - margen.left - margen.right
 
@@ -159,7 +177,14 @@ function BarrasHorizontales({ datos, tooltip, setTooltip, gradId }: SubProps) {
           const grosor = altoFila - 8
           return (
             <g key={`${d.etiqueta}-${i}`}>
-              <text className={styles.textoEje} x={margen.left - 6} y={yFila + grosor / 2 + 4} textAnchor="end">
+              <text
+                className={styles.textoEje}
+                x={margen.left - 6}
+                y={yFila + grosor / 2 + 4}
+                textAnchor="end"
+                aria-label={d.etiqueta}
+              >
+                <title>{d.etiqueta}</title>
                 {acortar(d.etiqueta, 16)}
               </text>
               {d.valor !== null && d.valor !== undefined && (

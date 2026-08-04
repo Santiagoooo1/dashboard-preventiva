@@ -10,6 +10,14 @@
   overflow: visible;
 }
 
+/* Serie con un único punto: se acota la altura para que un dato aislado no
+   ocupe el alto de una evolución completa. Sigue siendo un gráfico con su eje
+   temporal, no un KPI. */
+.svgCompacto {
+  max-height: 240px;
+  margin: 0 auto;
+}
+
 .grid {
   stroke: var(--chart-grid);
   stroke-width: 1;
@@ -94,6 +102,33 @@
   color: var(--color-text-muted);
   font-size: 0.8rem;
   margin: 0 0 var(--spacing-sm) 0;
+}
+
+/* Todo a cero: informativo, no advertencia. Azul muy suave del ámbito local
+   (tokens existentes), nunca ámbar fuerte ni rojo. */
+.ceroEstado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-xs);
+  text-align: center;
+  padding: var(--spacing-md) var(--spacing-sm);
+  background-color: var(--color-exploration-soft);
+  border: 1px solid var(--color-exploration-border);
+  border-radius: var(--radius-md);
+}
+
+.ceroTitulo {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ceroTexto {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
 }
 
 .donutTotal {

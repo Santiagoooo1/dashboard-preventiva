@@ -1,11 +1,15 @@
 import { apiDelete, apiGet, apiPost, apiPut } from './apiClient'
 import type {
+  ComparativaRequestDto,
+  ComparativaResponseDto,
   EjecucionMetricaRequestDto,
   MetadataMetricasResponseDto,
   MetricaClinicaRequestDto,
   MetricaClinicaResponseDto,
   PreviewMetricaRequestDto,
   ResultadoMetricaResponseDto,
+  SerieTemporalRequestDto,
+  SerieTemporalResponseDto,
 } from './types'
 
 export function listarMetricas(
@@ -60,4 +64,22 @@ export function ejecutarMetrica(
   signal?: AbortSignal,
 ): Promise<ResultadoMetricaResponseDto> {
   return apiPost<ResultadoMetricaResponseDto>(`/metricas-clinicas/${id}/ejecutar`, request ?? {}, signal)
+}
+
+/** Recalcula la métrica agrupada por el campo indicado. No persiste nada. */
+export function comparativaMetrica(
+  id: string | number,
+  request: ComparativaRequestDto,
+  signal?: AbortSignal,
+): Promise<ComparativaResponseDto> {
+  return apiPost<ComparativaResponseDto>(`/metricas-clinicas/${id}/comparativa`, request, signal)
+}
+
+/** Recalcula la métrica como evolución temporal. No persiste nada. */
+export function serieTemporalMetrica(
+  id: string | number,
+  request: SerieTemporalRequestDto,
+  signal?: AbortSignal,
+): Promise<SerieTemporalResponseDto> {
+  return apiPost<SerieTemporalResponseDto>(`/metricas-clinicas/${id}/serie-temporal`, request, signal)
 }

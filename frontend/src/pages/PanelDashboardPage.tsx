@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import type {
   CatalogoFrontendResponseDto,
+  ConfiguracionWidgetDto,
   DashboardPanelResponseDto,
-  DashboardWidgetDto,
   PanelMetricaResponseDto,
   TipoVisualizacion,
 } from '../api/types'
@@ -17,38 +17,19 @@ import { Breadcrumbs } from '../components/Breadcrumbs'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { DashboardFilters, FILTROS_VACIOS, aRequest } from '../components/dashboard/DashboardFilters'
 import type { ValoresFiltros } from '../components/dashboard/DashboardFilters'
-import { clasificarCampos } from '../components/dashboard/camposFiltroDashboard'
-import type { CampoFiltroCategoria, CamposClasificados } from '../components/dashboard/camposFiltroDashboard'
+import { clasificarCampos, detectarCampoIndividuo } from '../components/dashboard/camposFiltroDashboard'
+import type {
+  CampoFiltroCategoria,
+  CampoIndividuo,
+  CamposClasificados,
+} from '../components/dashboard/camposFiltroDashboard'
+import { widgetSinDatos, widgetTodoCero } from '../components/dashboard/exploracionWidget'
 import { DashboardWidgetRenderer } from '../components/dashboard/DashboardWidgetRenderer'
 import { DashboardHeader } from '../components/dashboard/DashboardHeader'
 import styles from './PanelDashboardPage.module.css'
 
 const CAMPOS_FECHA_O_NUMERICOS_EXCLUIDOS = new Set(['FECHA', 'ENTERO', 'DECIMAL'])
 const SIN_CAMPOS: CamposClasificados = { principales: [], avanzados: [] }
-
-/** Un widget se considera "sin resultados" si, con los filtros activos, no aporta ningún dato. */
-function widgetSinResultados(widget: DashboardWidgetDto): boolean {
-  if (widget.estado !== 'OK') return false
-
-  if (widget.resultadoActual) {
-    const r = widget.resultadoActual
-    const sinItems = !r.items || r.items.length === 0
-    const sinTotales = !r.totalDenominador && !r.totalNumerador
-    return sinItems && sinTotales && (r.valor === null || r.valor === 0)
-  }
-
-  if (widget.comparativa) {
-    return widget.comparativa.items.length === 0
-  }
-
-  if (widget.serieTemporal) {
-    const s = widget.serieTemporal
-    if (s.series) return s.series.every((serie) => serie.puntos.every((p) => !p.valor))
-    if (s.puntos) return s.puntos.every((p) => !p.valor)
-  }
-
-  return false
-}
 
 function hayFiltrosActivos(valores: ValoresFiltros): boolean {
   return (
@@ -74,6 +55,10 @@ export function PanelDashboardPage() {
   const [valoresPaciente, setValoresPaciente] = useState<string[]>([])
   const [campos, setCampos] = useState<CamposClasificados>(SIN_CAMPOS)
   const [errorCamposCategoria, setErrorCamposCategoria] = useState<string | null>(null)
+  /** Campo que identifica al individuo (paciente/HC) en este dataset, si existe. */
+  const [campoIndividuo, setCampoIndividuo] = useState<CampoIndividuo | null>(null)
+  /** Config persistida de cada widget, necesaria para reejecutar series temporales. */
+  const [configPorWidget, setConfigPorWidget] = useState<Record<number, ConfiguracionWidgetDto | null>>({})
 
   // `filtros` es lo que el usuario está editando en el formulario;
   // `filtrosAplicados` es lo que realmente se envió al backend y por tanto lo
@@ -124,16 +109,26 @@ export function PanelDashboardPage() {
     obtenerDashboardMetadata(panelId ?? '', controller.signal)
       .then(async (m) => {
         setCamposFecha(m.camposFechaPermitidos)
+        setConfigPorWidget(
+          Object.fromEntries(m.widgets.map((w) => [w.panelMetricaId, w.configuracionWidgetActual])),
+        )
 
         try {
           const datasetId = m.dataset.id
           const fm = await obtenerFrontendMetadata(datasetId, controller.signal)
 
+          // El identificador de individuo se resuelve aparte de los campos de
+          // agrupación: agrupar por HC daría una categoría por paciente, que
+          // no es una comparación útil.
+          const individuo = detectarCampoIndividuo(
+            fm.campos.filter((c) => c.activo && c.roles.filtrable && c.tipoDato === 'TEXTO'),
+          )
+
           const categoricos = fm.campos.filter(
             (c) =>
               c.activo &&
               c.roles.filtrable &&
-              c.codigo !== 'pacienteCodigo' &&
+              c.codigo !== individuo?.codigo &&
               !CAMPOS_FECHA_O_NUMERICOS_EXCLUIDOS.has(c.tipoDato),
           )
           const conValores: CampoFiltroCategoria[] = await Promise.all(
@@ -148,10 +143,11 @@ export function PanelDashboardPage() {
           // un selector vacío no aporta nada y suma ruido.
           setCampos(clasificarCampos(conValores.filter((c) => c.valores.length > 0)))
 
-          const paciente = fm.campos.find((c) => c.codigo === 'pacienteCodigo' && c.activo && c.roles.filtrable)
-          if (paciente) {
-            setTienePaciente(true)
-            setValoresPaciente(await listarValoresUnicosDeCampo(datasetId, 'pacienteCodigo', controller.signal))
+          if (individuo) {
+            const valores = await listarValoresUnicosDeCampo(datasetId, individuo.codigo, controller.signal)
+            setTienePaciente(valores.length > 0)
+            setValoresPaciente(valores)
+            setCampoIndividuo(valores.length > 0 ? { ...individuo, valores } : null)
           }
         } catch (err) {
           if (!controller.signal.aborted) {
@@ -206,6 +202,30 @@ export function PanelDashboardPage() {
     await cargarDashboard(filtros, false)
   }
 
+  // Campos ofrecidos como "Agrupar por" en la exploración local: los mismos
+  // que ya se validaron para los filtros (categóricos, con valores reales,
+  // sin el identificador de individuo).
+  const camposAgrupables = useMemo(
+    () => [...campos.principales, ...campos.avanzados],
+    [campos],
+  )
+
+  // Filtros globales YA aplicados, en el formato del backend: son los que cada
+  // widget combinará en AND con su filtro local.
+  const filtrosGlobalesAplicados = useMemo(
+    () => aRequest(filtrosAplicados).filtros ?? [],
+    [filtrosAplicados],
+  )
+
+  // Individuo fijado por el contexto global, si lo hay. Se lee de los filtros
+  // APLICADOS (no del formulario) y se compara con el código de campo realmente
+  // detectado, no con un "pacienteCodigo" asumido.
+  const individuoGlobal = useMemo(() => {
+    if (!campoIndividuo) return null
+    const filtro = filtrosGlobalesAplicados.find((f) => f.campo === campoIndividuo.codigo)
+    return typeof filtro?.valor === 'string' && filtro.valor.trim() ? filtro.valor.trim() : null
+  }, [campoIndividuo, filtrosGlobalesAplicados])
+
   return (
     <div className={styles.page}>
       <StateContainer loading={cargandoInicial} error={errorCarga && !datos ? errorCarga : null} empty={datos === null}>
@@ -234,7 +254,10 @@ export function PanelDashboardPage() {
               configurarWidgetsHref={`/datasets/${datos.dataset.id}/paneles/${datos.panel.id}/widgets`}
             />
 
-            <Card title="Filtrar el análisis" className={styles.filtrosCard}>
+            {/* La cabecera ("Contexto del análisis" + badge de alcance) la
+                renderiza DashboardFilters, para que título y badge compartan
+                fila; Card aporta solo el contenedor. */}
+            <Card className={styles.filtrosCard}>
               <DashboardFilters
                 valores={filtros}
                 aplicados={filtrosAplicados}
@@ -259,7 +282,7 @@ export function PanelDashboardPage() {
             {datos.widgets.length > 0 &&
               !aplicando &&
               hayFiltrosActivos(filtrosAplicados) &&
-              datos.widgets.every(widgetSinResultados) && (
+              datos.widgets.every((w) => widgetSinDatos(w) || widgetTodoCero(w)) && (
                 <div className={styles.sinResultados}>
                   <h2 className={styles.sinResultadosTitulo}>
                     No hay registros para los filtros seleccionados.
@@ -292,6 +315,15 @@ export function PanelDashboardPage() {
                     key={widget.panelMetricaId}
                     widget={widget}
                     onCambiarVisualizacion={cambiarVisualizacionWidget}
+                    camposAgrupables={camposAgrupables}
+                    campoIndividuo={campoIndividuo}
+                    filtrosGlobales={filtrosGlobalesAplicados}
+                    fechaDesde={filtrosAplicados.fechaDesde || null}
+                    fechaHasta={filtrosAplicados.fechaHasta || null}
+                    campoFecha={configPorWidget[widget.panelMetricaId]?.campoFecha ?? null}
+                    campoSegmentacion={configPorWidget[widget.panelMetricaId]?.campoSegmentacion ?? null}
+                    campoAgrupacionPersistido={configPorWidget[widget.panelMetricaId]?.campoAgrupacion ?? null}
+                    individuoGlobal={individuoGlobal}
                   />
                 ))}
               </div>

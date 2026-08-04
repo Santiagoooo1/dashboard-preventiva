@@ -12,8 +12,11 @@ export interface PuntoLinea {
 }
 
 export interface SerieLinea {
+  /** Texto ya formateado para mostrar (booleanos como Sí/No). */
   etiqueta: string
   puntos: PuntoLinea[]
+  /** Valor técnico original del backend, para filtros y la selección de 6.9H. */
+  valorOriginal?: string
 }
 
 interface LineChartWidgetProps {
@@ -104,9 +107,24 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
 
   const yBase = escala.y(Math.max(escala.min, 0))
 
+  // Un único punto en toda la serie (cohorte de un solo registro): la
+  // representación es correcta, pero reservar la altura completa de una
+  // evolución para un solo dato deja la tarjeta medio vacía. Se limita la
+  // altura sin tocar el viewBox, así el eje temporal, la fecha y el valor
+  // siguen intactos. Es solo presentación: no se persiste nada.
+  const puntosConValor = series.reduce(
+    (total, s) => total + s.puntos.filter((p) => p.valor !== null && p.valor !== undefined).length,
+    0,
+  )
+  const compacto = puntosConValor === 1
+
   return (
     <div className={styles.contenedor}>
-      <svg className={styles.svg} viewBox={`0 0 ${ANCHO} ${ALTO}`} role="img">
+      <svg
+        className={`${styles.svg} ${compacto ? styles.svgCompacto : ''}`}
+        viewBox={`0 0 ${ANCHO} ${ALTO}`}
+        role="img"
+      >
         <defs>
           <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={COLORES[0]} stopOpacity={0.28} />
@@ -143,7 +161,9 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
               x={x(i)}
               y={ALTO - margen.bottom + 14}
               textAnchor="middle"
+              aria-label={periodo}
             >
+              <title>{periodo}</title>
               {acortar(periodo, 8)}
             </text>
           ) : null,
@@ -166,8 +186,22 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
               {lineas.map((d, i) => (
                 <path key={i} d={d} fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
               ))}
+              {/* Puntos sin vecino con valor: nunca se traza línea entre ellos
+                  (sería inventar una evolución). Con una cohorte de un solo
+                  registro el punto es lo único que hay, así que se dibuja
+                  grande y con su propio texto accesible. */}
               {aislados.map((i) => (
-                <circle key={`aislado-${i}`} cx={x(i)} cy={escala.y(serie.puntos[i].valor!)} r={3} fill={color} />
+                <circle
+                  key={`aislado-${i}`}
+                  cx={x(i)}
+                  cy={escala.y(serie.puntos[i].valor!)}
+                  r={5}
+                  fill={color}
+                  stroke="var(--color-surface)"
+                  strokeWidth={1.5}
+                >
+                  <title>{`${serie.puntos[i].periodo}: ${formatNumber(serie.puntos[i].valor)}`}</title>
+                </circle>
               ))}
               {serie.puntos.map((p, i) =>
                 p.valor === null || p.valor === undefined ? null : (
@@ -203,7 +237,11 @@ export function LineChartWidget({ series, mostrarLeyenda }: LineChartWidgetProps
                   x={x(ultimoConValor.i) + 6}
                   y={escala.y(ultimoConValor.p.valor!) + 3}
                 >
-                  {formatNumber(ultimoConValor.p.valor)}
+                  {/* Con un único punto, el valor a secas no dice a qué periodo
+                      corresponde: se acompaña de la fecha. */}
+                  {serie.puntos.filter((p) => p.valor !== null && p.valor !== undefined).length === 1
+                    ? `${ultimoConValor.p.periodo}: ${formatNumber(ultimoConValor.p.valor)}`
+                    : formatNumber(ultimoConValor.p.valor)}
                 </text>
               )}
             </g>

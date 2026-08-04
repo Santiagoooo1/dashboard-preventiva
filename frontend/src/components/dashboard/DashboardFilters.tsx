@@ -183,6 +183,19 @@ export function DashboardFilters({
 
   return (
     <div className={styles.wrap}>
+      {/* Nivel 1 del producto: CONTEXTO. Define la población base sobre la que
+          se calcula todo. El badge en azul cobalto fija el ámbito, frente al
+          azul cielo "Solo este indicador" de la exploración local. */}
+      <div className={styles.cabecera}>
+        <div className={styles.cabeceraTexto}>
+          <h2 className={styles.cabeceraTitulo}>Contexto del análisis</h2>
+          <p className={styles.cabeceraAyuda}>
+            Define la población y el periodo que afectan a todo el dashboard.
+          </p>
+        </div>
+        <span className={styles.badgeAlcance}>Afecta a todo el dashboard</span>
+      </div>
+
       {/* Nivel 1 — exploración rápida: paciente + rango de fechas. */}
       <div className={styles.filaPrincipal}>
         {tienePaciente && (

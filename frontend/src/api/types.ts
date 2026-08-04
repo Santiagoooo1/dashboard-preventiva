@@ -182,6 +182,24 @@ export interface PreviewMetricaRequestDto {
 export interface EjecucionMetricaRequestDto {
   fechaDesde?: string | null
   fechaHasta?: string | null
+  /** Filtros aplicados a ESTA ejecución (globales del dashboard y/o locales del widget). */
+  filtrosGlobales?: FiltroMetricaDto[] | null
+}
+
+export interface ComparativaRequestDto {
+  fechaDesde?: string | null
+  fechaHasta?: string | null
+  campoAgrupacion: string
+  filtrosGlobales?: FiltroMetricaDto[] | null
+}
+
+export interface SerieTemporalRequestDto {
+  fechaDesde?: string | null
+  fechaHasta?: string | null
+  granularidad: Granularidad
+  campoFecha?: string | null
+  campoSegmentacion?: string | null
+  filtrosGlobales?: FiltroMetricaDto[] | null
 }
 
 export interface MetricaClinicaResponseDto {

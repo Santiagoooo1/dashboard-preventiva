@@ -14,8 +14,12 @@
   opacity: 0.85;
 }
 
+/* Ámbito GLOBAL: franja azul cobalto superior. Lo que se configura aquí
+   recalcula todos los widgets, a diferencia de la exploración local (azul
+   cielo) que vive dentro de cada tarjeta. */
 .filtrosCard {
   padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 3px solid var(--color-context-global);
 }
 
 .sinResultados {

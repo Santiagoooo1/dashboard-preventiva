@@ -1,5 +1,6 @@
 import type { SerieTemporalResponseDto } from '../../api/types'
 import { DataTable } from '../DataTable'
+import { formatearEtiquetaCategoria } from '../dashboard/camposFiltroDashboard'
 
 interface WidgetSerieTemporalProps {
   serie: SerieTemporalResponseDto
@@ -26,7 +27,7 @@ export function WidgetSerieTemporal({ serie }: WidgetSerieTemporalProps) {
       <>
         {serie.series.map((segmento) => (
           <div key={segmento.etiqueta}>
-            <h4>{segmento.etiqueta}</h4>
+            <h4>{formatearEtiquetaCategoria(segmento.etiqueta)}</h4>
             <DataTable
               columns={[
                 { key: 'periodo', header: 'Periodo' },

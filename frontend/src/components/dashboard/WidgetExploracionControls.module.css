@@ -1,0 +1,202 @@
+/* Zona de exploración local (azul cielo). En reposo es neutra: solo se tiñe y
+   gana franja lateral cuando hay una exploración realmente activa, para no
+   sugerir un estado temporal que no existe. El cobalto sigue reservado al
+   contexto global, que recalcula todo el dashboard. */
+.barra {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-neutral-soft);
+  border-left: 3px solid transparent;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.barraActiva {
+  background-color: var(--color-exploration-soft);
+  border-left-color: var(--color-exploration-border);
+}
+
+/* Los KPI aprietan más: el número debe seguir siendo lo dominante. */
+.barraCompacta {
+  gap: 6px;
+  padding: 6px var(--spacing-md) var(--spacing-sm) var(--spacing-md);
+  background-color: transparent;
+  border-left: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.barraCompacta.barraActiva {
+  background-color: var(--color-exploration-soft);
+}
+
+.filaPrincipal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+/* --- Segmented control: Actual / Categoría / Paciente --- */
+
+.segmentado {
+  display: inline-flex;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmento {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  /* Inactivo en color de texto normal, no gris claro: un modo disponible no
+     debe leerse como deshabilitado. */
+  color: var(--color-text);
+  padding: 7px var(--spacing-md);
+  border-radius: calc(var(--radius-md) - 3px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.segmento:hover:not(:disabled):not(.segmentoActivo) {
+  background-color: var(--color-exploration-soft);
+  color: var(--color-exploration);
+}
+
+.segmento:focus-visible {
+  outline: 2px solid var(--color-exploration);
+  outline-offset: 1px;
+}
+
+.segmento:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.segmentoActivo {
+  background-color: var(--color-exploration);
+  color: #fff;
+}
+
+/* --- Visualización: acción secundaria, no define el dato sino su forma --- */
+
+/* Columna derecha: alcance arriba, "Gráfico" debajo. */
+.ladoDerecho {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.alcanceLocal {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-exploration);
+  white-space: nowrap;
+}
+
+.visualizacion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.visualizacionEtiqueta {
+  font-size: 0.78rem;
+  /* Secundario, pero legible: gris muted resultaba casi deshabilitado. */
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.selectVisualizacion {
+  font-size: 0.82rem;
+  padding: 5px var(--spacing-sm);
+  width: auto;
+  min-width: 108px;
+  flex: 0 0 auto;
+}
+
+/* --- Campo contextual (Agrupar por / Paciente) --- */
+
+.contextual {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.etiqueta {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.select {
+  flex: 1 1 160px;
+  min-width: 140px;
+  max-width: 100%;
+  padding: 6px var(--spacing-sm);
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--color-text);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.select:hover:not(:disabled) {
+  border-color: var(--color-exploration);
+}
+
+.select:focus-visible {
+  outline: none;
+  border-color: var(--color-exploration);
+  box-shadow: 0 0 0 3px var(--color-exploration-soft);
+}
+
+.select:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* En tarjetas estrechas los controles envuelven en vez de comprimirse:
+   nunca un select ilegible ni scroll horizontal. */
+@media (max-width: 720px) {
+  .filaPrincipal {
+    align-items: stretch;
+  }
+
+  .segmentado {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .segmento {
+    flex: 1;
+    padding: 7px var(--spacing-sm);
+  }
+
+  .ladoDerecho {
+    margin-left: 0;
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .visualizacion {
+    justify-content: flex-end;
+  }
+}
