@@ -268,6 +268,44 @@ export function alternarSeleccion(
   return esLaMisma ? null : nueva
 }
 
+/**
+ * Filtros del SUBCONJUNTO activo (Fase 6.9H.3): exactamente los mismos que
+ * recibe el dashboard cruzado. Es un alias intencionado de `combinarFiltros`
+ * para que exista un único punto de construcción: si el detalle y los gráficos
+ * pudieran divergir, la tabla mostraría una población distinta de la que
+ * resumen los KPI.
+ */
+export function filtrosDelSubconjunto(
+  filtrosGlobales: FiltroMetricaDto[],
+  seleccion: SeleccionGrafica | null,
+): FiltroMetricaDto[] {
+  return combinarFiltros(filtrosGlobales, seleccion)
+}
+
+/**
+ * Firma determinista de un conjunto de filtros: identifica el subconjunto para
+ * la caché y para descartar respuestas obsoletas. INCLUYE los valores, porque
+ * sin ellos `sexo=HOMBRE` y `sexo=MUJER` tendrían la misma firma y una
+ * respuesta vieja podría darse por válida.
+ *
+ * Por eso NO debe registrarse en logs ni incluirse en mensajes de error: puede
+ * contener valores clínicos. Para trazar, usar `firmaFiltrosAnonima`.
+ */
+export function firmaFiltros(filtros: FiltroMetricaDto[]): string {
+  return filtros
+    .map((f) => `${f.campo} ${f.operador} ${JSON.stringify(f.valor ?? null)}`)
+    .sort()
+    .join('|')
+}
+
+/** Firma sin valores clínicos: describe la FORMA del filtro, apta para trazas. */
+export function firmaFiltrosAnonima(filtros: FiltroMetricaDto[]): string {
+  return filtros
+    .map((f) => `${f.campo}:${f.operador}`)
+    .sort()
+    .join('|')
+}
+
 export interface CapacidadSeleccionTemporal {
   seleccionable: boolean
   campoFecha: string | null

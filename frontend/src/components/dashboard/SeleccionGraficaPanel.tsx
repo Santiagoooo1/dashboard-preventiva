@@ -17,6 +17,10 @@ interface SeleccionGraficaPanelProps {
   error: string | null
   onQuitar: () => void
   onReintentar: () => void
+  /** Resumen ligero del subconjunto, si ya se cargó. */
+  resumen?: { totalRegistros: number; totalPacientesUnicos: number | null; tienePacientes: boolean } | null
+  detalleAbierto?: boolean
+  onExplorar?: () => void
 }
 
 /**
@@ -31,6 +35,9 @@ export function SeleccionGraficaPanel({
   error,
   onQuitar,
   onReintentar,
+  resumen = null,
+  detalleAbierto = false,
+  onExplorar,
 }: SeleccionGraficaPanelProps) {
   if (!seleccion) return null
 
@@ -54,6 +61,17 @@ export function SeleccionGraficaPanel({
           {seleccion.etiquetaCampo}: {seleccion.etiquetaVisible} <span aria-hidden="true">×</span>
         </button>
 
+        {onExplorar && (
+          <button
+            type="button"
+            className={`btn btnSecondary ${styles.explorar}`}
+            aria-expanded={detalleAbierto}
+            onClick={onExplorar}
+          >
+            {detalleAbierto ? 'Ocultar subconjunto' : 'Explorar subconjunto'}
+          </button>
+        )}
+
         <button type="button" className={styles.limpiar} onClick={onQuitar}>
           Limpiar selección
         </button>
@@ -68,6 +86,15 @@ export function SeleccionGraficaPanel({
       {seleccion.tipo === 'TEMPORAL' && (
         <span className={styles.rango}>
           Del {formatearFechaCorta(seleccion.fechaDesde)} al {formatearFechaCorta(seleccion.fechaHasta)}
+        </span>
+      )}
+
+      {/* Pacientes y registros son conceptos distintos: un paciente puede tener
+          varios registros, así que nunca se presentan como una sola cifra. */}
+      {resumen && (
+        <span className={styles.resumen}>
+          {resumen.tienePacientes && <>{resumen.totalPacientesUnicos} pacientes únicos · </>}
+          {resumen.totalRegistros} registros clínicos
         </span>
       )}
 

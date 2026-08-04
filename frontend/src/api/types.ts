@@ -592,6 +592,101 @@ export interface DashboardPanelResponseDto {
   resumen: DashboardPanelResumenDto
 }
 
+// --- Fase 6.9H.3: detalle del subconjunto seleccionado ---
+
+export interface SubconjuntoRequestDto {
+  /** Los MISMOS filtros que el dashboard cruzado: globales + selección gráfica. */
+  filtros: FiltroMetricaDto[]
+  campoIndividuo?: string | null
+  pagina?: number | null
+  tamano?: number | null
+  ordenCampo?: string | null
+  ordenDireccion?: 'ASC' | 'DESC' | null
+  busquedaIndividuo?: string | null
+}
+
+export interface ColumnaSubconjuntoDto {
+  codigo: string
+  etiqueta: string
+  tipoDato: string
+  orden: number
+  identificador: boolean
+}
+
+export interface FilaSubconjuntoDto {
+  clave: string
+  numeroRegistros: number | null
+  valores: Record<string, unknown>
+}
+
+export interface SubconjuntoResumenDto {
+  totalRegistros: number
+  totalPacientesUnicos: number | null
+  campoIndividuo: string | null
+  etiquetaCampoIndividuo: string | null
+  tienePacientes: boolean
+  periodoDesde: string | null
+  periodoHasta: string | null
+}
+
+export interface SubconjuntoPaginaDto {
+  contenido: FilaSubconjuntoDto[]
+  pagina: number
+  tamano: number
+  totalElementos: number
+  totalPaginas: number
+  columnas: ColumnaSubconjuntoDto[]
+}
+
+export interface PerfilNumericoDto {
+  campo: string
+  etiqueta: string
+  valoresValidos: number
+  valoresAusentes: number
+  media: number | null
+  mediana: number | null
+  minimo: number | null
+  maximo: number | null
+}
+
+export interface CategoriaPerfilDto {
+  /** Valor técnico sin traducir. */
+  valor: string
+  conteo: number
+  porcentaje: number | null
+}
+
+export interface PerfilCategoricoDto {
+  campo: string
+  etiqueta: string
+  tipoDato: string
+  valoresValidos: number
+  valoresAusentes: number
+  categorias: CategoriaPerfilDto[]
+  otrasCategorias: number
+}
+
+export interface PerfilFechaDto {
+  campo: string
+  etiqueta: string
+  valoresValidos: number
+  valoresAusentes: number
+  primera: string | null
+  ultima: string | null
+}
+
+export interface SubconjuntoPerfilDto {
+  /** "REGISTROS": denominador explícito de todas las distribuciones. */
+  baseCalculo: string
+  totalRegistros: number
+  totalPacientesUnicos: number | null
+  registrosPorPaciente: number | null
+  numericos: PerfilNumericoDto[]
+  categoricos: PerfilCategoricoDto[]
+  booleanos: PerfilCategoricoDto[]
+  fechas: PerfilFechaDto[]
+}
+
 // --- Fase 6.8C: copia interna de trabajo (corrección de filas sin tocar el archivo original) ---
 
 export interface ImportacionTrabajoResponseDto {

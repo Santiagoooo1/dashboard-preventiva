@@ -5,6 +5,7 @@ import type {
   ConfiguracionWidgetDto,
   DashboardPanelResponseDto,
   DashboardWidgetDto,
+  SubconjuntoResumenDto,
   PanelMetricaResponseDto,
   TipoVisualizacion,
 } from '../api/types'
@@ -29,8 +30,13 @@ import {
   CAMPO_FECHA_POR_DEFECTO,
   alternarSeleccion,
   combinarFiltros,
+  filtrosDelSubconjunto,
+  firmaFiltros,
   validarIntegridadCruce,
 } from '../components/dashboard/seleccionGrafica'
+import { SubconjuntoPanel } from '../components/dashboard/SubconjuntoPanel'
+import { resumenSubconjunto } from '../api/subconjuntoApi'
+import { formatearEtiquetaCategoria } from '../components/dashboard/camposFiltroDashboard'
 import type { SeleccionGrafica } from '../components/dashboard/seleccionGrafica'
 import { SeleccionGraficaPanel } from '../components/dashboard/SeleccionGraficaPanel'
 import { listarMetricas } from '../api/metricasApi'
@@ -40,6 +46,16 @@ import styles from './PanelDashboardPage.module.css'
 
 const CAMPOS_FECHA_O_NUMERICOS_EXCLUIDOS = new Set(['FECHA', 'ENTERO', 'DECIMAL'])
 const SIN_CAMPOS: CamposClasificados = { principales: [], avanzados: [] }
+
+/**
+ * Condición del subconjunto en lenguaje de usuario. Nunca muestra operadores
+ * técnicos (GTE/LTE) ni valores sin traducir.
+ */
+function descripcionSeleccion(seleccion: SeleccionGrafica): string {
+  return seleccion.tipo === 'TEMPORAL'
+    ? `Periodo: ${seleccion.etiquetaVisible}`
+    : `${seleccion.etiquetaCampo}: ${seleccion.etiquetaVisible}`
+}
 
 function hayFiltrosActivos(valores: ValoresFiltros): boolean {
   return (
@@ -93,6 +109,11 @@ export function PanelDashboardPage() {
   const peticionCruceRef = useRef(0)
   /** `configuracion.campoAgrupacion` por métrica: única fuente para DISTRIBUCION. */
   const [campoAgrupacionPorMetrica, setCampoAgrupacionPorMetrica] = useState<Record<number, string | null>>({})
+
+  // --- Detalle del subconjunto (6.9H.3) ---
+  // Estado propio: un fallo aquí no puede tumbar el dashboard ni la selección.
+  const [detalleAbierto, setDetalleAbierto] = useState(false)
+  const [resumenSub, setResumenSub] = useState<SubconjuntoResumenDto | null>(null)
 
   // Definición "en crudo" de cada widget (metricaId, título/descripción
   // personalizados, orden, ancho): la necesitamos completa para poder hacer
@@ -327,6 +348,39 @@ export function PanelDashboardPage() {
     [filtrosAplicados],
   )
 
+  /** Filtros del subconjunto: los MISMOS que el dashboard cruzado. */
+  const filtrosSubconjunto = useMemo(
+    () => filtrosDelSubconjunto(filtrosGlobalesAplicados, seleccionGrafica),
+    [filtrosGlobalesAplicados, seleccionGrafica],
+  )
+  const firmaSubconjunto = firmaFiltros(filtrosSubconjunto)
+
+  // Solo el resumen (barato) al crear una selección: las tablas y el perfil se
+  // piden cuando el usuario abre el detalle.
+  useEffect(() => {
+    if (!seleccionGrafica) {
+      setResumenSub(null)
+      setDetalleAbierto(false)
+      return
+    }
+
+    const controller = new AbortController()
+    resumenSubconjunto(
+      panelId ?? '',
+      { filtros: filtrosSubconjunto, campoIndividuo: campoIndividuo?.codigo ?? null },
+      controller.signal,
+    )
+      .then(setResumenSub)
+      .catch(() => {
+        // El resumen es informativo: si falla, el dashboard sigue igual.
+        if (!controller.signal.aborted) setResumenSub(null)
+      })
+
+    return () => controller.abort()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firmaSubconjunto, panelId, campoIndividuo])
+
+
   // Individuo fijado por el contexto global, si lo hay. Se lee de los filtros
   // APLICADOS (no del formulario) y se compara con el código de campo realmente
   // detectado, no con un "pacienteCodigo" asumido.
@@ -376,6 +430,15 @@ export function PanelDashboardPage() {
     const codigo = codigoConfigurado ?? CAMPO_FECHA_POR_DEFECTO
     return etiquetasCampos[codigo] ?? codigo
   }
+
+  /** Contexto global en texto, para la cabecera del detalle. */
+  const descripcionContextoGlobal = useMemo(() => {
+    const partes = filtrosGlobalesAplicados.map((f) => {
+      const etiqueta = etiquetasCampos[f.campo] ?? f.campo
+      return `${etiqueta}: ${formatearEtiquetaCategoria(String(f.valor ?? ''))}`
+    })
+    return partes.length > 0 ? partes.join(' · ') : null
+  }, [filtrosGlobalesAplicados, etiquetasCampos])
 
   const individuoGlobal = useMemo(() => {
     if (!campoIndividuo) return null
@@ -440,7 +503,24 @@ export function PanelDashboardPage() {
               error={errorCruce}
               onQuitar={quitarSeleccion}
               onReintentar={() => setReintentoCruce((r) => r + 1)}
+              resumen={resumenSub}
+              detalleAbierto={detalleAbierto}
+              onExplorar={() => setDetalleAbierto((abierto) => !abierto)}
             />
+
+            {seleccionGrafica && detalleAbierto && (
+              <SubconjuntoPanel
+                // La firma como key fuerza un remontaje al cambiar el
+                // subconjunto: nunca se ve un instante de datos anteriores.
+                key={firmaSubconjunto}
+                panelId={panelId ?? ''}
+                filtros={filtrosSubconjunto}
+                resumen={resumenSub}
+                descripcionSeleccion={descripcionSeleccion(seleccionGrafica)}
+                descripcionContexto={descripcionContextoGlobal}
+                onCerrar={() => setDetalleAbierto(false)}
+              />
+            )}
 
             {errorCarga && <ErrorBanner mensaje={errorCarga} />}
 

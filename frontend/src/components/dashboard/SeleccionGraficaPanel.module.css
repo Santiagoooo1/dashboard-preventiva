@@ -113,3 +113,22 @@
   font-size: 0.76rem;
   color: var(--color-text-muted);
 }
+
+/* Conteos del subconjunto: pacientes y registros, siempre diferenciados. */
+.resumen {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.explorar {
+  border-color: var(--color-selection-border);
+  color: var(--color-selection);
+  background-color: var(--color-surface);
+}
+
+.explorar:hover:not(:disabled) {
+  border-color: var(--color-selection);
+  background-color: var(--color-selection-soft);
+  color: var(--color-selection);
+}

@@ -1,0 +1,477 @@
+/* Fase 6.9H.3 — panel de detalle del subconjunto.
+   El turquesa marca la relación con la selección gráfica (borde, pestaña
+   activa); el área de datos se mantiene neutra para que las tablas clínicas
+   sean legibles. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-selection-border);
+  border-top: 3px solid var(--color-selection);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  padding: var(--spacing-md) var(--spacing-lg);
+}
+
+.cabeceraTexto {
+  min-width: 0;
+}
+
+.titulo {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.titulo:focus-visible {
+  outline: 2px solid var(--color-selection);
+  outline-offset: 2px;
+}
+
+.condicion {
+  margin: 2px 0 0 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-selection);
+}
+
+.contexto {
+  margin: 2px 0 0 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+/* --- Resumen: pacientes frente a registros --- */
+
+.resumen {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  padding: 0 var(--spacing-lg) var(--spacing-md) var(--spacing-lg);
+}
+
+.tarjetaResumen {
+  display: flex;
+  flex-direction: column;
+}
+
+.resumenValor {
+  font-size: 1.7rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.resumenEtiqueta {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.avisoSinIndividuo {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  max-width: 46ch;
+}
+
+/* --- Pestañas --- */
+
+.tabs {
+  display: flex;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--spacing-sm) var(--spacing-md);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover {
+  color: var(--color-selection);
+}
+
+.tab:focus-visible {
+  outline: 2px solid var(--color-selection);
+  outline-offset: -2px;
+}
+
+.tabActiva {
+  color: var(--color-selection);
+  border-bottom-color: var(--color-selection);
+}
+
+.contenido {
+  padding: var(--spacing-md) var(--spacing-lg) var(--spacing-lg) var(--spacing-lg);
+}
+
+/* --- Controles --- */
+
+.controles {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.controlesDerecha {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-md);
+  margin-left: auto;
+}
+
+.busqueda,
+.tamano {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 0.85rem;
+}
+
+.busquedaEtiqueta {
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}
+
+.busqueda input,
+.tamano select {
+  padding: 6px var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: 0.85rem;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+.busqueda input:focus-visible,
+.tamano select:focus-visible {
+  outline: none;
+  border-color: var(--color-selection);
+  box-shadow: 0 0 0 3px var(--color-selection-soft);
+}
+
+.columnas {
+  position: relative;
+}
+
+.columnasResumen {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+  padding: 6px var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  list-style: none;
+}
+
+.columnasResumen::-webkit-details-marker {
+  display: none;
+}
+
+.columnasLista {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  margin-top: 4px;
+  min-width: 220px;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--spacing-sm);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.columnaOpcion {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+}
+
+.restaurar {
+  margin-top: var(--spacing-xs);
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-selection);
+  text-decoration: underline;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* --- Tabla --- */
+
+.tablaScroll {
+  overflow-x: auto;
+}
+
+.tablaCargando {
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.caption {
+  text-align: left;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  padding-bottom: var(--spacing-xs);
+}
+
+.tabla th,
+.tabla td {
+  padding: 7px var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.tabla thead th {
+  background-color: var(--color-bg);
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+}
+
+.tabla tbody tr:hover {
+  background-color: var(--color-bg);
+}
+
+.celdaNumerica {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.botonOrden {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+}
+
+.botonOrden:focus-visible {
+  outline: 2px solid var(--color-selection);
+  outline-offset: 2px;
+}
+
+/* --- Paginación, estados --- */
+
+.paginacion {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.paginaTexto {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.cargando {
+  margin: 0;
+  padding: var(--spacing-lg);
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+.vacio {
+  padding: var(--spacing-lg);
+  text-align: center;
+}
+
+.vacioTitulo {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-warning);
+}
+
+.vacioTexto {
+  margin: var(--spacing-xs) 0 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.error {
+  padding: var(--spacing-lg);
+  text-align: center;
+}
+
+.errorTexto {
+  margin: 0 0 var(--spacing-sm) 0;
+  font-weight: 600;
+  color: var(--color-danger);
+}
+
+.erroresAcciones {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* --- Perfil --- */
+
+.perfil {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.perfilBase {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.perfilSeccion {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.perfilSeccionTitulo {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.perfilGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.perfilBloque {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.perfilTitulo {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.perfilLista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.perfilItem {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: 0.82rem;
+}
+
+.perfilBloque .perfilItem {
+  grid-template-columns: minmax(70px, 1fr) 60px auto;
+}
+
+.perfilCategoria {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perfilBarra {
+  height: 6px;
+  border-radius: 999px;
+  background-color: var(--color-border);
+  overflow: hidden;
+}
+
+.perfilBarraRelleno {
+  display: block;
+  height: 100%;
+  background-color: var(--color-selection);
+  border-radius: 999px;
+}
+
+.perfilCifra {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.perfilPie {
+  margin: var(--spacing-xs) 0 0 0;
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 639px) {
+  .cabecera,
+  .resumen,
+  .contenido {
+    padding-left: var(--spacing-md);
+    padding-right: var(--spacing-md);
+  }
+
+  .tabs {
+    padding: 0 var(--spacing-md);
+  }
+
+  .controlesDerecha {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .busqueda {
+    width: 100%;
+  }
+}
