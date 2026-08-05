@@ -12,6 +12,12 @@
   gap: var(--spacing-sm);
 }
 
+.botonesCabecera {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
 .opcionAutomatica {
   margin-top: var(--spacing-md);
   color: var(--color-text-muted);

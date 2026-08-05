@@ -9,6 +9,9 @@ import { DatasetCamposPage } from '../pages/DatasetCamposPage'
 import { CampoFormPage } from '../pages/CampoFormPage'
 import { DatasetMetricasPage } from '../pages/DatasetMetricasPage'
 import { MetricaFormPage } from '../pages/MetricaFormPage'
+import { NuevaMetricaPage } from '../pages/NuevaMetricaPage'
+import { MetricaDesdeColumnaPage } from '../pages/MetricaDesdeColumnaPage'
+import { MetricaPorcentajePage } from '../pages/MetricaPorcentajePage'
 import { DatasetImportPage } from '../pages/DatasetImportPage'
 import { PlantillasImportacionPage } from '../pages/PlantillasImportacionPage'
 import { PlantillaImportacionFormPage } from '../pages/PlantillaImportacionFormPage'
@@ -37,7 +40,12 @@ export function AppRoutes() {
         <Route path="/datasets/:datasetId/campos/nuevo" element={<CampoFormPage />} />
         <Route path="/datasets/:datasetId/campos/:campoId/editar" element={<CampoFormPage />} />
         <Route path="/datasets/:datasetId/metricas" element={<DatasetMetricasPage />} />
-        <Route path="/datasets/:datasetId/metricas/nueva" element={<MetricaFormPage />} />
+        {/* "Nueva métrica" ya no es un formulario, sino la elección de cómo
+            crearla. Los tres modos terminan en la misma MetricaClinica. */}
+        <Route path="/datasets/:datasetId/metricas/nueva" element={<NuevaMetricaPage />} />
+        <Route path="/datasets/:datasetId/metricas/nueva/desde-columna" element={<MetricaDesdeColumnaPage />} />
+        <Route path="/datasets/:datasetId/metricas/nueva/porcentaje" element={<MetricaPorcentajePage />} />
+        <Route path="/datasets/:datasetId/metricas/nueva/avanzada" element={<MetricaFormPage />} />
         <Route path="/datasets/:datasetId/metricas/:metricaId/editar" element={<MetricaFormPage />} />
         <Route path="/datasets/:datasetId/importar" element={<DatasetImportPage />} />
         <Route path="/datasets/:datasetId/plantillas" element={<PlantillasImportacionPage />} />

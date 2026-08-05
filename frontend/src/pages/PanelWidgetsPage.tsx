@@ -156,6 +156,15 @@ export function PanelWidgetsPage() {
                 >
                   + Añadir widget
                 </button>
+                {/* Añadir widget usa una métrica que YA existe; esta otra crea
+                    una nueva. Son dos acciones distintas y conviene que se vean
+                    como tales, en vez de esconder la segunda tras la primera. */}
+                <Link
+                  className="btn btnSecondary"
+                  to={`/datasets/${datasetId}/metricas/nueva/desde-columna`}
+                >
+                  + Crear métrica desde columna
+                </Link>
                 <Link className="btn btnSecondary" to={`/paneles/${panelId}/dashboard`}>
                   Ver dashboard
                 </Link>
@@ -164,9 +173,7 @@ export function PanelWidgetsPage() {
             <p className={styles.explicacion}>
               Aquí decides qué métricas aparecen en este panel, cómo se ve cada una (número, gráfico o
               tabla) y si está agrupada o segmentada. Para cambios rápidos de visualización sin entrar
-              aquí, usa el selector "Vista" de cada widget directamente en el dashboard. Para crear una
-              métrica nueva ya lista para agrupar/segmentar y añadirla al dashboard en un solo paso, usa
-              "Nueva métrica" desde la pantalla de métricas del dataset.
+              aquí, usa el selector "Vista" de cada widget directamente en el dashboard.
             </p>
             <p className={styles.subtitulo}>
               Dataset: {data.metadata.dataset.nombre} ({data.metadata.dataset.codigo})
@@ -180,6 +187,7 @@ export function PanelWidgetsPage() {
                   valorInicial={VALORES_NUEVO}
                   metricasDisponibles={data.metricas}
                   tipoVisualizaciones={data.catalogo.tipoVisualizaciones}
+                  datasetId={datasetId ?? ''}
                   esEdicion={false}
                   onSubmit={onAnadir}
                   onCancelar={cerrarForm}
@@ -254,6 +262,7 @@ export function PanelWidgetsPage() {
                       valorInicial={valoresEdicion(widget)}
                       metricasDisponibles={data.metricas}
                       tipoVisualizaciones={data.catalogo.tipoVisualizaciones}
+                      datasetId={datasetId ?? ''}
                       esEdicion
                       onSubmit={(payload) => onEditar(widget.id, payload)}
                       onCancelar={cerrarForm}

@@ -1,6 +1,7 @@
 package com.preventiva.backend.service.impl;
 
 import com.preventiva.backend.dto.ComparativaRequestDto;
+import com.preventiva.backend.dto.ConfiguracionMetricaDto;
 import com.preventiva.backend.dto.ComparativaResponseDto;
 import com.preventiva.backend.dto.FiltroMetricaDto;
 import com.preventiva.backend.dto.ItemComparativaDto;
@@ -25,6 +26,7 @@ import com.preventiva.backend.repository.RegistroClinicoGenericoRepository;
 import com.preventiva.backend.service.interfaces.MetricaAnaliticaService;
 import com.preventiva.backend.util.FiltroMetricaEvaluator;
 import com.preventiva.backend.util.MetricaCalculoBasico;
+import com.preventiva.backend.util.OperacionMetricaUtil;
 import com.preventiva.backend.util.PeriodoTemporalUtil;
 import com.preventiva.backend.util.PeriodoTemporalUtil.Periodo;
 import com.preventiva.backend.util.RegistroClinicoGenericoValueReader;
@@ -72,7 +74,7 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
         List<PanelMetricaSerieDto> resultados = panelMetricaRepository.findByPanelIdAndActivaTrue(panelId)
                 .stream()
                 .filter(pm -> Boolean.TRUE.equals(pm.getMetrica().getActiva()))
-                .filter(pm -> pm.getMetrica().getTipoMetrica() != TipoMetrica.DISTRIBUCION)
+                .filter(pm -> admiteSerie(pm.getMetrica()))
                 .sorted(Comparator.comparing(PanelMetrica::getOrden))
                 .map(pm -> construirSeriePanel(pm, request))
                 .toList();
@@ -103,10 +105,9 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
     }
 
     private SerieTemporalResponseDto calcularSerieTemporal(MetricaClinica metrica, SerieTemporalRequestDto request) {
-        validarTipoPermitido(metrica.getTipoMetrica());
-
         Long datasetId = metrica.getDataset().getId();
         Map<String, CampoClinico> camposPorCodigo = obtenerCamposActivosPorCodigo(datasetId);
+        validarTipoPermitido(metrica, camposPorCodigo);
 
         String codigoCampoFecha = request.getCampoFecha() != null ? request.getCampoFecha() : CAMPO_FECHA_DEFECTO;
         CampoClinico campoFecha = obtenerCampoOLanzar(codigoCampoFecha, camposPorCodigo);
@@ -192,10 +193,9 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
     }
 
     private ComparativaResponseDto calcularComparativa(MetricaClinica metrica, ComparativaRequestDto request) {
-        validarTipoPermitido(metrica.getTipoMetrica());
-
         Long datasetId = metrica.getDataset().getId();
         Map<String, CampoClinico> camposPorCodigo = obtenerCamposActivosPorCodigo(datasetId);
+        validarTipoPermitido(metrica, camposPorCodigo);
         CampoClinico campoAgrupacion = obtenerCampoOLanzar(request.getCampoAgrupacion(), camposPorCodigo);
         Function<String, CampoClinico> resolverCampo = camposPorCodigo::get;
         List<FiltroMetricaDto> filtrosGlobales = filtrosONull(request.getFiltrosGlobales());
@@ -221,6 +221,7 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
                             .valor(resultado.getValor())
                             .totalNumerador(resultado.getTotalNumerador())
                             .totalDenominador(resultado.getTotalDenominador())
+                            .estado(resultado.getEstadoNombre())
                             .build();
                 })
                 .toList();
@@ -247,7 +248,19 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
                 .valor(resultado.getValor())
                 .totalNumerador(resultado.getTotalNumerador())
                 .totalDenominador(resultado.getTotalDenominador())
+                .estado(resultado.getEstadoNombre())
                 .build();
+    }
+
+    /** Igual que `validarTipoPermitido`, pero sin lanzar: para filtrar el panel. */
+    private boolean admiteSerie(MetricaClinica metrica) {
+        Map<String, CampoClinico> campos = obtenerCamposActivosPorCodigo(metrica.getDataset().getId());
+        try {
+            validarTipoPermitido(metrica, campos);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private RangoEfectivo resolverRango(List<RegistroConFecha> registrosConFecha, LocalDate desde, LocalDate hasta) {
@@ -287,10 +300,28 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
         return builder.build();
     }
 
-    private void validarTipoPermitido(TipoMetrica tipoMetrica) {
-        if (tipoMetrica == TipoMetrica.DISTRIBUCION) {
+    /**
+     * Solo entran en una serie o una comparativa las métricas cuyo resultado es
+     * un número que se pueda poner en un eje.
+     *
+     * <p>Quedan fuera las que devuelven un reparto (DISTRIBUCION), una etiqueta
+     * (CATEGORIA_PRINCIPAL) o una fecha (MINIMO/MAXIMO sobre campo FECHA):
+     * dibujarlas exigiría un resultado de dos dimensiones que ni el DTO ni los
+     * renderers admiten hoy. Se rechaza con un mensaje explícito en vez de
+     * producir una serie de nulos.
+     */
+    private void validarTipoPermitido(MetricaClinica metrica, Map<String, CampoClinico> camposPorCodigo) {
+        TipoMetrica tipoMetrica = metrica.getTipoMetrica();
+        ConfiguracionMetricaDto config = metrica.getConfiguracion();
+
+        String codigoCampoValor = config != null ? config.getCampoValor() : null;
+        CampoClinico campoValor = codigoCampoValor != null ? camposPorCodigo.get(codigoCampoValor) : null;
+        TipoDatoExcel tipoDatoCampoValor = campoValor != null ? campoValor.getTipoDato() : null;
+
+        if (!OperacionMetricaUtil.produceValorNumerico(tipoMetrica, tipoDatoCampoValor)) {
             throw new IllegalArgumentException(
-                    "DISTRIBUCION no admite serie temporal ni comparativa; use la ejecución normal de la métrica.");
+                    tipoMetrica + " no produce un valor numérico, así que no admite serie temporal ni comparativa;"
+                            + " use la ejecución normal de la métrica.");
         }
     }
 

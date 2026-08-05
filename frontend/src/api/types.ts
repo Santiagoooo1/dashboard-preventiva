@@ -142,7 +142,34 @@ export interface CampoClinicoMetadataDto {
 
 // --- Fase 4.1: métricas configurables ---
 
-export type TipoMetrica = 'CONTEO' | 'PORCENTAJE' | 'PROMEDIO' | 'SUMA' | 'DISTRIBUCION'
+export type TipoMetrica =
+  | 'CONTEO'
+  | 'PORCENTAJE'
+  | 'PROMEDIO'
+  | 'SUMA'
+  | 'DISTRIBUCION'
+  // --- Fase 6.9I.2: capacidades genéricas del motor ---
+  | 'CONTEO_DISTINTO'
+  | 'COMPLETITUD'
+  | 'MEDIANA'
+  | 'MINIMO'
+  | 'MAXIMO'
+  | 'CATEGORIA_PRINCIPAL'
+
+/** Qué hacer con los registros sin valor. Por defecto se incluyen como «Sin dato». */
+export type TratamientoNulos = 'EXCLUIR' | 'INCLUIR_COMO_CATEGORIA'
+
+/** Cómo se interpreta analíticamente una columna. */
+export type RolAnaliticoCampo =
+  | 'IDENTIFICADOR'
+  | 'BOOLEANO'
+  | 'CATEGORICO'
+  | 'NUMERICO'
+  | 'FECHA'
+  | 'TEXTO_LIBRE'
+
+/** OK, o el motivo por el que no hay valor. Nunca NaN. */
+export type EstadoResultadoMetrica = 'OK' | 'SIN_BASE_EVALUABLE'
 
 export interface FiltroMetricaDto {
   campo: string
@@ -155,11 +182,18 @@ export interface FiltroGrupoDto {
 }
 
 export interface ConfiguracionMetricaDto {
+  /** Filtros base: acotan la población y, en PORCENTAJE, también numerador y denominador. */
   filtros?: FiltroMetricaDto[] | null
   numerador?: FiltroGrupoDto | null
   denominador?: FiltroGrupoDto | null
   campoValor?: string | null
   campoAgrupacion?: string | null
+  // --- Fase 6.9I.2 ---
+  tratamientoNulos?: TratamientoNulos | null
+  etiquetaNumerador?: string | null
+  etiquetaDenominador?: string | null
+  /** Top N de una distribución; el resto se agrupa en «Otros» (solo presentación). */
+  maxCategorias?: number | null
 }
 
 export interface MetricaClinicaRequestDto {
@@ -488,9 +522,63 @@ export interface ResultadoMetricaResponseDto {
   totalNumerador: number | null
   totalDenominador: number | null
   items: ItemDistribucionDto[] | null
+  // --- Fase 6.9I.2 ---
+  /** OK o SIN_BASE_EVALUABLE. Si no es OK, `valor` es null y hay que explicar por qué. */
+  estado?: EstadoResultadoMetrica | null
+  /** Resultado no numérico: fecha de un MINIMO/MAXIMO, etiqueta de CATEGORIA_PRINCIPAL. */
+  valorTexto?: string | null
+  etiquetaNumerador?: string | null
+  etiquetaDenominador?: string | null
+}
+
+// --- Fase 6.9I.2: perfil analítico de las columnas ---
+
+export interface OperacionDisponibleDto {
+  codigo: TipoMetrica
+  nombre: string
+  explicacion: string
+  sufijoCodigo: string
+  planResultado: 'UNICO' | 'AGRUPADO' | 'SERIE'
+  visualizacionRecomendada: string
+  porcentual: boolean
+  exigeTopN: boolean
+  advertencia: string | null
+}
+
+export interface PerfilCampoDto {
+  codigo: string
+  etiqueta: string
+  tipoDato: string
+  activo: boolean
+  rolSugerido: RolAnaliticoCampo
+  rolesAlternativos: RolAnaliticoCampo[]
+  totalRegistros: number
+  valoresInformados: number
+  valoresSinDato: number
+  valoresDistintos: number
+  cardinalidad: 'BAJA' | 'MEDIA' | 'ALTA'
+  completitud: number | null
+  valorMinimo: string | null
+  valorMaximo: string | null
+  valoresEjemplo: string[]
+  /** Operaciones para el rol sugerido. Nunca vacío. */
+  operaciones: OperacionDisponibleDto[]
+  /** Operaciones de cada rol elegible (el sugerido incluido), resueltas por el backend. */
+  operacionesPorRol: Record<string, OperacionDisponibleDto[]>
+  esIdentificadorIndividuo: boolean
+}
+
+export interface PerfilCamposResponseDto {
+  dataset: DatasetClinicoResponseDto
+  totalRegistros: number
+  campos: PerfilCampoDto[]
+  campoIndividuo: string | null
+  umbralCardinalidadCategorica: number
+  maxCategoriasDonut: number
 }
 
 export interface PuntoSerieDto {
+  estado?: EstadoResultadoMetrica | null
   periodo: string
   fechaInicio: string
   fechaFin: string
@@ -519,6 +607,7 @@ export interface ItemComparativaDto {
   valor: number | null
   totalNumerador: number | null
   totalDenominador: number | null
+  estado?: EstadoResultadoMetrica | null
 }
 
 export interface ComparativaResponseDto {

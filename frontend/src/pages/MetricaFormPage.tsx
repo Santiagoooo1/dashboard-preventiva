@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import type {
-  CampoMetricaMetadataDto,
   CatalogoFrontendResponseDto,
   ConfiguracionMetricaDto,
   ConfiguracionWidgetDto,
@@ -10,7 +9,6 @@ import type {
   MetadataMetricasResponseDto,
   MetricaClinicaRequestDto,
   MetricaClinicaResponseDto,
-  OperadorFiltroCatalogoDto,
   PanelClinicoResponseDto,
   ResultadoMetricaResponseDto,
   TipoMetrica,
@@ -27,6 +25,9 @@ import { Breadcrumbs } from '../components/Breadcrumbs'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { avisoCodigo } from '../utils/validacion'
 import { MetricaConfigForm } from '../components/metrics/MetricaConfigForm'
+// Las conversiones de filtros son las mismas en los tres modos de creación:
+// viven en un único sitio para que no puedan divergir.
+import { filtrosParaFormulario, filtrosParaPayload } from '../components/metrics/constructorMetrica'
 import { WidgetActual } from '../components/widgets/WidgetActual'
 import type { PlanResultado } from '../components/dashboard/visualizacionesCompatibles'
 import { visualizacionesSegunPlan } from '../components/dashboard/visualizacionesCompatibles'
@@ -56,48 +57,27 @@ const ANCHOS = [
   { valor: '12', etiqueta: 'Ancho completo' },
 ]
 
+/**
+ * Configuración vacía de partida según la operación.
+ *
+ * Las operaciones se agrupan por lo que necesitan, no una por una: las que
+ * agregan un valor piden `campoValor`, las que reparten piden `campoAgrupacion`
+ * y el porcentaje pide numerador y denominador. Así, ampliar el motor no
+ * obliga a tocar este formulario.
+ */
 function configuracionBase(tipo: TipoMetrica): ConfiguracionMetricaDto {
-  switch (tipo) {
-    case 'CONTEO':
-      return { filtros: [] }
-    case 'PORCENTAJE':
-      return { numerador: { filtros: [] }, denominador: { filtros: [] } }
-    case 'PROMEDIO':
-    case 'SUMA':
-      return { campoValor: null, filtros: [] }
-    case 'DISTRIBUCION':
-      return { campoAgrupacion: null, filtros: [] }
+  if (tipo === 'PORCENTAJE') {
+    return { numerador: { filtros: [] }, denominador: { filtros: [] } }
   }
-}
-
-// En el formulario, el valor de IN/NOT_IN se edita como texto separado por
-// comas; el backend espera una lista. Estas dos funciones convierten en ambos
-// sentidos al cargar una métrica existente y al construir el payload.
-function filtrosParaFormulario(filtros: FiltroMetricaDto[] | null | undefined): FiltroMetricaDto[] {
-  return (filtros ?? []).map((f) => ({
-    ...f,
-    valor: Array.isArray(f.valor) ? f.valor.join(', ') : f.valor,
-  }))
-}
-
-function filtrosParaPayload(
-  filtros: FiltroMetricaDto[],
-  campos: CampoMetricaMetadataDto[],
-  operadores: OperadorFiltroCatalogoDto[],
-): FiltroMetricaDto[] {
-  return filtros.map((f) => {
-    const operador = operadores.find((o) => o.codigo === f.operador)
-    if (!operador?.requiereLista || typeof f.valor !== 'string') {
-      return f
-    }
-    const campo = campos.find((c) => c.codigo === f.campo)
-    const esNumerico = campo?.tipoDato === 'ENTERO' || campo?.tipoDato === 'DECIMAL'
-    const elementos = f.valor
-      .split(',')
-      .map((s) => s.trim())
-      .filter((s) => s !== '')
-    return { ...f, valor: esNumerico ? elementos.map(Number) : elementos }
-  })
+  if (tipo === 'DISTRIBUCION' || tipo === 'CATEGORIA_PRINCIPAL') {
+    return { campoAgrupacion: null, filtros: [] }
+  }
+  if (tipo === 'CONTEO') {
+    return { filtros: [] }
+  }
+  // PROMEDIO, SUMA, MEDIANA, MINIMO, MAXIMO, CONTEO_DISTINTO y COMPLETITUD
+  // operan todas sobre un único campo.
+  return { campoValor: null, filtros: [] }
 }
 
 function configuracionParaFormulario(tipo: TipoMetrica, config: ConfiguracionMetricaDto): ConfiguracionMetricaDto {
@@ -160,6 +140,9 @@ export function MetricaFormPage() {
   const [campoFechaWidget, setCampoFechaWidget] = useState('')
   const [campoSegmentacionWidget, setCampoSegmentacionWidget] = useState('')
   const [tipoVisualizacionElegida, setTipoVisualizacionElegida] = useState('')
+  // Desmarcado a propósito: crear una métrica y publicarla en un dashboard son
+  // dos decisiones distintas, y la segunda no debe ocurrir por omisión.
+  const [anadirADashboard, setAnadirADashboard] = useState(false)
   const [panelIdElegido, setPanelIdElegido] = useState('')
   const [anchoElegido, setAnchoElegido] = useState('3')
   const [erroresPlan, setErroresPlan] = useState<Record<string, string>>({})
@@ -195,7 +178,11 @@ export function MetricaFormPage() {
   // de configuracionBase), así que el paso "cómo quieres verlo" (agrupar/segmentar
   // a nivel de widget) no aplica — y tampoco lo admite el backend (ver
   // MetricaAnaliticaServiceImpl.validarTipoPermitido).
-  const admiteAgruparOSegmentar = form.tipoMetrica !== 'DISTRIBUCION'
+  // Ni un reparto ni una etiqueta se pueden poner en un eje: para ambos, el
+  // paso "cómo quieres verlo" no aplica (y el backend también los rechaza en
+  // serie temporal y comparativa).
+  const admiteAgruparOSegmentar =
+    form.tipoMetrica !== 'DISTRIBUCION' && form.tipoMetrica !== 'CATEGORIA_PRINCIPAL'
   const modoEfectivo: PlanResultado = admiteAgruparOSegmentar ? modoResultado : 'AGRUPADO'
   const opcionesVisualizacion = visualizacionesSegunPlan(modoEfectivo)
 
@@ -212,7 +199,7 @@ export function MetricaFormPage() {
   const cambiarTipo = (tipo: TipoMetrica) => {
     setForm((f) => ({ ...f, tipoMetrica: tipo, configuracion: configuracionBase(tipo) }))
     setResultadoPreview(null)
-    if (tipo === 'DISTRIBUCION') setModoResultado('UNICO')
+    if (tipo === 'DISTRIBUCION' || tipo === 'CATEGORIA_PRINCIPAL') setModoResultado('UNICO')
   }
 
   const validar = (): Record<string, string> => {
@@ -221,10 +208,14 @@ export function MetricaFormPage() {
     if (!form.nombre.trim()) errores.nombre = 'El nombre es obligatorio.'
 
     const config = form.configuracion
-    if ((form.tipoMetrica === 'PROMEDIO' || form.tipoMetrica === 'SUMA') && !config.campoValor) {
-      errores['configuracion.campoValor'] = 'Selecciona el campo de valor.'
+    const requiereAgrupacion = form.tipoMetrica === 'DISTRIBUCION' || form.tipoMetrica === 'CATEGORIA_PRINCIPAL'
+    const requiereValor =
+      form.tipoMetrica !== 'CONTEO' && form.tipoMetrica !== 'PORCENTAJE' && !requiereAgrupacion
+
+    if (requiereValor && !config.campoValor) {
+      errores['configuracion.campoValor'] = 'Selecciona el campo sobre el que se calcula.'
     }
-    if (form.tipoMetrica === 'DISTRIBUCION' && !config.campoAgrupacion) {
+    if (requiereAgrupacion && !config.campoAgrupacion) {
       errores['configuracion.campoAgrupacion'] = 'Selecciona el campo de agrupación.'
     }
 
@@ -279,7 +270,7 @@ export function MetricaFormPage() {
     if (!tipoVisualizacionElegida) {
       errores['plan.visualizacion'] = 'Selecciona cómo quieres verlo.'
     }
-    if ((data?.paneles.length ?? 0) > 0 && !panelIdElegido) {
+    if (anadirADashboard && !panelIdElegido) {
       errores['plan.panel'] = 'Selecciona en qué dashboard quieres añadirlo.'
     }
     return errores
@@ -290,17 +281,24 @@ export function MetricaFormPage() {
     const operadores = data?.catalogo.operadoresFiltro ?? []
     const config = form.configuracion
 
+    // El campo objetivo viaja en `campoValor` o en `campoAgrupacion` según lo
+    // que exija la operación. Se decide con los mismos criterios que
+    // `configuracionBase`, para que ampliar el motor no obligue a añadir aquí
+    // un caso más por cada operación nueva.
+    const usaAgrupacion = form.tipoMetrica === 'DISTRIBUCION' || form.tipoMetrica === 'CATEGORIA_PRINCIPAL'
+    const usaValor =
+      form.tipoMetrica !== 'CONTEO' && form.tipoMetrica !== 'PORCENTAJE' && !usaAgrupacion
+
     const configuracion: ConfiguracionMetricaDto =
       form.tipoMetrica === 'PORCENTAJE'
         ? {
+            filtros: filtrosParaPayload(config.filtros ?? [], campos, operadores),
             numerador: { filtros: filtrosParaPayload(config.numerador?.filtros ?? [], campos, operadores) },
             denominador: { filtros: filtrosParaPayload(config.denominador?.filtros ?? [], campos, operadores) },
           }
         : {
-            ...(form.tipoMetrica === 'PROMEDIO' || form.tipoMetrica === 'SUMA'
-              ? { campoValor: config.campoValor }
-              : {}),
-            ...(form.tipoMetrica === 'DISTRIBUCION' ? { campoAgrupacion: config.campoAgrupacion } : {}),
+            ...(usaValor ? { campoValor: config.campoValor } : {}),
+            ...(usaAgrupacion ? { campoAgrupacion: config.campoAgrupacion } : {}),
             filtros: filtrosParaPayload(config.filtros ?? [], campos, operadores),
           }
 
@@ -370,9 +368,9 @@ export function MetricaFormPage() {
     try {
       const metricaCreada = await crearMetrica(datasetId ?? '', construirPayload())
 
-      if (!panelIdElegido) {
-        // No hay ningún panel en el dataset todavía: la métrica queda creada,
-        // sin añadirla a ningún dashboard (no hay dónde).
+      if (!anadirADashboard || !panelIdElegido) {
+        // Comportamiento por defecto: la métrica queda en el catálogo y no se
+        // toca ningún panel.
         navigate(`/datasets/${datasetId}/metricas`)
         return
       }
@@ -662,14 +660,29 @@ export function MetricaFormPage() {
             )}
 
             {!esEdicion && (
-              <Card title="Paso 4 — Añadir al dashboard">
-                {data.paneles.length === 0 ? (
-                  <p className={styles.introPaso}>
-                    Este dataset todavía no tiene ningún dashboard. Se creará solo la métrica; podrás añadirla a un
-                    panel más adelante desde{' '}
-                    <Link to={`/datasets/${datasetId}/paneles`}>Paneles</Link>.
-                  </p>
-                ) : (
+              <Card title="Paso 4 — Guardar">
+                <p className={styles.introPaso}>
+                  La métrica se guarda en el catálogo del dataset. Añadirla a un dashboard es opcional: puedes
+                  hacerlo ahora o más tarde, desde «Configurar widgets» de cualquier panel.
+                </p>
+
+                <label className={styles.opcionDashboard}>
+                  <input
+                    type="checkbox"
+                    checked={anadirADashboard}
+                    onChange={(e) => setAnadirADashboard(e.target.checked)}
+                    disabled={data.paneles.length === 0}
+                  />
+                  Añadir también a un dashboard
+                  {data.paneles.length === 0 && (
+                    <span className={styles.ayudaEnLinea}>
+                      (este dataset todavía no tiene ninguno; créalo desde{' '}
+                      <Link to={`/datasets/${datasetId}/paneles`}>Paneles</Link>)
+                    </span>
+                  )}
+                </label>
+
+                {anadirADashboard && data.paneles.length > 0 && (
                   <div className={styles.formGrid}>
                     <FormField label="Dashboard" error={erroresPlan['plan.panel']}>
                       <select value={panelIdElegido} onChange={(e) => setPanelIdElegido(e.target.value)}>
@@ -692,13 +705,10 @@ export function MetricaFormPage() {
                     </FormField>
                   </div>
                 )}
+
                 <div className={styles.botones}>
                   <button type="button" className="btn btnPrimary" disabled={guardando} onClick={guardarYAnadir}>
-                    {guardando
-                      ? 'Guardando…'
-                      : data.paneles.length === 0
-                        ? 'Crear métrica'
-                        : 'Crear y añadir al dashboard'}
+                    {guardando ? 'Guardando…' : anadirADashboard ? 'Crear y añadir al dashboard' : 'Crear métrica'}
                   </button>
                 </div>
               </Card>

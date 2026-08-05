@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import type {
   MetricaClinicaResponseDto,
   PanelMetricaRequestDto,
@@ -21,16 +22,43 @@ interface WidgetFormProps {
   valorInicial: WidgetFormValores
   metricasDisponibles: MetricaClinicaResponseDto[]
   tipoVisualizaciones: TipoVisualizacionCatalogoDto[]
+  datasetId: string
   esEdicion: boolean
   onSubmit: (payload: PanelMetricaRequestDto) => void
   onCancelar: () => void
   guardando: boolean
 }
 
+/** Nombre en pantalla de cada operación. El enum crudo no le dice nada a nadie. */
+const NOMBRE_OPERACION: Record<string, string> = {
+  CONTEO: 'Conteo',
+  CONTEO_DISTINTO: 'Valores distintos',
+  PORCENTAJE: 'Porcentaje',
+  COMPLETITUD: 'Completitud',
+  PROMEDIO: 'Media',
+  MEDIANA: 'Mediana',
+  SUMA: 'Suma',
+  MINIMO: 'Mínimo',
+  MAXIMO: 'Máximo',
+  DISTRIBUCION: 'Distribución',
+  CATEGORIA_PRINCIPAL: 'Categoría más frecuente',
+}
+
+/** Forma del resultado, deducida de la operación. */
+function formaResultado(tipoMetrica: string): 'UNICO' | 'REPARTO' {
+  return tipoMetrica === 'DISTRIBUCION' ? 'REPARTO' : 'UNICO'
+}
+
+/** Sobre qué columna opera la métrica, si opera sobre alguna. */
+function campoOrigen(metrica: MetricaClinicaResponseDto): string | null {
+  return metrica.configuracion?.campoValor ?? metrica.configuracion?.campoAgrupacion ?? null
+}
+
 export function WidgetForm({
   valorInicial,
   metricasDisponibles,
   tipoVisualizaciones,
+  datasetId,
   esEdicion,
   onSubmit,
   onCancelar,
@@ -43,6 +71,35 @@ export function WidgetForm({
   const [orden, setOrden] = useState(valorInicial.orden)
   const [ancho, setAncho] = useState(valorInicial.ancho)
   const [errores, setErrores] = useState<Record<string, string>>({})
+
+  // --- Búsqueda y filtros del catálogo de métricas ---
+  // Un desplegable plano deja de servir en cuanto el dataset pasa de una docena
+  // de métricas, y el constructor de esta fase hace fácil llegar a decenas. Se
+  // filtra antes de elegir, no revisando la lista entera.
+  const [busqueda, setBusqueda] = useState('')
+  const [filtroForma, setFiltroForma] = useState('')
+  const [filtroCampo, setFiltroCampo] = useState('')
+
+  const camposOrigen = useMemo(() => {
+    const codigos = new Set<string>()
+    for (const m of metricasDisponibles) {
+      const campo = campoOrigen(m)
+      if (campo) codigos.add(campo)
+    }
+    return [...codigos].sort()
+  }, [metricasDisponibles])
+
+  const metricasFiltradas = useMemo(() => {
+    const texto = busqueda.trim().toLowerCase()
+    return metricasDisponibles.filter((m) => {
+      if (texto && !m.nombre.toLowerCase().includes(texto) && !m.codigo.toLowerCase().includes(texto)) {
+        return false
+      }
+      if (filtroForma && formaResultado(m.tipoMetrica) !== filtroForma) return false
+      if (filtroCampo && campoOrigen(m) !== filtroCampo) return false
+      return true
+    })
+  }, [metricasDisponibles, busqueda, filtroForma, filtroCampo])
 
   const enviar = () => {
     const nuevosErrores: Record<string, string> = {}
@@ -65,19 +122,58 @@ export function WidgetForm({
 
   return (
     <div className={styles.form}>
+      {!esEdicion && (
+        <div className={styles.buscador}>
+          <FormField label="Buscar métrica">
+            <input
+              type="search"
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Por nombre o código…"
+            />
+          </FormField>
+          <FormField label="Tipo de resultado">
+            <select value={filtroForma} onChange={(e) => setFiltroForma(e.target.value)}>
+              <option value="">Todos</option>
+              <option value="UNICO">Valor único</option>
+              <option value="REPARTO">Reparto por categorías</option>
+            </select>
+          </FormField>
+          <FormField label="Campo de origen">
+            <select value={filtroCampo} onChange={(e) => setFiltroCampo(e.target.value)}>
+              <option value="">Todos</option>
+              {camposOrigen.map((codigo) => (
+                <option key={codigo} value={codigo}>
+                  {codigo}
+                </option>
+              ))}
+            </select>
+          </FormField>
+        </div>
+      )}
+
       <div className={styles.grid}>
         <FormField
           label="Métrica"
-          help="Selecciona la métrica que alimentará este widget."
+          help={
+            esEdicion
+              ? 'La métrica de un widget no se cambia: quita el widget y añade otro.'
+              : `Mostrando ${metricasFiltradas.length} de ${metricasDisponibles.length} métricas del dataset.`
+          }
           error={errores.metricaId}
         >
           <select value={metricaId} disabled={esEdicion} onChange={(e) => setMetricaId(e.target.value)}>
             <option value="">— seleccionar métrica —</option>
-            {metricasDisponibles.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.nombre} ({m.tipoMetrica})
-              </option>
-            ))}
+            {metricasFiltradas.map((m) => {
+              const campo = campoOrigen(m)
+              return (
+                <option key={m.id} value={m.id}>
+                  {m.nombre} — {NOMBRE_OPERACION[m.tipoMetrica] ?? m.tipoMetrica}
+                  {campo ? ` · ${campo}` : ''}
+                  {formaResultado(m.tipoMetrica) === 'REPARTO' ? ' · reparto' : ''}
+                </option>
+              )
+            })}
           </select>
         </FormField>
         <FormField
@@ -111,6 +207,14 @@ export function WidgetForm({
           </select>
         </FormField>
       </div>
+
+      {!esEdicion && (
+        <p className={styles.ayudaCrear}>
+          ¿No encuentras la métrica?{' '}
+          <Link to={`/datasets/${datasetId}/metricas/nueva/desde-columna`}>Crear una nueva desde una columna.</Link>
+        </p>
+      )}
+
       <div className={styles.botones}>
         <button type="button" className="btn btnPrimary" disabled={guardando} onClick={enviar}>
           {esEdicion ? 'Guardar cambios' : 'Añadir widget'}

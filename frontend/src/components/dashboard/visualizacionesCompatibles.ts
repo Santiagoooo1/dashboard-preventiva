@@ -42,11 +42,18 @@ export function visualizacionesCompatibles(widget: DashboardWidgetDto): OpcionVi
   if (widget.estado === 'ERROR') return []
 
   const itemsDistribucion = widget.tipoResultado === 'ACTUAL' ? (widget.resultadoActual?.items ?? null) : null
+
+  // Un escalar puede llegar de tres formas y las tres se pintan igual (KPI):
+  // un número; un texto (fecha de MINIMO/MAXIMO, etiqueta de
+  // CATEGORIA_PRINCIPAL); o sin valor por falta de base evaluable — que sigue
+  // siendo un resultado escalar, solo que el KPI lo explica en vez de dibujarlo.
+  const actual = widget.tipoResultado === 'ACTUAL' ? widget.resultadoActual : null
   const valorUnico =
-    widget.tipoResultado === 'ACTUAL' &&
-    widget.resultadoActual?.valor !== null &&
-    widget.resultadoActual?.valor !== undefined &&
-    !itemsDistribucion
+    !!actual &&
+    !itemsDistribucion &&
+    ((actual.valor !== null && actual.valor !== undefined) ||
+      !!actual.valorTexto ||
+      actual.estado === 'SIN_BASE_EVALUABLE')
   const itemsComparativa = widget.tipoResultado === 'COMPARATIVA' ? (widget.comparativa?.items ?? null) : null
   const esSerie = widget.tipoResultado === 'SERIE_TEMPORAL' && widget.serieTemporal != null
 
@@ -130,7 +137,32 @@ export type PlanResultado = 'UNICO' | 'AGRUPADO' | 'SERIE'
  * (sin donut para "agrupado": ver el porqué en ese comentario).
  */
 export function visualizacionesSegunPlan(plan: PlanResultado): OpcionVisualizacion[] {
+  // 'UNICO' ofrece solo KPI, igual que `visualizacionesCompatibles`: para un
+  // escalar, "Tabla" renderiza el mismo <KpiWidget>. Eran dos etiquetas para
+  // una única representación.
   const valores: TipoVisualizacionOfrecido[] =
-    plan === 'UNICO' ? ['KPI', 'TABLA'] : plan === 'AGRUPADO' ? ['BARRAS', 'TABLA'] : ['LINEAS', 'BARRAS', 'TABLA']
+    plan === 'UNICO' ? ['KPI'] : plan === 'AGRUPADO' ? ['BARRAS', 'TABLA'] : ['LINEAS', 'BARRAS', 'TABLA']
+  return valores.map((valor) => ({ valor, etiqueta: ETIQUETA_VISUALIZACION_OFRECIDA[valor] }))
+}
+
+/**
+ * Visualizaciones para una distribución que todavía no se ha calculado (se está
+ * creando la métrica). A diferencia de `visualizacionesSegunPlan('AGRUPADO')`,
+ * aquí sí se conoce cuántas categorías habrá —lo dice el perfil del campo—, así
+ * que el donut puede ofrecerse cuando es legible.
+ *
+ * `topN` acota el número real de porciones: una columna de 40 valores recortada
+ * a las 5 más frecuentes son 6 porciones ("Otros" incluido), perfectamente
+ * representables.
+ */
+export function visualizacionesDeDistribucion(
+  valoresDistintos: number,
+  topN: number | null,
+  maxCategoriasDonut: number,
+): OpcionVisualizacion[] {
+  const categoriasEfectivas = topN != null && topN > 0 ? topN + 1 : valoresDistintos
+  const valores: TipoVisualizacionOfrecido[] = ['BARRAS']
+  if (categoriasEfectivas <= maxCategoriasDonut) valores.push('DONUT')
+  valores.push('TABLA')
   return valores.map((valor) => ({ valor, etiqueta: ETIQUETA_VISUALIZACION_OFRECIDA[valor] }))
 }

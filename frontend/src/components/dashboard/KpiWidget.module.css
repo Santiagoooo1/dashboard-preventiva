@@ -60,3 +60,29 @@
   color: var(--color-text-muted);
   white-space: nowrap;
 }
+
+/* Estado sin base evaluable: se distingue del valor real por tamaño y color.
+   Deliberadamente NO usa el rojo de error: no es un fallo, es una respuesta
+   legítima ("no hay casos que evaluar"). */
+.valorSinBase {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-texto-suave, #64748b);
+}
+
+/* Un valor textual (una fecha, el nombre de una categoría) no puede usar el
+   tamaño de un número: desbordaría la tarjeta. */
+.valorTexto {
+  font-size: 0.62em;
+  overflow-wrap: anywhere;
+}
+
+.detalleEtiquetas {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--color-texto-suave, #64748b);
+}

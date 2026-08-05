@@ -6,6 +6,7 @@ import type {
   MetadataMetricasResponseDto,
   MetricaClinicaRequestDto,
   MetricaClinicaResponseDto,
+  PerfilCamposResponseDto,
   PreviewMetricaRequestDto,
   ResultadoMetricaResponseDto,
   SerieTemporalRequestDto,
@@ -28,6 +29,20 @@ export function obtenerMetadataMetricas(
   signal?: AbortSignal,
 ): Promise<MetadataMetricasResponseDto> {
   return apiGet<MetadataMetricasResponseDto>(`/datasets-clinicos/${datasetId}/metadata-metricas`, signal)
+}
+
+/**
+ * Perfil analítico de las columnas del dataset: qué contiene cada una y qué
+ * operaciones admite. Es lo que alimenta al constructor «desde columna».
+ *
+ * Devuelve un resumen (conteos, cardinalidad, unos pocos valores de ejemplo),
+ * nunca el contenido íntegro de las columnas.
+ */
+export function obtenerPerfilCampos(
+  datasetId: string | number,
+  signal?: AbortSignal,
+): Promise<PerfilCamposResponseDto> {
+  return apiGet<PerfilCamposResponseDto>(`/datasets-clinicos/${datasetId}/campos-perfil`, signal)
 }
 
 export function crearMetrica(

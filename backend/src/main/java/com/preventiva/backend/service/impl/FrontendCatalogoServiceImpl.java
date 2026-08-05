@@ -16,6 +16,7 @@ import com.preventiva.backend.enums.TipoMetrica;
 import com.preventiva.backend.enums.TipoResultadoWidget;
 import com.preventiva.backend.enums.TipoVisualizacion;
 import com.preventiva.backend.service.interfaces.FrontendCatalogoService;
+import com.preventiva.backend.util.OperacionMetricaUtil;
 import com.preventiva.backend.util.OperadorFiltroCompatibilidadUtil;
 
 import org.springframework.stereotype.Service;
@@ -60,7 +61,10 @@ public class FrontendCatalogoServiceImpl implements FrontendCatalogoService {
                 TipoMetricaCatalogoDto.builder()
                         .codigo(TipoMetrica.PORCENTAJE.name())
                         .nombre("Porcentaje")
-                        .descripcion("Calcula numerador/denominador, cada uno con sus propios filtros.")
+                        .descripcion("Calcula numerador/denominador, cada uno con sus propios filtros."
+                                + " Los filtros base acotan la población de ambos: eso es un porcentaje"
+                                + " condicional (por ejemplo, adecuación solo entre los casos con profilaxis"
+                                + " indicada).")
                         .requiereCampoValor(false)
                         .requiereCampoAgrupacion(false)
                         .permiteFiltros(true)
@@ -119,7 +123,58 @@ public class FrontendCatalogoServiceImpl implements FrontendCatalogoService {
                                 .camposOpcionales(List.of())
                                 .build())
                         .ejemploConfiguracion(Map.of("campoAgrupacion", "<campo_agrupable>"))
-                        .build());
+                        .build(),
+                generica(TipoMetrica.CONTEO_DISTINTO, "Valores distintos",
+                        "Cuenta cuántos valores distintos y no vacíos tiene un campo. Es la operación correcta"
+                                + " para contar pacientes únicos.",
+                        "campoValor"),
+                generica(TipoMetrica.COMPLETITUD, "Completitud",
+                        "Porcentaje de registros con el campo informado sobre el total evaluado."
+                                + " Sirve para medir calidad del registro.",
+                        "campoValor"),
+                generica(TipoMetrica.MEDIANA, "Mediana",
+                        "Valor central de un campo numérico. A diferencia de la media, no la desplazan"
+                                + " unos pocos valores extremos.",
+                        "campoValor"),
+                generica(TipoMetrica.MINIMO, "Mínimo / primera fecha",
+                        "El valor más bajo de un campo numérico, o la fecha más antigua de un campo de fecha.",
+                        "campoValor"),
+                generica(TipoMetrica.MAXIMO, "Máximo / última fecha",
+                        "El valor más alto de un campo numérico, o la fecha más reciente de un campo de fecha.",
+                        "campoValor"),
+                generica(TipoMetrica.CATEGORIA_PRINCIPAL, "Categoría más frecuente",
+                        "El valor más repetido de un campo y qué porcentaje representa sobre los registros"
+                                + " con dato.",
+                        "campoAgrupacion"));
+    }
+
+    /**
+     * Entrada de catálogo para las operaciones de la Fase 6.9I.2: todas operan
+     * sobre un único campo, así que su estructura es siempre la misma y no
+     * merece repetir el builder seis veces.
+     */
+    private TipoMetricaCatalogoDto generica(
+            TipoMetrica tipo, String nombre, String descripcion, String campoRequerido) {
+        boolean esAgrupacion = "campoAgrupacion".equals(campoRequerido);
+        // Solo se ofrecen serie y comparativa donde el resultado es un número
+        // que se pueda poner en un eje (ver OperacionMetricaUtil).
+        boolean numerico = OperacionMetricaUtil.produceValorNumerico(tipo, null);
+
+        return TipoMetricaCatalogoDto.builder()
+                .codigo(tipo.name())
+                .nombre(nombre)
+                .descripcion(descripcion)
+                .requiereCampoValor(!esAgrupacion)
+                .requiereCampoAgrupacion(esAgrupacion)
+                .permiteFiltros(true)
+                .permiteSerieTemporal(numerico)
+                .permiteComparativa(numerico)
+                .estructuraConfiguracion(EstructuraConfiguracionMetricaDto.builder()
+                        .camposRequeridos(List.of(campoRequerido))
+                        .camposOpcionales(List.of("filtros", "tratamientoNulos"))
+                        .build())
+                .ejemploConfiguracion(Map.of(campoRequerido, "<campo>", "filtros", List.of()))
+                .build();
     }
 
     private List<OperadorFiltroCatalogoDto> construirOperadoresFiltro() {

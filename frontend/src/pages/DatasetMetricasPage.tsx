@@ -53,9 +53,14 @@ export function DatasetMetricasPage() {
             />
             <div className={styles.cabecera}>
               <h1>Métricas de {data.dataset.nombre}</h1>
-              <Link className="btn btnPrimary" to={`/datasets/${datasetId}/metricas/nueva`}>
-                + Nueva métrica
-              </Link>
+              <div className={styles.botonesCabecera}>
+                <Link className="btn btnPrimary" to={`/datasets/${datasetId}/metricas/nueva/desde-columna`}>
+                  + Crear métrica desde columna
+                </Link>
+                <Link className="btn btnSecondary" to={`/datasets/${datasetId}/metricas/nueva`}>
+                  Otras formas de crear
+                </Link>
+              </div>
             </div>
 
             <ErrorBanner mensaje={errorAccion} />
@@ -65,8 +70,8 @@ export function DatasetMetricasPage() {
                 <p className="stateEmpty">
                   No hay métricas configuradas en este dataset. Crea la primera para empezar a medir.
                 </p>
-                <Link className="btn btnPrimary" to={`/datasets/${datasetId}/metricas/nueva`}>
-                  Nueva métrica
+                <Link className="btn btnPrimary" to={`/datasets/${datasetId}/metricas/nueva/desde-columna`}>
+                  Crear métrica desde columna
                 </Link>
                 <p className={styles.opcionAutomatica}>
                   También puedes generar métricas iniciales automáticamente a partir de los campos importados.

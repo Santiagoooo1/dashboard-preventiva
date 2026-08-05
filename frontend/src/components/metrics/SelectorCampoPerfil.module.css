@@ -1,0 +1,147 @@
+.selector {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.busqueda {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 26rem;
+}
+
+.busquedaEtiqueta {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: 0.85rem;
+}
+
+.vacio {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: var(--spacing-sm);
+  /* Con decenas de columnas la lista crece mucho: se acota y se desplaza
+     dentro de sí misma en vez de empujar los pasos siguientes fuera de vista. */
+  max-height: 26rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.campo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  height: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.campo:hover {
+  border-color: var(--color-primary);
+}
+
+/* El foco del radio debe verse en la tarjeta entera, no solo en el círculo. */
+.campo:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.campoActivo {
+  border-color: var(--color-primary);
+  background: var(--color-primary-soft);
+}
+
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.cabecera {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.etiqueta {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.rol {
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-neutral-soft);
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.codigo {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.cifras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.7rem;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.cifraAviso {
+  color: var(--color-danger);
+}
+
+.cardinalidad,
+.rango {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.ejemplos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem;
+  margin-top: 0.15rem;
+}
+
+.ejemplo {
+  padding: 0.05rem 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  /* Un valor largo no debe estirar la tarjeta ni desbordar la cuadrícula. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avisoSinDatos {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: var(--color-danger);
+}
