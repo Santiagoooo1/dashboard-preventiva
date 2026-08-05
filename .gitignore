@@ -38,3 +38,6 @@ logs/
 
 ### Docker ###
 docker-compose.override.yml
+
+# Volcados de base de datos: nunca se versionan (pueden contener datos clínicos)
+backups/
