@@ -146,5 +146,37 @@ export function formatearEtiquetaCategoria(
   const v = etiqueta.trim().toLowerCase()
   if (v === 'true') return 'Sí'
   if (v === 'false') return 'No'
-  return etiqueta
+  return humanizarCodigo(etiqueta)
+}
+
+/**
+ * `INCISIONAL_PROFUNDA` → `Incisional profunda`.
+ *
+ * Los códigos en mayúsculas con guiones bajos vienen tal cual del Excel del
+ * hospital y son el valor técnico real: se siguen guardando, filtrando y
+ * enviando así. Esto es SOLO presentación — una leyenda que dice
+ * «ORGANO_ESPACIO» se lee como un volcado de base de datos, no como una
+ * localización quirúrgica.
+ *
+ * Deliberadamente conservador: solo actúa sobre códigos que son inequívocamente
+ * técnicos (mayúsculas y guiones bajos). Un texto normal, una sigla suelta
+ * («ASA», «CIE10») o un valor ya legible se devuelven intactos, porque
+ * «arreglarlos» estropearía mayúsculas clínicas que sí significan algo.
+ */
+export function humanizarCodigo(valor: string): string {
+  const texto = valor.trim()
+
+  // Sin guion bajo no hay nada que separar; y sin minúsculas ausentes tampoco
+  // sabemos que sea un código (podría ser una sigla legítima).
+  if (!texto.includes('_')) return valor
+  if (texto !== texto.toUpperCase()) return valor
+  if (!/^[A-ZÁÉÍÓÚÜÑ0-9_]+$/.test(texto)) return valor
+
+  const palabras = texto.split('_').filter((p) => p !== '')
+  if (palabras.length === 0) return valor
+
+  // La barra en ORGANO_ESPACIO / ÓRGANO-ESPACIO no se puede deducir del código;
+  // se deja el espacio, que se lee bien igualmente.
+  const frase = palabras.join(' ').toLowerCase()
+  return frase.charAt(0).toUpperCase() + frase.slice(1)
 }

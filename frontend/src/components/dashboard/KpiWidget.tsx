@@ -54,20 +54,27 @@ export function KpiWidget({ resultado, descripcion, compacto }: KpiWidgetProps) 
       {descripcion && <p className={styles.sub}>{descripcion}</p>}
       {tieneTotales && (
         <div className={styles.detalle}>
-          {proporcion !== null && (
-            <span className={styles.barra}>
-              <span className={styles.barraRelleno} style={{ width: `${Math.min(100, proporcion * 100)}%` }} />
+          <div className={styles.detalleFila}>
+            {proporcion !== null && (
+              <span className={styles.barra}>
+                <span className={styles.barraRelleno} style={{ width: `${Math.min(100, proporcion * 100)}%` }} />
+              </span>
+            )}
+            {/* Numerador y denominador SIEMPRE visibles: un porcentaje clínico
+                del que no se sabe sobre cuántos casos se calcula no es
+                interpretable. */}
+            <span className={styles.detalleTexto}>
+              {resultado.totalNumerador} de {resultado.totalDenominador}
             </span>
-          )}
-          {/* Numerador y denominador SIEMPRE visibles: un porcentaje clínico del
-              que no se sabe sobre cuántos casos se calcula no es interpretable. */}
-          <span className={styles.detalleTexto}>
-            {resultado.totalNumerador} de {resultado.totalDenominador}
-          </span>
+          </div>
           {(resultado.etiquetaNumerador || resultado.etiquetaDenominador) && (
-            <span className={styles.detalleEtiquetas}>
-              {resultado.etiquetaNumerador ?? 'Numerador'} sobre {resultado.etiquetaDenominador ?? 'denominador'}
-            </span>
+            // En su propia línea, no apretado al lado de la cifra: es lo que
+            // convierte "24 de 269" en un dato clínico interpretable.
+            <p className={styles.detalleEtiquetas}>
+              {resultado.etiquetaNumerador ?? 'Numerador'}
+              <span className={styles.detalleSeparador}> / </span>
+              {resultado.etiquetaDenominador ?? 'denominador'}
+            </p>
           )}
         </div>
       )}

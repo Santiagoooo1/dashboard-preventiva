@@ -55,3 +55,61 @@
   font-size: 0.85rem;
   color: var(--color-text-muted);
 }
+
+/* La forma del resultado ("cómo se calcula") es una decisión distinta de la
+   presentación: se separa visualmente en vez de mezclar los dos grupos de
+   controles en la misma rejilla. */
+.seccionResultado {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.seccionTitulo {
+  margin: 0 0 var(--spacing-sm);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+/* Explicación de por qué una opción no está disponible. Neutro, no de error:
+   que una distribución no se pueda agrupar no es un fallo del usuario. */
+.notaBloqueada {
+  margin: 0;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  background: var(--color-neutral-soft);
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+  max-width: 75ch;
+}
+
+/* Aviso de que el tamaño se ha ampliado solo. Informativo: el cambio ya está
+   hecho y es reversible en el propio formulario. */
+.avisoAncho {
+  margin: var(--spacing-sm) 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+}
+
+/* Ajustes finos, plegados: la pantalla habitual son tres decisiones. */
+.personalizar {
+  margin-top: var(--spacing-sm);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.personalizarResumen {
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.personalizar[open] .personalizarResumen {
+  margin-bottom: var(--spacing-sm);
+}

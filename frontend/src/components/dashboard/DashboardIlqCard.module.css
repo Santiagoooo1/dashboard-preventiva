@@ -1,0 +1,71 @@
+/* Compatible: se ofrece una acción, así que lleva el acento primario. */
+.tarjetaCompatible {
+  border-left: 4px solid var(--color-primary);
+}
+
+.tarjetaListo {
+  border-left: 4px solid var(--color-primary);
+}
+
+/* No compatible: informativo y neutro. NO es un error — que un dataset no sea
+   de vigilancia de ILQ es perfectamente normal. */
+.tarjetaNoAplica {
+  border-left: 4px solid var(--color-border);
+}
+
+.mensaje {
+  margin: 0 0 var(--spacing-sm);
+  max-width: 75ch;
+  line-height: 1.5;
+}
+
+.nota {
+  margin: 0 0 var(--spacing-sm);
+  max-width: 75ch;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.detalle {
+  font-size: 0.9rem;
+}
+
+.detalle summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.listas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+}
+
+.listaTitulo {
+  margin: 0 0 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.lista {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.listaAusentes {
+  color: var(--color-danger);
+}

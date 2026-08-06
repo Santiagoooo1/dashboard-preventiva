@@ -26,15 +26,23 @@
 
 .sub {
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: 0.88rem;
+  line-height: 1.35;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .detalle {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.detalleFila {
+  display: flex;
   align-items: center;
   gap: var(--spacing-sm);
-  margin-top: 2px;
 }
 
 .barra {
@@ -56,8 +64,12 @@
 }
 
 .detalleTexto {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
+  /* "24 de 269" es tan importante como el propio porcentaje: sin él, un 8,92 %
+     no dice si son 24 casos de 269 o 2 de 22. Sube de 0.8 a 0.95rem y toma el
+     color del texto normal, no el atenuado. */
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
   white-space: nowrap;
 }
 

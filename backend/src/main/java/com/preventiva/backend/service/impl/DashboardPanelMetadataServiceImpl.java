@@ -1,5 +1,6 @@
 package com.preventiva.backend.service.impl;
 
+import com.preventiva.backend.dto.ConfiguracionMetricaDto;
 import com.preventiva.backend.dto.ConfiguracionWidgetDto;
 import com.preventiva.backend.dto.DashboardPanelMetadataResponseDto;
 import com.preventiva.backend.dto.DatasetClinicoResponseDto;
@@ -9,6 +10,7 @@ import com.preventiva.backend.entity.CampoClinico;
 import com.preventiva.backend.entity.DatasetClinico;
 import com.preventiva.backend.entity.PanelClinico;
 import com.preventiva.backend.entity.PanelMetrica;
+import com.preventiva.backend.enums.TipoDatoExcel;
 import com.preventiva.backend.enums.TipoMetrica;
 import com.preventiva.backend.enums.TipoResultadoWidget;
 import com.preventiva.backend.enums.TipoVisualizacion;
@@ -17,6 +19,7 @@ import com.preventiva.backend.repository.PanelClinicoRepository;
 import com.preventiva.backend.repository.PanelMetricaRepository;
 import com.preventiva.backend.service.interfaces.DashboardPanelMetadataService;
 import com.preventiva.backend.util.CampoRolesUtil;
+import com.preventiva.backend.util.OperacionMetricaUtil;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -67,7 +70,6 @@ public class DashboardPanelMetadataServiceImpl implements DashboardPanelMetadata
 
     private WidgetMetadataDto mapWidget(PanelMetrica pm) {
         TipoResultadoWidget tipoResultadoActual = resolverTipoResultado(pm);
-        boolean esDistribucion = pm.getMetrica().getTipoMetrica() == TipoMetrica.DISTRIBUCION;
 
         String titulo = pm.getTituloPersonalizado() != null ? pm.getTituloPersonalizado() : pm.getMetrica().getNombre();
 
@@ -81,9 +83,41 @@ public class DashboardPanelMetadataServiceImpl implements DashboardPanelMetadata
                 .tipoResultadoWidgetConfigurado(
                         pm.getTipoResultadoWidget() != null ? pm.getTipoResultadoWidget().name() : null)
                 .tipoResultadoActual(tipoResultadoActual.name())
-                .tipoResultadosPermitidos(esDistribucion ? TIPOS_RESULTADO_SOLO_ACTUAL : TIPOS_RESULTADO_COMPLETOS)
+                .tipoResultadosPermitidos(tipoResultadosPermitidos(pm))
                 .configuracionWidgetActual(pm.getConfiguracionWidget())
                 .build();
+    }
+
+    /**
+     * Qué formas de resultado admite ESTE widget.
+     *
+     * <p>Antes solo se excluía DISTRIBUCION. Desde la Fase 6.9I.2 hay más
+     * operaciones cuyo resultado no es un número que se pueda poner en un eje
+     * —la categoría más frecuente devuelve una etiqueta, y un mínimo o máximo
+     * sobre una fecha devuelve una fecha—, y ofrecerles «agrupar» dejaba un
+     * botón activo que abría un formulario sin ninguna opción útil.
+     *
+     * <p>El criterio es el mismo que usa el motor para rechazarlas
+     * ({@link OperacionMetricaUtil#produceValorNumerico}), de modo que lo que
+     * se ofrece aquí y lo que el backend acepta no puedan divergir.
+     */
+    private List<String> tipoResultadosPermitidos(PanelMetrica pm) {
+        ConfiguracionMetricaDto config = pm.getMetrica().getConfiguracion();
+        String codigoCampoValor = config != null ? config.getCampoValor() : null;
+
+        TipoDatoExcel tipoDatoCampoValor = null;
+        if (codigoCampoValor != null) {
+            tipoDatoCampoValor = campoClinicoRepository
+                    .findByDatasetIdAndActivoTrue(pm.getMetrica().getDataset().getId()).stream()
+                    .filter(c -> c.getCodigo().equals(codigoCampoValor))
+                    .map(CampoClinico::getTipoDato)
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        return OperacionMetricaUtil.produceValorNumerico(pm.getMetrica().getTipoMetrica(), tipoDatoCampoValor)
+                ? TIPOS_RESULTADO_COMPLETOS
+                : TIPOS_RESULTADO_SOLO_ACTUAL;
     }
 
     private TipoResultadoWidget resolverTipoResultado(PanelMetrica pm) {

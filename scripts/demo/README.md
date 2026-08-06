@@ -128,7 +128,51 @@ docker exec -i preventiva_postgres psql -U preventiva_user -d preventiva_db -v C
 
 Además comprueba que la base sea `preventiva_db` y aborta en cualquier otra.
 
-## 5. Restaurar el backup
+## 5. Dashboard clínico MVP (Fase 6.9I.3-MVP)
+
+Desde la aplicación: abre el dataset y pulsa **«Crear dashboard ILQ, profilaxis
+y Drago»**. Ese botón usa el mismo servicio que valida los campos, aplica la
+plantilla y es idempotente.
+
+Este script hace exactamente lo mismo sin necesidad de arrancar la aplicación,
+para preparar una demo de un tirón:
+
+```cmd
+docker exec -i preventiva_postgres psql -U preventiva_user -d preventiva_db -v ON_ERROR_STOP=1 < scripts\demo\seed-dashboard-mvp-ilq.sql
+docker exec -i preventiva_postgres psql -U preventiva_user -d preventiva_db < scripts\demo\verify-dashboard-mvp-ilq.sql
+```
+
+Crea el panel `mvp_ilq_profilaxis_drago` con **14 métricas y 14 widgets**
+(8 KPI + 6 gráficos):
+
+| | Indicador |
+|---|---|
+| KPI | Intervenciones · Pacientes únicos · Casos de ILQ · Tasa de ILQ |
+| KPI | Profilaxis adecuada · Profilaxis inadecuadas · Prescripción en Drago · Registro de Drago completado |
+| Gráficos | Evolución mensual de la tasa · Localización de las ILQ · Adecuación · Motivos de inadecuación · Estado de Drago · ILQ por procedimiento |
+
+**Solo toca elementos cuyo código empieza por `mvp_ilq_`**, dentro del dataset
+sintético. No modifica otros datasets, ni sus paneles, ni los registros
+clínicos, ni el esquema.
+
+Es **idempotente**: actualiza lo que existe y crea lo que falta, resolviendo
+todo por código estable. Ejecutarlo dos veces deja el mismo panel con los mismos
+ids, así que el enlace al dashboard sigue siendo válido.
+
+La definición de las 14 métricas vive en `PlantillaDashboardIlq.java`, que es lo
+que aplica la aplicación. Este script la reproduce en SQL para el uso sin
+arranque; `verify-dashboard-mvp-ilq.sql` valida el resultado de **cualquiera de
+los dos caminos** por igual, recalculando las cifras desde los datos.
+
+La verificación devuelve **47 comprobaciones** con `OK`/`ERROR`: estructura del
+panel, las cifras de los ocho KPI con sus numeradores y denominadores, las
+distribuciones, la configuración que hace que esas cifras salgan bien, y el
+aislamiento respecto a los demás datasets.
+
+Ninguna cifra clínica está escrita en la aplicación: todas se calculan a partir
+de los datos, y el script las recalcula por su cuenta para compararlas.
+
+## 6. Restaurar el backup
 
 ```cmd
 docker exec -i preventiva_postgres psql -U preventiva_user -d preventiva_db < backups\preventiva_antes_de_demo.sql

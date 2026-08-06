@@ -1,0 +1,88 @@
+/* Tarjeta de éxito: se distingue del resto del formulario por el borde de
+   acento, sin gritar como un banner de error. */
+.tarjetaExito {
+  border-left: 4px solid var(--color-primary);
+}
+
+.mensajeExito {
+  margin: 0 0 var(--spacing-sm);
+}
+
+.resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--spacing-sm);
+  margin: 0 0 var(--spacing-md);
+}
+
+.resumen dt {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.resumen dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.pregunta {
+  margin: 0 0 var(--spacing-sm);
+  font-weight: 600;
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--spacing-sm);
+}
+
+.anchoCompleto {
+  grid-column: 1 / -1;
+}
+
+/* Aviso de duplicado: informativo, no de error — añadir la misma métrica a dos
+   paneles (o dos veces con distinta visualización) es legítimo. */
+.aviso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-neutral);
+  border-radius: var(--radius-sm);
+  background: var(--color-neutral-soft);
+}
+
+.aviso p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.valorFijo {
+  margin: 0;
+  padding: 0.35rem 0;
+  font-weight: 600;
+}
+
+.notaCancelar {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}

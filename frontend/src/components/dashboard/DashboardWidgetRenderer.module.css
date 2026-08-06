@@ -251,3 +251,12 @@
 .widget {
   align-self: stretch;
 }
+
+/* Título y menú en la misma línea: el menú a la derecha, sin empujar el título
+   ni robarle espacio cuando es largo. */
+.cardTituloFila {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+}

@@ -23,6 +23,7 @@ import { ErrorBanner } from '../components/ErrorBanner'
 import { FileDropzone } from '../components/importacion/FileDropzone'
 import { ImportValidationSummary } from '../components/importacion/ImportValidationSummary'
 import { ImportErrorsTable } from '../components/importacion/ImportErrorsTable'
+import { DashboardIlqCard } from '../components/dashboard/DashboardIlqCard'
 import styles from './DatasetImportPage.module.css'
 
 type Paso = 'inicial' | 'columnas' | 'filas' | 'importado'
@@ -339,6 +340,16 @@ export function DatasetImportPage() {
                     {erroresImportacion && (
                       <div style={{ marginTop: 'var(--spacing-md)' }}>
                         <ImportErrorsTable errores={erroresImportacion} />
+                      </div>
+                    )}
+
+                    {/* Si las columnas importadas encajan con la vigilancia de
+                        ILQ, se ofrece el dashboard clínico. Solo se ofrece: no
+                        se aplican reglas clínicas sin que el usuario lo pida, y
+                        en un dataset que no encaje esta tarjeta ni aparece. */}
+                    {resultado.filasImportadas > 0 && (
+                      <div style={{ marginTop: 'var(--spacing-md)' }}>
+                        <DashboardIlqCard datasetId={datasetId ?? ''} soloSiCompatible />
                       </div>
                     )}
 

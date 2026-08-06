@@ -78,3 +78,38 @@
     gap: var(--spacing-md);
   }
 }
+
+/* Barra de gestión de widgets: encima de la rejilla, que es donde el usuario
+   está mirando cuando le surge la necesidad de añadir uno. */
+.barraWidgets {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.barraTitulo {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.barraAcciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.mensajeWidgets {
+  margin: 0;
+  padding: var(--spacing-sm);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  font-size: 0.9rem;
+}

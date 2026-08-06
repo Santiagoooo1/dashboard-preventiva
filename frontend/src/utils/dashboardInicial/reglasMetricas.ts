@@ -1,7 +1,13 @@
 import type { CampoMetricaMetadataDto, ConfiguracionMetricaDto, TipoMetrica, TipoVisualizacion } from '../../api/types'
 import { normalizarTexto } from '../importacionGuiada/sugerenciasColumnas'
 
-export const MAX_WIDGETS_DASHBOARD_INICIAL = 12
+/**
+ * Tope del dashboard inicial. Sube de 12 a 14 en la Fase 6.9I.4 para dejar
+ * sitio a "Pacientes únicos" y a la completitud sin desplazar las
+ * distribuciones que ya se generaban. Sigue siendo un dashboard curado: NO se
+ * crea un widget por columna.
+ */
+export const MAX_WIDGETS_DASHBOARD_INICIAL = 14
 
 export interface PropuestaWidget {
   tipoVisualizacion: TipoVisualizacion
@@ -136,7 +142,23 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
     widget: { tipoVisualizacion: 'KPI', ancho: 3 },
   })
 
-  // 2. Edad media, si existe.
+  // 2. Pacientes únicos, si el dataset identifica al individuo.
+  //
+  // Sin esta métrica el dashboard cuenta registros y los llama pacientes, que
+  // es el error de lectura más caro en vigilancia: un paciente reintervenido
+  // aparece dos veces. Es posible desde que existe CONTEO_DISTINTO (6.9I.2).
+  const campoPaciente = buscarCampo(campos, 'pacienteCodigo')
+  if (campoPaciente) {
+    propuestas.push({
+      codigo: 'pacientes_unicos',
+      nombre: 'Pacientes únicos',
+      tipoMetrica: 'CONTEO_DISTINTO',
+      configuracion: { campoValor: 'pacienteCodigo', filtros: [] },
+      widget: { tipoVisualizacion: 'KPI', ancho: 3 },
+    })
+  }
+
+  // 3. Edad media, si existe.
   const campoEdad = buscarCampo(campos, 'edad')
   if (campoEdad?.utilizableComoCampoValor) {
     propuestas.push({
@@ -155,10 +177,30 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
     .sort((a, b) => a.prioridad - b.prioridad)
     .map(({ campo }) => metricaPorcentaje(campo))
 
-  // 3-4. Los dos primeros booleanos van en la fila 1, como KPI.
+  // Los dos primeros booleanos van en la fila 1, como KPI.
   propuestas.push(...booleanos.slice(0, 2))
 
-  // 5. Registros por mes (siempre): métrica CONTEO propia, distinta de
+  // Completitud del campo clínico más relevante (el primer booleano por
+  // prioridad, que es el indicador principal del dataset).
+  //
+  // Un indicador sin saber sobre cuántos registros está informado no es
+  // interpretable: un 3 % de infección puede significar que hay poca infección
+  // o que casi nadie rellena la casilla, y son problemas opuestos.
+  const campoParaCompletitud = campos
+    .filter((c) => c.tipoDato === 'BOOLEANO' && !estaExcluido(c))
+    .sort((a, b) => prioridadBooleano(a) - prioridadBooleano(b))[0]
+
+  if (campoParaCompletitud) {
+    propuestas.push({
+      codigo: `completitud_${generarCodigoSnakeCase(campoParaCompletitud.codigo)}`,
+      nombre: `Completitud de ${campoParaCompletitud.etiqueta}`,
+      tipoMetrica: 'COMPLETITUD',
+      configuracion: { campoValor: campoParaCompletitud.codigo, filtros: [] },
+      widget: { tipoVisualizacion: 'KPI', ancho: 3 },
+    })
+  }
+
+  // Registros por mes (siempre): métrica CONTEO propia, distinta de
   // total_registros, porque el backend no permite la misma métrica en dos
   // widgets del mismo panel.
   propuestas.push({
@@ -169,13 +211,13 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
     widget: { tipoVisualizacion: 'LINEAS', ancho: 12, requiereGranularidad: true },
   })
 
-  // 6. Servicio.
+  // Servicio.
   const campoServicio = buscarCampo(campos, 'servicio')
   if (campoServicio?.utilizableComoCampoAgrupacion) {
     propuestas.push(metricaDistribucion(campoServicio, { codigo: 'registros_por_servicio', nombre: 'Registros por servicio' }))
   }
 
-  // 7. Sexo (DONUT en vez de BARRAS).
+  // Sexo (DONUT en vez de BARRAS).
   const campoSexo = buscarCampo(campos, 'sexo')
   if (campoSexo?.utilizableComoCampoAgrupacion) {
     propuestas.push(
@@ -187,7 +229,7 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
     )
   }
 
-  // 8. Procedimiento.
+  // Procedimiento.
   const campoProcedimiento = buscarCampo(campos, 'procedimiento')
   if (campoProcedimiento?.utilizableComoCampoAgrupacion) {
     propuestas.push(
@@ -195,7 +237,7 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
     )
   }
 
-  // 9. Diagnóstico/CIE-10 (el que exista de los dos).
+  // Diagnóstico/CIE-10 (el que exista de los dos).
   const campoDiagnostico = buscarCampo(campos, 'diagnostico') ?? buscarCampo(campos, 'cie10')
   if (campoDiagnostico?.utilizableComoCampoAgrupacion) {
     propuestas.push(
@@ -203,7 +245,7 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
     )
   }
 
-  // 10-12. Resto: categóricas clínicamente relevantes y booleanos restantes,
+  // Resto: categóricas clínicamente relevantes y booleanos restantes,
   // en ese orden, hasta completar el tope.
   const categoricas = campos
     .filter(

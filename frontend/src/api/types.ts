@@ -952,3 +952,67 @@ export interface TrazabilidadImportacionTrabajoResponseDto {
   resumen: ResumenTrazabilidadImportacionTrabajoDto
   eventos: EventoImportacionTrabajoDto[]
 }
+
+// --- Fase 6.9I.4: plantilla de dashboard clínico ILQ ---
+
+export interface CompatibilidadDashboardIlqDto {
+  datasetId: number
+  datasetCodigo: string
+  /** Están todos los campos esenciales y activos. */
+  compatible: boolean
+  /** Ya existe el panel: aplicar sería actualizar, no crear. */
+  yaAplicado: boolean
+  panelId: number | null
+  camposEncontrados: string[]
+  camposAusentes: string[]
+  totalElementos: number
+}
+
+export interface AplicacionDashboardIlqDto {
+  panelId: number
+  panelCodigo: string
+  panelNombre: string
+  /** false = el panel ya existía y se ha actualizado. */
+  panelCreado: boolean
+  metricasCreadas: number
+  metricasActualizadas: number
+  widgetsCreados: number
+  widgetsActualizados: number
+  totalMetricas: number
+  totalWidgets: number
+}
+
+// --- Fase 6.9I.4.1: dashboard recomendado ---
+
+export interface PropuestaWidgetDto {
+  codigoMetrica: string
+  nombre: string
+  descripcion: string | null
+  tipoMetrica: TipoMetrica
+  configuracion: ConfiguracionMetricaDto
+  unidad: string | null
+  decimales: number | null
+  campoOrigen: string | null
+  campoOrigenEtiqueta: string | null
+  /** Por qué se propone: «Campo fundamental», «Campo obligatorio»… */
+  motivo: string
+  /** Puntuación con la que se ordenó; se expone para poder auditarla. */
+  prioridad: number
+  tipoVisualizacion: TipoVisualizacion
+  ancho: number
+  orden: number
+  tipoResultado: TipoResultado
+  configuracionWidget: ConfiguracionWidgetDto | null
+  advertencia: string | null
+}
+
+export interface PropuestaDashboardResponseDto {
+  datasetId: number
+  datasetCodigo: string
+  suficiente: boolean
+  motivoInsuficiente: string | null
+  propuestas: PropuestaWidgetDto[]
+  maximoWidgets: number
+  /** El dataset admite además la plantilla clínica de ILQ. */
+  compatibleIlq: boolean
+}

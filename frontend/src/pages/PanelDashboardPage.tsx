@@ -2,15 +2,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import type {
   CatalogoFrontendResponseDto,
+  MetricaClinicaResponseDto,
+  PanelMetricaConfiguracionWidgetRequestDto,
+  PanelMetricaRequestDto,
   ConfiguracionWidgetDto,
   DashboardPanelResponseDto,
   DashboardWidgetDto,
   SubconjuntoResumenDto,
   PanelMetricaResponseDto,
   TipoVisualizacion,
+  WidgetMetadataDto,
 } from '../api/types'
 import { ejecutarDashboard } from '../api/dashboardApi'
-import { actualizarWidget, listarWidgets, obtenerDashboardMetadata } from '../api/panelesApi'
+import {
+  actualizarConfiguracionWidget,
+  actualizarWidget,
+  anadirWidget as anadirWidgetApi,
+  listarWidgets,
+  obtenerDashboardMetadata,
+  quitarWidget,
+} from '../api/panelesApi'
 import { getCatalogo } from '../api/frontendCatalogApi'
 import { listarValoresUnicosDeCampo, obtenerFrontendMetadata } from '../api/datasetApi'
 import { StateContainer } from '../components/StateContainer'
@@ -41,6 +52,9 @@ import type { SeleccionGrafica } from '../components/dashboard/seleccionGrafica'
 import { SeleccionGraficaPanel } from '../components/dashboard/SeleccionGraficaPanel'
 import { listarMetricas } from '../api/metricasApi'
 import { DashboardWidgetRenderer } from '../components/dashboard/DashboardWidgetRenderer'
+import type { OpcionMenuWidget } from '../components/dashboard/WidgetMenu'
+import { WidgetForm } from '../components/paneles/WidgetForm'
+import { WidgetEditarForm } from '../components/paneles/WidgetEditarForm'
 import { DashboardHeader } from '../components/dashboard/DashboardHeader'
 import styles from './PanelDashboardPage.module.css'
 
@@ -87,6 +101,15 @@ export function PanelDashboardPage() {
   const [etiquetasCampos, setEtiquetasCampos] = useState<Record<string, string>>({})
   /** Config persistida de cada widget, necesaria para reejecutar series temporales. */
   const [configPorWidget, setConfigPorWidget] = useState<Record<number, ConfiguracionWidgetDto | null>>({})
+  // Qué formas de resultado admite cada widget, según el backend. Es lo que
+  // decide si «Agrupar o segmentar» está disponible en su menú.
+  const [metadataWidgets, setMetadataWidgets] = useState<Record<number, string[]>>({})
+  // Metadata completa y widgets persistidos: hacen falta para poder EDITAR sin
+  // salir del dashboard.
+  const [metaCompleta, setMetaCompleta] = useState<Record<number, WidgetMetadataDto>>({})
+  const [widgetEnEdicion, setWidgetEnEdicion] = useState<{ id: number; enfocarAgrupacion: boolean } | null>(
+    null,
+  )
 
   // `filtros` es lo que el usuario está editando en el formulario;
   // `filtrosAplicados` es lo que realmente se envió al backend y por tanto lo
@@ -113,6 +136,16 @@ export function PanelDashboardPage() {
   // --- Detalle del subconjunto (6.9H.3) ---
   // Estado propio: un fallo aquí no puede tumbar el dashboard ni la selección.
   const [detalleAbierto, setDetalleAbierto] = useState(false)
+
+  // --- Gestión de widgets desde el propio dashboard (Fase 6.9I.4.1) ---
+  const [formWidgetAbierto, setFormWidgetAbierto] = useState(false)
+  const [guardandoWidget, setGuardandoWidget] = useState(false)
+  const [errorWidgets, setErrorWidgets] = useState<string | null>(null)
+  const [mensajeWidgets, setMensajeWidgets] = useState<string | null>(null)
+  const [catalogoWidgets, setCatalogoWidgets] = useState<{
+    metricas: MetricaClinicaResponseDto[]
+    catalogo: CatalogoFrontendResponseDto
+  } | null>(null)
   const [resumenSub, setResumenSub] = useState<SubconjuntoResumenDto | null>(null)
 
   // Definición "en crudo" de cada widget (metricaId, título/descripción
@@ -145,6 +178,170 @@ export function PanelDashboardPage() {
     cargarDashboard(FILTROS_VACIOS, true)
   }, [cargarDashboard])
 
+  // Catálogo de métricas del dataset, para poder añadir un widget sin salir del
+  // dashboard. Se carga en cuanto se conoce el dataset y es auxiliar: si falla,
+  // el dashboard se ve igual y la barra remite a "Organizar".
+  useEffect(() => {
+    if (!datos?.dataset.id || catalogoWidgets) return
+    const controller = new AbortController()
+    Promise.all([
+      listarMetricas(datos.dataset.id, controller.signal),
+      getCatalogo(controller.signal),
+    ])
+      .then(([metricas, cat]) => setCatalogoWidgets({ metricas, catalogo: cat }))
+      .catch(() => {
+        if (!controller.signal.aborted) setCatalogoWidgets(null)
+      })
+    return () => controller.abort()
+  }, [datos?.dataset.id, catalogoWidgets])
+
+  /** Añade un widget y recarga el dashboard sin abandonar la pantalla. */
+  const anadirWidgetAqui = async (payload: PanelMetricaRequestDto) => {
+    setErrorWidgets(null)
+    setMensajeWidgets(null)
+    setGuardandoWidget(true)
+    try {
+      await anadirWidgetApi(panelId ?? '', payload)
+      setFormWidgetAbierto(false)
+      setMensajeWidgets('Widget añadido al dashboard.')
+      await cargarDashboard(filtrosAplicados, false)
+    } catch (err) {
+      // El backend rechaza la misma métrica dos veces en el mismo panel; su
+      // mensaje ya lo explica, así que se muestra tal cual.
+      setErrorWidgets(err instanceof Error ? err.message : 'No se pudo añadir el widget.')
+    } finally {
+      setGuardandoWidget(false)
+    }
+  }
+
+  /**
+   * Guarda los cambios del widget y refresca la tarjeta al momento.
+   *
+   * <p>Antes, las acciones del menú llevaban a la pantalla de widgets: el
+   * usuario editaba allí y tenía que volver al dashboard para ver el efecto.
+   * Con anchos y agrupaciones eso se leía como «no se ha guardado», porque la
+   * tarjeta que estaba mirando no cambiaba.
+   *
+   * <p>Se recargan las tres cosas que dependen del cambio: los datos del
+   * dashboard (que traen el ancho y la forma ya resueltos), la definición en
+   * crudo de los widgets y la metadata.
+   */
+  const guardarEdicionWidget = async (
+    panelMetricaId: number,
+    presentacion: PanelMetricaRequestDto,
+    resultado: PanelMetricaConfiguracionWidgetRequestDto | null,
+  ) => {
+    setErrorWidgets(null)
+    setMensajeWidgets(null)
+    setGuardandoWidget(true)
+
+    const anchoAnterior = widgetsRaw.find((w) => w.id === panelMetricaId)?.ancho ?? null
+
+    try {
+      await actualizarWidget(panelId ?? '', panelMetricaId, presentacion)
+      if (resultado) {
+        await actualizarConfiguracionWidget(panelId ?? '', panelMetricaId, resultado)
+      }
+
+      setWidgetEnEdicion(null)
+      await refrescarTrasEditar()
+
+      const seAmplio = anchoAnterior != null && (presentacion.ancho ?? 0) > anchoAnterior
+      setMensajeWidgets(
+        seAmplio
+          ? 'Indicador actualizado correctamente. Se ha ajustado el tamaño para que el resultado sea legible.'
+          : 'Indicador actualizado correctamente.',
+      )
+    } catch (err) {
+      setErrorWidgets(err instanceof Error ? err.message : 'No se pudo actualizar el indicador.')
+    } finally {
+      setGuardandoWidget(false)
+    }
+  }
+
+  /**
+   * Recarga lo que depende de la configuración de los widgets. El dashboard va
+   * primero porque es lo que se ve; metadata y definición en crudo alimentan el
+   * formulario y el menú.
+   */
+  const refrescarTrasEditar = async () => {
+    await cargarDashboard(filtrosAplicados, false)
+    try {
+      const [crudos, meta] = await Promise.all([
+        listarWidgets(panelId ?? ''),
+        obtenerDashboardMetadata(panelId ?? ''),
+      ])
+      setWidgetsRaw(crudos)
+      setMetadataWidgets(
+        Object.fromEntries(meta.widgets.map((w) => [w.panelMetricaId, w.tipoResultadosPermitidos])),
+      )
+      setMetaCompleta(Object.fromEntries(meta.widgets.map((w) => [w.panelMetricaId, w])))
+      setConfigPorWidget(
+        Object.fromEntries(meta.widgets.map((w) => [w.panelMetricaId, w.configuracionWidgetActual])),
+      )
+    } catch {
+      // La tarjeta ya se ha refrescado con `cargarDashboard`; que falle el
+      // refresco auxiliar no debe deshacer el guardado ni alarmar al usuario.
+    }
+  }
+
+  /** Quita un widget del panel. La métrica sigue en el catálogo del dataset. */
+  const quitarWidgetAqui = async (panelMetricaId: number, titulo: string) => {
+    if (!window.confirm(`¿Quitar «${titulo}» de este dashboard? La métrica seguirá en el catálogo.`)) {
+      return
+    }
+    setErrorWidgets(null)
+    setMensajeWidgets(null)
+    try {
+      await quitarWidget(panelId ?? '', panelMetricaId)
+      setMensajeWidgets('Widget quitado del dashboard.')
+      await cargarDashboard(filtrosAplicados, false)
+    } catch (err) {
+      setErrorWidgets(err instanceof Error ? err.message : 'No se pudo quitar el widget.')
+    }
+  }
+
+  /**
+   * Acciones del menú «⋮» de una tarjeta. Editar y cambiar tamaño llevan a la
+   * pantalla de widgets, que es donde vive el formulario completo; quitar se
+   * resuelve aquí mismo porque no necesita más contexto.
+   */
+  const accionesDeWidget = (
+    panelMetricaId: number,
+    titulo: string,
+    admiteAgrupar: boolean,
+  ): OpcionMenuWidget[] => {
+    const abrirEdicion = (enfocarAgrupacion: boolean) => {
+      setErrorWidgets(null)
+      setMensajeWidgets(null)
+      setWidgetEnEdicion({ id: panelMetricaId, enfocarAgrupacion })
+    }
+
+    return [
+      {
+        etiqueta: 'Editar visualización',
+        onSeleccionar: () => abrirEdicion(false),
+      },
+      {
+        etiqueta: 'Agrupar o segmentar',
+        onSeleccionar: () => abrirEdicion(true),
+        deshabilitada: !admiteAgrupar,
+        motivoDeshabilitada: admiteAgrupar
+          ? undefined
+          : 'Este indicador no admite agrupación: su resultado es un reparto o una etiqueta.',
+      },
+      {
+        etiqueta: 'Cambiar tamaño',
+        onSeleccionar: () => abrirEdicion(false),
+      },
+      {
+        etiqueta: 'Quitar del dashboard',
+        destructiva: true,
+        onSeleccionar: () => quitarWidgetAqui(panelMetricaId, titulo),
+      },
+    ]
+  }
+
   // El catálogo y la metadata son auxiliares: si fallan, los filtros siguen
   // funcionando y el dashboard no se bloquea.
   useEffect(() => {
@@ -157,6 +354,10 @@ export function PanelDashboardPage() {
     obtenerDashboardMetadata(panelId ?? '', controller.signal)
       .then(async (m) => {
         setCamposFecha(m.camposFechaPermitidos)
+        setMetadataWidgets(
+          Object.fromEntries(m.widgets.map((w) => [w.panelMetricaId, w.tipoResultadosPermitidos])),
+        )
+        setMetaCompleta(Object.fromEntries(m.widgets.map((w) => [w.panelMetricaId, w])))
         setConfigPorWidget(
           Object.fromEntries(m.widgets.map((w) => [w.panelMetricaId, w.configuracionWidgetActual])),
         )
@@ -523,6 +724,89 @@ export function PanelDashboardPage() {
             )}
 
             {errorCarga && <ErrorBanner mensaje={errorCarga} />}
+            <ErrorBanner mensaje={errorWidgets} />
+            {mensajeWidgets && <p className={styles.mensajeWidgets}>{mensajeWidgets}</p>}
+
+            {/* Barra de widgets: encima de los gráficos, que es donde se está
+                mirando cuando surge la necesidad de añadir uno. "Configurar
+                widgets" sigue existiendo, pero como acceso secundario. */}
+            <div className={styles.barraWidgets}>
+              <span className={styles.barraTitulo}>Indicadores y gráficos</span>
+              <div className={styles.barraAcciones}>
+                <button
+                  type="button"
+                  className="btn btnPrimary"
+                  onClick={() => {
+                    setMensajeWidgets(null)
+                    setFormWidgetAbierto((v) => !v)
+                  }}
+                >
+                  + Añadir indicador o gráfico
+                </button>
+                <Link
+                  className="btn btnSecondary"
+                  to={`/datasets/${datos.dataset.id}/metricas/nueva/desde-columna?panelId=${datos.panel.id}`}
+                >
+                  + Crear indicador
+                </Link>
+                <Link
+                  className="btn btnSecondary"
+                  to={`/datasets/${datos.dataset.id}/paneles/${datos.panel.id}/widgets`}
+                >
+                  Organizar
+                </Link>
+              </div>
+            </div>
+
+            {/* Edición del widget SIN salir del dashboard: al guardar, la
+                tarjeta de abajo se refresca sola. */}
+            {widgetEnEdicion &&
+              (() => {
+                const crudo = widgetsRaw.find((w) => w.id === widgetEnEdicion.id)
+                if (!crudo || !catalogoWidgets) return null
+                return (
+                  <Card title={`Editar: ${crudo.tituloPersonalizado ?? crudo.metricaNombre}`}>
+                    <WidgetEditarForm
+                      widget={crudo}
+                      meta={metaCompleta[widgetEnEdicion.id]}
+                      tipoVisualizaciones={catalogoWidgets.catalogo.tipoVisualizaciones}
+                      camposFechaPermitidos={camposFecha ?? []}
+                      camposAgrupacionPermitidos={camposAgrupables.map((c) => c.codigo)}
+                      granularidades={catalogoWidgets.catalogo.granularidades}
+                      enfocarAgrupacion={widgetEnEdicion.enfocarAgrupacion}
+                      onGuardar={(presentacion, resultado) =>
+                        guardarEdicionWidget(widgetEnEdicion.id, presentacion, resultado)
+                      }
+                      onCancelar={() => setWidgetEnEdicion(null)}
+                      guardando={guardandoWidget}
+                    />
+                  </Card>
+                )
+              })()}
+
+            {formWidgetAbierto && catalogoWidgets && (
+              <Card title="Añadir indicador o gráfico">
+                <WidgetForm
+                  valorInicial={{
+                    metricaId: '',
+                    tituloPersonalizado: '',
+                    descripcionPersonalizada: '',
+                    tipoVisualizacion: '',
+                    orden: '',
+                    ancho: '',
+                  }}
+                  metricasDisponibles={catalogoWidgets.metricas}
+                  tipoVisualizaciones={catalogoWidgets.catalogo.tipoVisualizaciones}
+                  datasetId={String(datos.dataset.id)}
+                  panelId={String(datos.panel.id)}
+                  siguienteOrden={Math.max(0, ...datos.widgets.map((w) => w.orden ?? 0)) + 1}
+                  esEdicion={false}
+                  onSubmit={anadirWidgetAqui}
+                  onCancelar={() => setFormWidgetAbierto(false)}
+                  guardando={guardandoWidget}
+                />
+              </Card>
+            )}
 
             {datos.widgets.length > 0 &&
               !aplicando &&
@@ -559,6 +843,11 @@ export function PanelDashboardPage() {
                   <DashboardWidgetRenderer
                     key={widget.panelMetricaId}
                     widget={widget}
+                    accionesMenu={accionesDeWidget(
+                      widget.panelMetricaId,
+                      widget.titulo,
+                      (metadataWidgets[widget.panelMetricaId]?.length ?? 1) > 1,
+                    )}
                     onCambiarVisualizacion={cambiarVisualizacionWidget}
                     camposAgrupables={camposAgrupables}
                     campoIndividuo={campoIndividuo}

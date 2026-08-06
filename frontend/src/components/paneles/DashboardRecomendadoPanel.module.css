@@ -1,0 +1,113 @@
+.tarjeta {
+  border-left: 4px solid var(--color-primary);
+}
+
+.mensaje {
+  margin: 0 0 var(--spacing-sm);
+  max-width: 75ch;
+  line-height: 1.5;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.anchoCompleto {
+  grid-column: 1 / -1;
+}
+
+.propuestas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  /* Doce propuestas caben, pero se acota por si el tope sube algún día. */
+  max-height: 28rem;
+  overflow-y: auto;
+  margin: 0 0 var(--spacing-sm);
+  padding: 0;
+  list-style: none;
+}
+
+.propuesta {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.propuesta:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Descartada: se atenúa pero sigue visible, para poder recuperarla. */
+.descartada {
+  opacity: 0.5;
+}
+
+.contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.cabecera {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.nombre {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.vista {
+  padding: 0.05rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-neutral-soft);
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+/* Por qué se propone: es lo que permite al usuario decidir si la quiere. */
+.motivo {
+  font-size: 0.78rem;
+  color: var(--color-primary);
+}
+
+.descripcion {
+  font-size: 0.83rem;
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.advertencia {
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+}
+
+.progreso {
+  margin: 0 0 var(--spacing-sm);
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}

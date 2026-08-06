@@ -1,0 +1,91 @@
+.contenedor {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.boton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* 32px: mínimo cómodo para el dedo en móvil sin robar sitio al título. */
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.boton:hover {
+  border-color: var(--color-border);
+  background: var(--color-neutral-soft);
+  color: var(--color-text);
+}
+
+.boton:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  min-width: 15rem;
+  /* Sin tope, un motivo largo estiraría el menú fuera de la tarjeta. */
+  max-width: min(20rem, 80vw);
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+}
+
+.opcion {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0.45rem 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcion:hover:not(:disabled) {
+  background: var(--color-neutral-soft);
+}
+
+.opcion:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.opcion:disabled {
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+}
+
+.opcionDestructiva:not(:disabled) {
+  color: var(--color-danger);
+}
+
+/* Por qué una opción no está disponible: se lee dentro del propio menú, sin
+   depender de que el usuario deje el ratón encima. */
+.motivo {
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  white-space: normal;
+}

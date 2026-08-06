@@ -4,3 +4,35 @@
   gap: var(--spacing-md);
   max-width: 700px;
 }
+
+/* Elección entre dashboard recomendado y vacío. Dos tarjetas, no un
+   desplegable: la diferencia entre ambos modos necesita explicarse. */
+.modos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--spacing-sm);
+}
+
+.modo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.modo:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.modoAyuda {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}

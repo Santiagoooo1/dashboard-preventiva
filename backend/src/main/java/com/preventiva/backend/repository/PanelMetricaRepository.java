@@ -10,5 +10,11 @@ public interface PanelMetricaRepository extends JpaRepository<PanelMetrica, Long
 
     List<PanelMetrica> findByPanelIdAndActivaTrue(Long panelId);
 
+    /** Incluye los archivados, por el mismo motivo que en las métricas. */
+    List<PanelMetrica> findByPanelId(Long panelId);
+
+    /** Para avisar de duplicados aunque el widget esté archivado. */
+    Optional<PanelMetrica> findByPanelIdAndMetricaId(Long panelId, Long metricaId);
+
     Optional<PanelMetrica> findByPanelIdAndMetricaIdAndActivaTrue(Long panelId, Long metricaId);
 }

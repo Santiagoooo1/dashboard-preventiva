@@ -201,13 +201,16 @@ export function PieChartWidget({ datos, seleccion }: PieChartWidgetProps) {
       <div className={styles.leyenda}>
         {sectores.map((s) => {
           const sel = propsSeleccionSector(s, seleccion, formatNumber(s.valor))
+          const textoCompleto = `${s.etiqueta}: ${formatNumber(s.valor)}`
           const contenido = (
             <>
               <span
                 className={styles.leyendaMarca}
                 style={{ backgroundColor: sel.activa ? 'var(--color-selection)' : s.color }}
               />
-              {s.etiqueta} · {formatNumber(s.valor)}
+              <span className={styles.leyendaTexto} title={textoCompleto}>
+                {s.etiqueta} · {formatNumber(s.valor)}
+              </span>
             </>
           )
 

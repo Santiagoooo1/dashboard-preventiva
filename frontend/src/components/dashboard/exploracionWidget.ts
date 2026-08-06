@@ -151,12 +151,21 @@ export function resolverSubtituloWidget(
   tipoResultado: string,
   etiquetaExploracion: string | null,
   etiquetasTipoResultado: Record<string, string>,
+  /**
+   * Etiqueta legible del campo por el que agrupa el widget de forma
+   * persistida, si agrupa por alguno. Convierte el genérico «Agrupado por
+   * categoría» —que no dice cuál— en «Agrupado por Procedimiento».
+   */
+  etiquetaAgrupacionPersistida?: string | null,
 ): string {
   if (modo === 'CATEGORIA') {
     return etiquetaExploracion ? `Desglosado por ${etiquetaExploracion}` : 'Sin desglose seleccionado'
   }
   if (modo === 'INDIVIDUO') {
     return etiquetaExploracion ? `Vista individual · ${etiquetaExploracion}` : 'Sin individuo seleccionado'
+  }
+  if (tipoResultado === 'COMPARATIVA' && etiquetaAgrupacionPersistida) {
+    return `Agrupado por ${etiquetaAgrupacionPersistida}`
   }
   return etiquetasTipoResultado[tipoResultado] ?? tipoResultado
 }

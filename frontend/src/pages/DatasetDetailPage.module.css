@@ -39,3 +39,17 @@
   gap: var(--spacing-md);
   margin-bottom: var(--spacing-md);
 }
+
+/* Acceso directo al dashboard, por encima de la configuración: es lo que un
+   médico viene a abrir, no algo que tenga que buscar en una tabla. */
+.accesoDashboard {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.accesoDashboardNombre {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}

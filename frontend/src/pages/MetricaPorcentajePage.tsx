@@ -1,14 +1,14 @@
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useParams, useSearchParams } from 'react-router'
 import type {
   FiltroMetricaDto,
   MetricaClinicaRequestDto,
+  MetricaClinicaResponseDto,
   ResultadoMetricaResponseDto,
-  TipoVisualizacion,
 } from '../api/types'
 import { getCatalogo } from '../api/frontendCatalogApi'
 import { crearMetrica, listarMetricas, obtenerMetadataMetricas, previewMetrica } from '../api/metricasApi'
-import { anadirWidget, listarPaneles } from '../api/panelesApi'
+import { listarPaneles } from '../api/panelesApi'
 import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
 import { Card } from '../components/Card'
@@ -18,13 +18,8 @@ import { ErrorBanner } from '../components/ErrorBanner'
 import { FiltroBuilder } from '../components/metrics/FiltroBuilder'
 import { WidgetActual } from '../components/widgets/WidgetActual'
 import { filtrosParaPayload } from '../components/metrics/constructorMetrica'
+import { MetricaCreadaPanel } from '../components/metrics/MetricaCreadaPanel'
 import styles from './MetricaDesdeColumnaPage.module.css'
-
-const ANCHOS = [
-  { valor: '3', etiqueta: 'Pequeño' },
-  { valor: '6', etiqueta: 'Medio' },
-  { valor: '12', etiqueta: 'Ancho completo' },
-]
 
 /**
  * Porcentaje condicional (Fase 6.9I.2).
@@ -40,7 +35,9 @@ const ANCHOS = [
  */
 export function MetricaPorcentajePage() {
   const { datasetId } = useParams<{ datasetId: string }>()
-  const navigate = useNavigate()
+  // De qué panel venía el usuario, si venía de alguno.
+  const [searchParams] = useSearchParams()
+  const panelOrigenId = searchParams.get('panelId')
 
   const { data, loading, error } = useApiResource(
     async (signal) => {
@@ -67,14 +64,12 @@ export function MetricaPorcentajePage() {
   const [descripcion, setDescripcion] = useState('')
   const [decimales, setDecimales] = useState('2')
 
-  const [anadirADashboard, setAnadirADashboard] = useState(false)
-  const [panelIdElegido, setPanelIdElegido] = useState('')
-  const [anchoElegido, setAnchoElegido] = useState('3')
-
   const [errores, setErrores] = useState<Record<string, string>>({})
   const [errorBackend, setErrorBackend] = useState<string | null>(null)
   const [preview, setPreview] = useState<ResultadoMetricaResponseDto | null>(null)
   const [guardando, setGuardando] = useState(false)
+  const [metricaCreada, setMetricaCreada] = useState<MetricaClinicaResponseDto | null>(null)
+  const [abrirFormularioWidget, setAbrirFormularioWidget] = useState(false)
 
   const construirPayload = (): MetricaClinicaRequestDto => {
     const campos = data?.metadata.campos ?? []
@@ -108,7 +103,6 @@ export function MetricaPorcentajePage() {
     if (filtrosNumerador.length === 0) {
       nuevos.numerador = 'Define qué cuenta en el numerador: sin condición, contaría toda la población.'
     }
-    if (anadirADashboard && !panelIdElegido) nuevos.panel = 'Elige a qué dashboard añadirlo.'
 
     const usados = new Set((data?.metricas ?? []).map((m) => m.codigo.toLowerCase()))
     if (codigo.trim() && usados.has(codigo.trim().toLowerCase())) {
@@ -132,7 +126,11 @@ export function MetricaPorcentajePage() {
     }
   }
 
-  const guardar = async () => {
+  /**
+   * Crea la métrica y deja el paso siguiente a mano. `conWidget` solo decide si
+   * el formulario rápido aparece desplegado: el widget nunca se crea solo.
+   */
+  const guardar = async (conWidget: boolean) => {
     setErrorBackend(null)
     const nuevos = validar()
     setErrores(nuevos)
@@ -141,25 +139,26 @@ export function MetricaPorcentajePage() {
     setGuardando(true)
     try {
       const metrica = await crearMetrica(datasetId ?? '', construirPayload())
-
-      if (!anadirADashboard || !panelIdElegido) {
-        navigate(`/datasets/${datasetId}/metricas`)
-        return
-      }
-
-      await anadirWidget(panelIdElegido, {
-        metricaId: metrica.id,
-        // Un porcentaje es un escalar: KPI. No hay otra representación real.
-        tipoVisualizacion: 'KPI' as TipoVisualizacion,
-        ancho: Number(anchoElegido),
-        orden: null,
-      })
-
-      navigate(`/paneles/${panelIdElegido}/dashboard`)
+      setMetricaCreada(metrica)
+      setAbrirFormularioWidget(conWidget)
+      setGuardando(false)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (err) {
       setErrorBackend(err instanceof Error ? err.message : 'No se pudo crear la métrica.')
       setGuardando(false)
     }
+  }
+
+  const crearOtra = () => {
+    setMetricaCreada(null)
+    setFiltrosBase([])
+    setFiltrosNumerador([])
+    setFiltrosDenominador([])
+    setCodigo('')
+    setNombre('')
+    setPreview(null)
+    setErrores({})
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
@@ -183,6 +182,20 @@ export function MetricaPorcentajePage() {
             </p>
 
             <ErrorBanner mensaje={errorBackend} />
+
+            {metricaCreada && (
+              <MetricaCreadaPanel
+                datasetId={datasetId ?? ''}
+                metrica={metricaCreada}
+                campos={data.metadata.campos}
+                paneles={data.paneles}
+                granularidades={data.catalogo.granularidades}
+                panelOrigenId={panelOrigenId}
+                abrirFormulario={abrirFormularioWidget}
+                onCrearOtra={crearOtra}
+                rutaCatalogo={`/datasets/${datasetId}/metricas`}
+              />
+            )}
 
             <Card title="Paso 1 — ¿A quién se mira? (filtros base)">
               <p className={styles.ayuda}>
@@ -285,46 +298,12 @@ export function MetricaPorcentajePage() {
                 </div>
               </div>
 
-              <label className={styles.checkbox}>
-                <input
-                  type="checkbox"
-                  checked={anadirADashboard}
-                  onChange={(e) => setAnadirADashboard(e.target.checked)}
-                  disabled={data.paneles.length === 0}
-                />
-                Añadir también a un dashboard
-                {data.paneles.length === 0 && (
-                  <span className={styles.ayudaEnLinea}>(este dataset todavía no tiene ningún dashboard)</span>
-                )}
-              </label>
-
-              {anadirADashboard && data.paneles.length > 0 && (
-                <div className={styles.grid}>
-                  <FormField label="Dashboard" error={errores.panel}>
-                    <select value={panelIdElegido} onChange={(e) => setPanelIdElegido(e.target.value)}>
-                      <option value="">— seleccionar —</option>
-                      {data.paneles.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
-                  <FormField label="Tamaño del widget">
-                    <select value={anchoElegido} onChange={(e) => setAnchoElegido(e.target.value)}>
-                      {ANCHOS.map((a) => (
-                        <option key={a.valor} value={a.valor}>
-                          {a.etiqueta}
-                        </option>
-                      ))}
-                    </select>
-                  </FormField>
-                </div>
-              )}
-
               <div className={styles.botones}>
-                <button type="button" className="btn btnPrimary" disabled={guardando} onClick={guardar}>
-                  {guardando ? 'Guardando…' : anadirADashboard ? 'Crear y añadir al dashboard' : 'Crear métrica'}
+                <button type="button" className="btn btnPrimary" disabled={guardando} onClick={() => guardar(false)}>
+                  {guardando ? 'Guardando…' : 'Crear métrica'}
+                </button>
+                <button type="button" className="btn btnPrimary" disabled={guardando} onClick={() => guardar(true)}>
+                  Crear y añadir al dashboard
                 </button>
                 <button type="button" className="btn btnSecondary" onClick={previsualizar}>
                   Previsualizar

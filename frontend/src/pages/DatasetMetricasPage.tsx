@@ -1,7 +1,9 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router'
 import type { MetricaClinicaResponseDto, ResultadoMetricaResponseDto } from '../api/types'
-import { listarMetricas } from '../api/metricasApi'
+import { listarMetricas, obtenerMetadataMetricas } from '../api/metricasApi'
+import { getCatalogo } from '../api/frontendCatalogApi'
+import { listarPaneles } from '../api/panelesApi'
 import { obtenerFrontendMetadata } from '../api/datasetApi'
 import { useApiResource } from '../hooks/useApiResource'
 import { StateContainer } from '../components/StateContainer'
@@ -10,20 +12,25 @@ import { DataTable } from '../components/DataTable'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { MetricaRowActions } from '../components/metrics/MetricaRowActions'
+import { MetricaCreadaPanel } from '../components/metrics/MetricaCreadaPanel'
 import { WidgetActual } from '../components/widgets/WidgetActual'
 import { DashboardInicialCard } from '../components/dashboard/DashboardInicialCard'
 import styles from './DatasetMetricasPage.module.css'
 
 export function DatasetMetricasPage() {
   const { datasetId } = useParams<{ datasetId: string }>()
+  const [searchParams] = useSearchParams()
 
   const { data, loading, error, reload } = useApiResource(
     async (signal) => {
-      const [metadata, metricas] = await Promise.all([
+      const [metadata, metricas, metadataMetricas, paneles, catalogo] = await Promise.all([
         obtenerFrontendMetadata(datasetId ?? '', signal),
         listarMetricas(datasetId ?? '', signal),
+        obtenerMetadataMetricas(datasetId ?? '', signal),
+        listarPaneles(datasetId ?? '', signal),
+        getCatalogo(signal),
       ])
-      return { dataset: metadata.dataset, metricas }
+      return { dataset: metadata.dataset, metricas, campos: metadataMetricas.campos, paneles, catalogo }
     },
     [datasetId],
   )
@@ -33,6 +40,18 @@ export function DatasetMetricasPage() {
     resultado: ResultadoMetricaResponseDto
   } | null>(null)
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
+  // Métrica que el usuario quiere llevar a un dashboard: reutiliza el mismo
+  // formulario rápido que aparece justo después de crear una.
+  const [metricaParaWidget, setMetricaParaWidget] = useState<MetricaClinicaResponseDto | null>(null)
+
+  // ?anadir=<id> abre el formulario rápido directamente: es como llega el
+  // usuario desde la vista avanzada del dataset.
+  useEffect(() => {
+    const id = searchParams.get('anadir')
+    if (!id || !data) return
+    const metrica = data.metricas.find((m) => String(m.id) === id)
+    if (metrica) setMetricaParaWidget(metrica)
+  }, [searchParams, data])
 
   const onResultado = (metrica: MetricaClinicaResponseDto, resultado: ResultadoMetricaResponseDto) => {
     setErrorAccion(null)
@@ -64,6 +83,19 @@ export function DatasetMetricasPage() {
             </div>
 
             <ErrorBanner mensaje={errorAccion} />
+
+            {metricaParaWidget && data.campos && (
+              <MetricaCreadaPanel
+                datasetId={datasetId ?? ''}
+                metrica={metricaParaWidget}
+                campos={data.campos}
+                paneles={data.paneles}
+                granularidades={data.catalogo.granularidades}
+                abrirFormulario
+                onCrearOtra={() => setMetricaParaWidget(null)}
+                rutaCatalogo={`/datasets/${datasetId}/metricas`}
+              />
+            )}
 
             {data.metricas.length === 0 ? (
               <div>
@@ -97,6 +129,11 @@ export function DatasetMetricasPage() {
                           onResultado={onResultado}
                           onError={setErrorAccion}
                           onDesactivada={reload}
+                          onAnadirADashboard={(m) => {
+                            setErrorAccion(null)
+                            setMetricaParaWidget(m)
+                            window.scrollTo({ top: 0, behavior: 'smooth' })
+                          }}
                         />
                       ),
                     },

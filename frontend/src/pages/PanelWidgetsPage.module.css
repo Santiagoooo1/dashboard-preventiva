@@ -33,3 +33,14 @@
 .automatico {
   color: var(--color-text-muted);
 }
+
+/* Confirmación de una acción realizada. Verde no: el sistema usa el primario
+   como color de "esto ha ido bien", igual que en las tarjetas de éxito. */
+.exito {
+  margin: 0;
+  padding: var(--spacing-sm);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-soft);
+  font-size: 0.9rem;
+}

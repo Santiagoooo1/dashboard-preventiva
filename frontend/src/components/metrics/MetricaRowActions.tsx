@@ -8,9 +8,17 @@ interface MetricaRowActionsProps {
   onResultado: (metrica: MetricaClinicaResponseDto, resultado: ResultadoMetricaResponseDto) => void
   onError: (mensaje: string) => void
   onDesactivada: () => void
+  /** Abre el formulario rápido de widget para esta métrica (Fase 6.9I.4). */
+  onAnadirADashboard: (metrica: MetricaClinicaResponseDto) => void
 }
 
-export function MetricaRowActions({ metrica, onResultado, onError, onDesactivada }: MetricaRowActionsProps) {
+export function MetricaRowActions({
+  metrica,
+  onResultado,
+  onError,
+  onDesactivada,
+  onAnadirADashboard,
+}: MetricaRowActionsProps) {
   const [ocupado, setOcupado] = useState(false)
 
   const ejecutar = async () => {
@@ -46,12 +54,19 @@ export function MetricaRowActions({ metrica, onResultado, onError, onDesactivada
 
   return (
     <div className="rowActions">
+      {/* Acción principal de la fila: una métrica del catálogo que nadie ve en
+          ningún dashboard no sirve de nada, y hasta ahora llegar hasta ahí
+          exigía ir al panel, abrir "Añadir widget" y buscarla en un
+          desplegable. */}
+      <button type="button" className="btn btnAction" onClick={() => onAnadirADashboard(metrica)}>
+        Añadir al dashboard
+      </button>
+      <button type="button" className="btn btnAction" disabled={ocupado} onClick={ejecutar}>
+        Ver resultado
+      </button>
       <Link className="btn btnAction" to={`/datasets/${metrica.datasetId}/metricas/${metrica.id}/editar`}>
         Editar
       </Link>
-      <button type="button" className="btn btnAction" disabled={ocupado} onClick={ejecutar}>
-        Ejecutar
-      </button>
       <button type="button" className="btn btnDanger" disabled={ocupado} onClick={archivar}>
         Archivar
       </button>

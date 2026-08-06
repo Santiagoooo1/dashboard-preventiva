@@ -7,6 +7,7 @@ import type {
   TipoVisualizacionCatalogoDto,
 } from '../../api/types'
 import { FormField } from '../FormField'
+import { anchoRecomendado, visualizacionesDeForma } from '../metrics/widgetRapido'
 import styles from './WidgetForm.module.css'
 
 export interface WidgetFormValores {
@@ -23,6 +24,10 @@ interface WidgetFormProps {
   metricasDisponibles: MetricaClinicaResponseDto[]
   tipoVisualizaciones: TipoVisualizacionCatalogoDto[]
   datasetId: string
+  /** Panel actual: viaja al constructor para poder volver aquí al terminar. */
+  panelId?: string
+  /** Siguiente hueco libre de orden en el panel. Se rellena solo al añadir. */
+  siguienteOrden?: number
   esEdicion: boolean
   onSubmit: (payload: PanelMetricaRequestDto) => void
   onCancelar: () => void
@@ -59,6 +64,8 @@ export function WidgetForm({
   metricasDisponibles,
   tipoVisualizaciones,
   datasetId,
+  panelId,
+  siguienteOrden,
   esEdicion,
   onSubmit,
   onCancelar,
@@ -71,6 +78,9 @@ export function WidgetForm({
   const [orden, setOrden] = useState(valorInicial.orden)
   const [ancho, setAncho] = useState(valorInicial.ancho)
   const [errores, setErrores] = useState<Record<string, string>>({})
+  // Plegado por defecto: título, descripción y orden ya vienen rellenos con algo
+  // razonable, y solo estorban a quien no quiere cambiarlos.
+  const [personalizarAbierto, setPersonalizarAbierto] = useState(false)
 
   // --- Búsqueda y filtros del catálogo de métricas ---
   // Un desplegable plano deja de servir en cuanto el dataset pasa de una docena
@@ -101,6 +111,30 @@ export function WidgetForm({
     })
   }, [metricasDisponibles, busqueda, filtroForma, filtroCampo])
 
+  /**
+   * Elegir el indicador rellena solo lo demás: visualización compatible, título,
+   * orden y tamaño. Son cuatro decisiones que casi siempre tienen una respuesta
+   * evidente a partir de la métrica, y pedirlas todas convertía «añadir un
+   * gráfico» en un formulario de seis campos.
+   *
+   * Todo sigue siendo editable: esto adelanta trabajo, no lo impone.
+   */
+  const elegirMetrica = (id: string) => {
+    setMetricaId(id)
+    if (!id) return
+
+    const metrica = metricasDisponibles.find((m) => String(m.id) === id)
+    if (!metrica) return
+
+    const opciones = visualizacionesDeForma(metrica, 'ACTUAL')
+    const recomendada = opciones[0]?.valor ?? 'KPI'
+
+    setTipoVisualizacion(recomendada)
+    setAncho(String(anchoRecomendado(recomendada, 'ACTUAL')))
+    if (!titulo.trim()) setTitulo(metrica.nombre)
+    if (orden === '' && siguienteOrden != null) setOrden(String(siguienteOrden))
+  }
+
   const enviar = () => {
     const nuevosErrores: Record<string, string> = {}
     if (!metricaId) nuevosErrores.metricaId = 'Selecciona una métrica.'
@@ -124,7 +158,7 @@ export function WidgetForm({
     <div className={styles.form}>
       {!esEdicion && (
         <div className={styles.buscador}>
-          <FormField label="Buscar métrica">
+          <FormField label="Buscar indicador">
             <input
               type="search"
               value={busqueda}
@@ -139,7 +173,7 @@ export function WidgetForm({
               <option value="REPARTO">Reparto por categorías</option>
             </select>
           </FormField>
-          <FormField label="Campo de origen">
+          <FormField label="Campo analizado">
             <select value={filtroCampo} onChange={(e) => setFiltroCampo(e.target.value)}>
               <option value="">Todos</option>
               {camposOrigen.map((codigo) => (
@@ -154,16 +188,16 @@ export function WidgetForm({
 
       <div className={styles.grid}>
         <FormField
-          label="Métrica"
+          label="Indicador"
           help={
             esEdicion
-              ? 'La métrica de un widget no se cambia: quita el widget y añade otro.'
-              : `Mostrando ${metricasFiltradas.length} de ${metricasDisponibles.length} métricas del dataset.`
+              ? 'El indicador de un widget no se cambia: quítalo y añade otro.'
+              : `Mostrando ${metricasFiltradas.length} de ${metricasDisponibles.length} indicadores del dataset.`
           }
           error={errores.metricaId}
         >
-          <select value={metricaId} disabled={esEdicion} onChange={(e) => setMetricaId(e.target.value)}>
-            <option value="">— seleccionar métrica —</option>
+          <select value={metricaId} disabled={esEdicion} onChange={(e) => elegirMetrica(e.target.value)}>
+            <option value="">— seleccionar indicador —</option>
             {metricasFiltradas.map((m) => {
               const campo = campoOrigen(m)
               return (
@@ -177,7 +211,7 @@ export function WidgetForm({
           </select>
         </FormField>
         <FormField
-          label="Tipo de visualización"
+          label="Visualización"
           help="Cómo se muestra esta métrica en el dashboard: como número (indicador), gráfico o tabla. Puedes cambiarlo también directamente desde el propio dashboard, en cada widget."
           error={errores.tipoVisualizacion}
         >
@@ -190,34 +224,50 @@ export function WidgetForm({
             ))}
           </select>
         </FormField>
-        <FormField label="Título personalizado">
-          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
-        </FormField>
-        <FormField label="Descripción personalizada">
-          <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
-        </FormField>
-        <FormField label="Orden" help="Posición del widget dentro del panel: los números más bajos van primero.">
-          <input type="number" step={1} value={orden} onChange={(e) => setOrden(e.target.value)} />
-        </FormField>
-        <FormField label="Tamaño" help="Cuánto sitio ocupa el widget en el dashboard." error={errores.ancho}>
+        <FormField label="Tamaño" help="Cuánto sitio ocupa en el dashboard." error={errores.ancho}>
           <select value={ancho} onChange={(e) => setAncho(e.target.value)}>
-            <option value="3">Pequeño</option>
-            <option value="6">Medio</option>
+            <option value="3">Pequeño (un cuarto de fila)</option>
+            <option value="6">Medio (media fila)</option>
             <option value="12">Ancho completo</option>
           </select>
         </FormField>
       </div>
 
+      {/* Título, descripción y orden ya vienen rellenos: se pliegan para que la
+          pantalla habitual sean tres decisiones, no seis. */}
+      <details
+        className={styles.personalizar}
+        open={personalizarAbierto}
+        onToggle={(e) => setPersonalizarAbierto((e.target as HTMLDetailsElement).open)}
+      >
+        <summary className={styles.personalizarResumen}>Personalizar</summary>
+        <div className={styles.grid}>
+          <FormField label="Título personalizado" help="Vacío = se usa el nombre del indicador.">
+            <input value={titulo} onChange={(e) => setTitulo(e.target.value)} />
+          </FormField>
+          <FormField label="Descripción personalizada">
+            <input value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+          </FormField>
+          <FormField label="Orden" help="Posición dentro del panel: los números más bajos van primero.">
+            <input type="number" step={1} value={orden} onChange={(e) => setOrden(e.target.value)} />
+          </FormField>
+        </div>
+      </details>
+
       {!esEdicion && (
         <p className={styles.ayudaCrear}>
-          ¿No encuentras la métrica?{' '}
-          <Link to={`/datasets/${datasetId}/metricas/nueva/desde-columna`}>Crear una nueva desde una columna.</Link>
+          ¿No encuentras el indicador?{' '}
+          <Link
+            to={`/datasets/${datasetId}/metricas/nueva/desde-columna${panelId ? `?panelId=${panelId}` : ''}`}
+          >
+            Crear una nueva desde una columna.
+          </Link>
         </p>
       )}
 
       <div className={styles.botones}>
         <button type="button" className="btn btnPrimary" disabled={guardando} onClick={enviar}>
-          {esEdicion ? 'Guardar cambios' : 'Añadir widget'}
+          {esEdicion ? 'Guardar cambios' : 'Añadir al dashboard'}
         </button>
         <button type="button" className="btn btnSecondary" onClick={onCancelar}>
           Cancelar

@@ -26,6 +26,8 @@ import {
   widgetTodoCero,
 } from './exploracionWidget'
 import { WidgetExploracionControls } from './WidgetExploracionControls'
+import { WidgetMenu } from './WidgetMenu'
+import type { OpcionMenuWidget } from './WidgetMenu'
 import { resolverRangoTemporal, resolverSeleccionTemporalWidget, resolverSeleccionWidget } from './seleccionGrafica'
 import type { SeleccionGrafica } from './seleccionGrafica'
 import type { CampoFiltroCategoria, CampoIndividuo } from './camposFiltroDashboard'
@@ -36,6 +38,11 @@ const MAX_SERIES_LINEA = 4
 
 interface DashboardWidgetRendererProps {
   widget: DashboardWidgetDto
+  /**
+   * Acciones del menú «⋮» de la tarjeta (editar, agrupar, tamaño, quitar). Las
+   * decide la página, que es quien conoce el panel y puede navegar o recargar.
+   */
+  accionesMenu?: OpcionMenuWidget[]
   /**
    * Ausente en contextos de solo lectura (no aplica aquí, pero deja la puerta
    * abierta). Cuando está presente, el widget ofrece el selector
@@ -226,6 +233,7 @@ function cuerpoWidget(
 
 export function DashboardWidgetRenderer({
   widget,
+  accionesMenu,
   onCambiarVisualizacion,
   camposAgrupables = [],
   campoIndividuo = null,
@@ -402,7 +410,22 @@ export function DashboardWidgetRenderer({
     camposAgrupables,
     campoIndividuo,
   )
-  const subtitulo = resolverSubtituloWidget(modo, mostrado.tipoResultado, etiquetaExploracion, ETIQUETA_TIPO_RESULTADO)
+  // Campo por el que agrupa el widget de forma persistida, en legible: sale de
+  // lo que devolvió el backend (`agrupadoPor`) o de la config guardada, y se
+  // traduce con las etiquetas de los campos del dataset.
+  const codigoAgrupacionMostrada = mostrado.comparativa?.agrupadoPor ?? campoAgrupacionPersistido
+  const etiquetaAgrupacionPersistida = codigoAgrupacionMostrada
+    ? (camposAgrupables.find((c) => c.codigo === codigoAgrupacionMostrada)?.etiqueta ??
+      codigoAgrupacionMostrada)
+    : null
+
+  const subtitulo = resolverSubtituloWidget(
+    modo,
+    mostrado.tipoResultado,
+    etiquetaExploracion,
+    ETIQUETA_TIPO_RESULTADO,
+    etiquetaAgrupacionPersistida,
+  )
   const sinDatosLocal = resultadoLocal !== null && !cargandoLocal && widgetSinDatos(resultadoLocal)
   const esKpi = seRenderizaComoKpi(mostrado)
 
@@ -614,7 +637,14 @@ export function DashboardWidgetRenderer({
     >
       <div className={`${styles.card} ${conError ? styles.cardError : ''} ${esOrigen ? styles.cardOrigen : ''}`}>
         <div className={styles.cardHeader}>
-          <h3 className={styles.cardTitle}>{widget.titulo}</h3>
+          <div className={styles.cardTituloFila}>
+            <h3 className={styles.cardTitle}>{widget.titulo}</h3>
+            {/* Acciones del widget recogidas tras «⋮»: cuatro botones fijos en
+                cada tarjeta competirían con el propio dato. */}
+            {accionesMenu && accionesMenu.length > 0 && (
+              <WidgetMenu titulo={widget.titulo} opciones={accionesMenu} />
+            )}
+          </div>
           {/* Una sola frase de contexto: durante la exploración manda esta;
               en Actual, el tipo de resultado persistido. */}
           <p className={styles.cardMeta}>

@@ -94,7 +94,9 @@ const ALTO = 260
 // Con muchas categorías o etiquetas largas, las barras verticales apilan
 // texto ilegible en el eje X; en ese caso se giran a horizontal.
 function convieneHorizontal(datos: DatoBarra[]): boolean {
-  return datos.length > 6 || datos.some((d) => d.etiqueta.length > 12)
+  // Umbral bajo a propósito: en horizontal cada etiqueta tiene su propia línea
+  // y se lee entera; en vertical compiten por el mismo eje y se recortan.
+  return datos.length > 5 || datos.some((d) => d.etiqueta.length > 10)
 }
 
 export function BarChartWidget({ datos, seleccion }: BarChartWidgetProps) {
@@ -196,7 +198,7 @@ function BarrasVerticales({ datos, tooltip, setTooltip, gradId, seleccion }: Sub
                     recortado; el valor completo nunca se pierde (lo necesitará
                     la selección gráfica de 6.9H). */}
                 <title>{d.etiqueta}</title>
-                {acortar(d.etiqueta, 10)}
+                {acortar(d.etiqueta, 14)}
               </text>
             </g>
           )
@@ -208,7 +210,16 @@ function BarrasVerticales({ datos, tooltip, setTooltip, gradId, seleccion }: Sub
 }
 
 function BarrasHorizontales({ datos, tooltip, setTooltip, gradId, seleccion }: SubProps) {
-  const margen = { top: 8, right: 48, bottom: 8, left: 110 }
+  // El margen izquierdo se ajusta a la etiqueta más larga en vez de ser fijo:
+  // con 110px, "Redosificación no realizada" quedaba cortada en "Redosifica…" y
+  // el gráfico dejaba de decir cuál es el motivo más frecuente, que es
+  // justamente para lo que se mira. Se acota a un tercio del lienzo para que la
+  // barra nunca desaparezca.
+  const masLarga = Math.max(...datos.map((d) => d.etiqueta.length), 0)
+  const margenIzquierdo = Math.min(Math.max(110, masLarga * 6.2 + 12), ANCHO * 0.42)
+  const maxCaracteres = Math.floor((margenIzquierdo - 12) / 6.2)
+
+  const margen = { top: 8, right: 48, bottom: 8, left: margenIzquierdo }
   // Con una sola categoría (cohorte de un paciente, por ejemplo) una fila de
   // 26px en un lienzo alto deja la tarjeta casi vacía: se engorda la fila para
   // que la barra siga siendo legible sin inventar categorías que no existen.
@@ -239,7 +250,7 @@ function BarrasHorizontales({ datos, tooltip, setTooltip, gradId, seleccion }: S
                 aria-label={d.etiqueta}
               >
                 <title>{d.etiqueta}</title>
-                {acortar(d.etiqueta, 16)}
+                {acortar(d.etiqueta, maxCaracteres)}
               </text>
               {d.valor !== null && d.valor !== undefined && (
                 <>

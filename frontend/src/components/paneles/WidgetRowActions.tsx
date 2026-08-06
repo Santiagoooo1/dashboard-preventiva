@@ -5,8 +5,10 @@ import { quitarWidget } from '../../api/panelesApi'
 interface WidgetRowActionsProps {
   panelId: string | number
   widget: PanelMetricaResponseDto
+  /** La métrica admite comparativa o serie temporal (lo dice el backend). */
+  admiteAgrupar: boolean
   onEditar: () => void
-  onConfigurar: () => void
+  onAgrupar: () => void
   onError: (mensaje: string) => void
   onQuitado: () => void
 }
@@ -14,8 +16,9 @@ interface WidgetRowActionsProps {
 export function WidgetRowActions({
   panelId,
   widget,
+  admiteAgrupar,
   onEditar,
-  onConfigurar,
+  onAgrupar,
   onError,
   onQuitado,
 }: WidgetRowActionsProps) {
@@ -23,7 +26,7 @@ export function WidgetRowActions({
 
   const quitar = async () => {
     const nombre = widget.tituloPersonalizado ?? widget.metricaNombre
-    if (!window.confirm(`¿Quitar el widget '${nombre}' del panel?`)) {
+    if (!window.confirm(`¿Quitar «${nombre}» de este dashboard? El indicador seguirá en el catálogo.`)) {
       return
     }
     setOcupado(true)
@@ -42,8 +45,21 @@ export function WidgetRowActions({
       <button type="button" className="btn btnAction" onClick={onEditar}>
         Editar visualización
       </button>
-      <button type="button" className="btn btnAction" onClick={onConfigurar}>
-        Agrupar / segmentar
+      {/* Deshabilitado con explicación, nunca activo sin efecto: una
+          distribución o una categoría más frecuente no se pueden agrupar, y
+          hasta ahora el botón abría un formulario con una sola opción. */}
+      <button
+        type="button"
+        className="btn btnAction"
+        onClick={onAgrupar}
+        disabled={!admiteAgrupar}
+        title={
+          admiteAgrupar
+            ? undefined
+            : 'Esta métrica no admite agrupación: su resultado es un reparto de categorías o una etiqueta.'
+        }
+      >
+        Agrupar o segmentar
       </button>
       <button type="button" className="btn btnDanger" disabled={ocupado} onClick={quitar}>
         Quitar del dashboard

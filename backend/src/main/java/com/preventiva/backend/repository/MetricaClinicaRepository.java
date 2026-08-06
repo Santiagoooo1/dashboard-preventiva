@@ -10,5 +10,8 @@ public interface MetricaClinicaRepository extends JpaRepository<MetricaClinica, 
 
     List<MetricaClinica> findByDatasetIdAndActivaTrue(Long datasetId);
 
+    /** Incluye las archivadas: reaplicar una plantilla las reactiva en vez de duplicarlas. */
+    List<MetricaClinica> findByDatasetId(Long datasetId);
+
     Optional<MetricaClinica> findByDatasetIdAndCodigoIgnoreCaseAndActivaTrue(Long datasetId, String codigo);
 }

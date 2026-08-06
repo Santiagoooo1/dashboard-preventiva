@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import type {
   MetricaClinicaResponseDto,
   ResultadoMetricaResponseDto,
@@ -16,6 +16,7 @@ import { MetricaRowActions } from '../components/metrics/MetricaRowActions'
 import { PanelRowActions } from '../components/paneles/PanelRowActions'
 import { WidgetActual } from '../components/widgets/WidgetActual'
 import { DashboardInicialCard } from '../components/dashboard/DashboardInicialCard'
+import { DashboardIlqCard } from '../components/dashboard/DashboardIlqCard'
 import styles from './DatasetDetailPage.module.css'
 
 interface Recomendacion {
@@ -77,6 +78,7 @@ function siguientePaso(datasetId: string, resumen: ResumenConfiguracionDatasetDt
 
 export function DatasetDetailPage() {
   const { datasetId } = useParams<{ datasetId: string }>()
+  const navigate = useNavigate()
   const { data, loading, error, reload } = useApiResource(
     (signal) => obtenerFrontendMetadata(datasetId ?? '', signal),
     [datasetId],
@@ -97,6 +99,12 @@ export function DatasetDetailPage() {
     ? siguientePaso(datasetId ?? '', data.resumenConfiguracion, data.dataset.estadoDataset === 'ACTIVO')
     : null
 
+  // A qué dashboard lleva el botón de arriba: el panel de menor orden, que es
+  // el que el propio dataset declara como principal.
+  const panelPrincipal = [...(data?.paneles ?? [])].sort(
+    (a, b) => (a.orden ?? 0) - (b.orden ?? 0),
+  )[0]
+
   return (
     <div className={styles.page}>
       <StateContainer loading={loading} error={error} empty={data === null}>
@@ -110,7 +118,23 @@ export function DatasetDetailPage() {
             {data.dataset.descripcion && <p>{data.dataset.descripcion}</p>}
             <p className="stateEmpty">Esta es una vista avanzada de configuración.</p>
 
+            {/* El dashboard ya era alcanzable desde la tabla de paneles de más
+                abajo, pero queda a cuatro tarjetas de distancia en una pantalla
+                que se presenta como "vista avanzada de configuración". Para
+                abrirlo hace falta un acceso a la vista, no solo existente. */}
+            {panelPrincipal && (
+              <div className={styles.accesoDashboard}>
+                <Link className="btn btnPrimary" to={`/paneles/${panelPrincipal.id}/dashboard`}>
+                  Abrir dashboard clínico
+                </Link>
+                <span className={styles.accesoDashboardNombre}>{panelPrincipal.nombre}</span>
+              </div>
+            )}
+
             {data.dataset.estadoDataset === 'ACTIVO' && <DashboardInicialCard datasetId={Number(datasetId)} />}
+
+            {/* Plantilla clínica: solo se aplica si el usuario lo pide. */}
+            <DashboardIlqCard datasetId={datasetId ?? ''} />
 
             <Card title="Siguiente paso recomendado" className={styles.recomendacion}>
               <p className={styles.recomendacionTitulo}>{recomendacion.titulo}</p>
@@ -223,6 +247,12 @@ export function DatasetDetailPage() {
                           onResultado={onResultado}
                           onError={setErrorAccion}
                           onDesactivada={reload}
+                          // Esta pantalla es la vista avanzada de configuración:
+                          // el formulario rápido vive en la de métricas, que es
+                          // donde se trabaja con el catálogo.
+                          onAnadirADashboard={(m) =>
+                            navigate(`/datasets/${datasetId}/metricas?anadir=${m.id}`)
+                          }
                         />
                       ),
                     },

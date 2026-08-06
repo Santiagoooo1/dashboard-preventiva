@@ -9,7 +9,20 @@ interface WidgetComparativaProps {
   seleccion?: SeleccionChart
 }
 
+/**
+ * Operaciones cuyo resultado ES una proporción, y solo ellas tienen numerador
+ * y denominador con significado propio.
+ *
+ * En las demás el motor también los rellena (una media informa de cuántos
+ * valores promedió), pero mostrarlos en columnas tituladas «Numerador» y
+ * «Denominador» los presenta como los términos de una fracción que no existe:
+ * la media de edad no es «250 partido por 280».
+ */
+const OPERACIONES_CON_PROPORCION = new Set(['PORCENTAJE', 'COMPLETITUD'])
+
 export function WidgetComparativa({ comparativa, seleccion }: WidgetComparativaProps) {
+  const esProporcion = OPERACIONES_CON_PROPORCION.has(comparativa.tipoMetrica)
+
   return (
     <DataTable
       filaInteractiva={filaInteractivaDeCategoria<ComparativaResponseDto['items'][number]>(seleccion)}
@@ -18,8 +31,12 @@ export function WidgetComparativa({ comparativa, seleccion }: WidgetComparativaP
         // aquí solo se formatea la presentación (true → Sí).
         { key: 'etiqueta', header: 'Etiqueta', render: (i) => formatearEtiquetaCategoria(i.etiqueta) },
         { key: 'valor', header: 'Valor' },
-        { key: 'totalNumerador', header: 'Numerador', render: (i) => i.totalNumerador ?? '—' },
-        { key: 'totalDenominador', header: 'Denominador', render: (i) => i.totalDenominador ?? '—' },
+        ...(esProporcion
+          ? [
+              { key: 'totalNumerador', header: 'Numerador', render: (i: ComparativaResponseDto['items'][number]) => i.totalNumerador ?? '—' },
+              { key: 'totalDenominador', header: 'Denominador', render: (i: ComparativaResponseDto['items'][number]) => i.totalDenominador ?? '—' },
+            ]
+          : []),
       ]}
       rows={comparativa.items}
       getRowKey={(item, index) => `${item.etiqueta}-${index}`}
