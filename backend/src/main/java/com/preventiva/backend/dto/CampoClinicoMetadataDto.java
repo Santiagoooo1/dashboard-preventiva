@@ -17,4 +17,7 @@ public class CampoClinicoMetadataDto {
     private Boolean obligatorio;
     private Boolean activo;
     private CampoRolesDto roles;
+
+    /** Relevancia para dashboards, independiente de esComun y obligatorio. */
+    private String prioridadDashboard;
 }

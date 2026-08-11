@@ -68,9 +68,20 @@ export function CampoFormPage() {
         tipoDato: data.campoExistente.tipoDato,
         esComun: data.campoExistente.esComun,
         obligatorio: data.campoExistente.obligatorio,
+        prioridadDashboard: data.campoExistente.prioridadDashboard ?? 'NORMAL',
         orden: data.campoExistente.orden === null ? '' : String(data.campoExistente.orden),
       }
-    : { codigo: '', etiqueta: '', tipoDato: '', esComun: false, obligatorio: false, orden: '' }
+    : {
+        codigo: '',
+        etiqueta: '',
+        tipoDato: '',
+        esComun: false,
+        obligatorio: false,
+        orden: '',
+        // Un campo nuevo nace sin prioridad especial: quien conoce el uso
+        // clínico decide si sube o baja.
+        prioridadDashboard: 'NORMAL' as const,
+      }
 
   const campoNoEncontrado = esEdicion && data !== null && data.campoExistente === null
 

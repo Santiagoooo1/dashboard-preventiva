@@ -9,12 +9,40 @@ import { DataTable } from '../components/DataTable'
 import { Breadcrumbs } from '../components/Breadcrumbs'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { CampoRowActions } from '../components/datasets/CampoRowActions'
+import { ETIQUETA_PRIORIDAD } from '../components/datasets/prioridadDashboard'
 import styles from './DatasetCamposPage.module.css'
 
+// Los tres campos con los que arranca un dataset. Nacen FUNDAMENTAL por una
+// regla explícita del sistema —son el esqueleto de cualquier análisis—, no por
+// inferirlo de esComun: la prioridad sigue siendo editable después.
 const CAMPOS_BASICOS: CampoClinicoRequestDto[] = [
-  { codigo: 'pacienteCodigo', etiqueta: 'Código paciente', tipoDato: 'TEXTO', esComun: true, obligatorio: true, orden: 1 },
-  { codigo: 'fechaEvento', etiqueta: 'Fecha evento', tipoDato: 'FECHA', esComun: true, obligatorio: true, orden: 2 },
-  { codigo: 'servicio', etiqueta: 'Servicio', tipoDato: 'TEXTO', esComun: true, obligatorio: false, orden: 3 },
+  {
+    codigo: 'pacienteCodigo',
+    etiqueta: 'Código paciente',
+    tipoDato: 'TEXTO',
+    esComun: true,
+    obligatorio: true,
+    orden: 1,
+    prioridadDashboard: 'FUNDAMENTAL',
+  },
+  {
+    codigo: 'fechaEvento',
+    etiqueta: 'Fecha evento',
+    tipoDato: 'FECHA',
+    esComun: true,
+    obligatorio: true,
+    orden: 2,
+    prioridadDashboard: 'FUNDAMENTAL',
+  },
+  {
+    codigo: 'servicio',
+    etiqueta: 'Servicio',
+    tipoDato: 'TEXTO',
+    esComun: true,
+    obligatorio: false,
+    orden: 3,
+    prioridadDashboard: 'IMPORTANTE',
+  },
 ]
 
 export function DatasetCamposPage() {
@@ -98,6 +126,11 @@ export function DatasetCamposPage() {
                     { key: 'tipoDato', header: 'Tipo' },
                     { key: 'esComun', header: 'Común', render: (c) => (c.esComun ? 'Sí' : 'No') },
                     { key: 'obligatorio', header: 'Obligatorio', render: (c) => (c.obligatorio ? 'Sí' : 'No') },
+                    {
+                      key: 'prioridadDashboard',
+                      header: 'Prioridad en dashboards',
+                      render: (c) => ETIQUETA_PRIORIDAD[c.prioridadDashboard ?? 'NORMAL'] ?? '—',
+                    },
                     { key: 'orden', header: 'Orden', render: (c) => c.orden ?? '—' },
                     { key: 'activo', header: 'Activo', render: (c) => (c.activo ? 'Sí' : 'No') },
                     {

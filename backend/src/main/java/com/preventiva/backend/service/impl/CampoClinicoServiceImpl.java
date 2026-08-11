@@ -4,6 +4,7 @@ import com.preventiva.backend.dto.CampoClinicoRequestDto;
 import com.preventiva.backend.dto.CampoClinicoResponseDto;
 import com.preventiva.backend.entity.CampoClinico;
 import com.preventiva.backend.entity.DatasetClinico;
+import com.preventiva.backend.enums.PrioridadDashboardCampo;
 import com.preventiva.backend.repository.CampoClinicoRepository;
 import com.preventiva.backend.repository.DatasetClinicoRepository;
 import com.preventiva.backend.service.interfaces.CampoClinicoService;
@@ -51,6 +52,12 @@ public class CampoClinicoServiceImpl implements CampoClinicoService {
                 .esComun(request.getEsComun())
                 .obligatorio(request.getObligatorio())
                 .orden(request.getOrden())
+                // Sin indicación explícita, un campo nuevo nace NORMAL: la
+                // relevancia para dashboards la decide quien conoce el uso
+                // clínico, no se deduce de cómo se importó.
+                .prioridadDashboard(request.getPrioridadDashboard() != null
+                        ? request.getPrioridadDashboard()
+                        : PrioridadDashboardCampo.NORMAL)
                 .activo(true)
                 .build();
 
@@ -79,6 +86,12 @@ public class CampoClinicoServiceImpl implements CampoClinicoService {
         campo.setEsComun(request.getEsComun());
         campo.setObligatorio(request.getObligatorio());
         campo.setOrden(request.getOrden());
+
+        // Solo se toca si viene: editar la etiqueta de un campo no debe
+        // restablecer una prioridad que alguien ya había decidido.
+        if (request.getPrioridadDashboard() != null) {
+            campo.setPrioridadDashboard(request.getPrioridadDashboard());
+        }
 
         return mapToDto(campoClinicoRepository.save(campo));
     }
@@ -119,6 +132,7 @@ public class CampoClinicoServiceImpl implements CampoClinicoService {
                 .obligatorio(campo.getObligatorio())
                 .orden(campo.getOrden())
                 .activo(campo.getActivo())
+                .prioridadDashboard(campo.getPrioridadDashboard().name())
                 .build();
     }
 }

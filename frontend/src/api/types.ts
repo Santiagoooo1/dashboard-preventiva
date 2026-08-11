@@ -102,6 +102,8 @@ export interface DatasetClinicoRequestDto {
 }
 
 export interface CampoClinicoRequestDto {
+  /** Opcional: si no viene, se conserva la prioridad que tuviera el campo. */
+  prioridadDashboard?: PrioridadDashboardCampo | null
   codigo: string
   etiqueta: string
   tipoDato: TipoDato
@@ -111,6 +113,7 @@ export interface CampoClinicoRequestDto {
 }
 
 export interface CampoClinicoResponseDto {
+  prioridadDashboard: PrioridadDashboardCampo
   id: number
   datasetId: number
   codigo: string
@@ -130,6 +133,7 @@ export interface CampoRolesDto {
 }
 
 export interface CampoClinicoMetadataDto {
+  prioridadDashboard: PrioridadDashboardCampo
   id: number
   codigo: string
   etiqueta: string
@@ -253,6 +257,7 @@ export interface MetricaClinicaResponseDto {
 // --- Fase 5.2: metadata para construir métricas ---
 
 export interface CampoMetricaMetadataDto {
+  prioridadDashboard: PrioridadDashboardCampo
   codigo: string
   etiqueta: string
   tipoDato: string
@@ -546,6 +551,7 @@ export interface OperacionDisponibleDto {
 }
 
 export interface PerfilCampoDto {
+  prioridadDashboard: PrioridadDashboardCampo
   codigo: string
   etiqueta: string
   tipoDato: string
@@ -1016,3 +1022,14 @@ export interface PropuestaDashboardResponseDto {
   /** El dataset admite además la plantilla clínica de ILQ. */
   compatibleIlq: boolean
 }
+
+// --- Fase 6.9J.1: prioridad explícita del campo para dashboards ---
+
+/**
+ * Relevancia de una columna para los dashboards.
+ *
+ * Es INDEPENDIENTE de `obligatorio` (calidad del dato) y de `esComun`
+ * (pertenencia al modelo clínico común): un campo puede ser obligatorio y no
+ * interesar en ningún gráfico, y uno opcional puede ser el indicador principal.
+ */
+export type PrioridadDashboardCampo = 'FUNDAMENTAL' | 'IMPORTANTE' | 'NORMAL' | 'EXCLUIR'

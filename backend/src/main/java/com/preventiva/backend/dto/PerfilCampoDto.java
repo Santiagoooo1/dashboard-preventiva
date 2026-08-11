@@ -25,6 +25,9 @@ public class PerfilCampoDto {
     private String tipoDato;
     private Boolean activo;
 
+    /** Relevancia para dashboards elegida por el usuario (no deducida). */
+    private String prioridadDashboard;
+
     /** Rol analítico sugerido. El usuario puede corregirlo dentro de lo seguro. */
     private String rolSugerido;
 

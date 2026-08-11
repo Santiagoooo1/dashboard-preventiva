@@ -100,6 +100,7 @@ public class DatasetFrontendMetadataServiceImpl implements DatasetFrontendMetada
                         .utilizableComoCampoValor(CampoRolesUtil.esNumerico(campo.getTipoDato()))
                         .utilizableComoCampoAgrupacion(CampoRolesUtil.esAgrupable(campo.getTipoDato()))
                         .utilizableComoCampoFecha(CampoRolesUtil.esFecha(campo.getTipoDato()))
+                        .prioridadDashboard(campo.getPrioridadDashboard().name())
                         .build())
                 .toList();
 
@@ -126,6 +127,7 @@ public class DatasetFrontendMetadataServiceImpl implements DatasetFrontendMetada
                 .obligatorio(campo.getObligatorio())
                 .activo(campo.getActivo())
                 .roles(roles)
+                .prioridadDashboard(campo.getPrioridadDashboard().name())
                 .build();
     }
 

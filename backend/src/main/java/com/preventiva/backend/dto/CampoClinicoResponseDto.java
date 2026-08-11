@@ -18,4 +18,7 @@ public class CampoClinicoResponseDto {
     private Boolean obligatorio;
     private Integer orden;
     private Boolean activo;
+
+    /** Relevancia para dashboards, independiente de esComun y obligatorio. */
+    private String prioridadDashboard;
 }

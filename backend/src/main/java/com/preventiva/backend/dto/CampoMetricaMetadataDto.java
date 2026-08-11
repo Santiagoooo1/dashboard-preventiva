@@ -19,4 +19,7 @@ public class CampoMetricaMetadataDto {
     private Boolean utilizableComoCampoValor;
     private Boolean utilizableComoCampoAgrupacion;
     private Boolean utilizableComoCampoFecha;
+
+    /** Relevancia para dashboards, independiente de esComun y obligatorio. */
+    private String prioridadDashboard;
 }

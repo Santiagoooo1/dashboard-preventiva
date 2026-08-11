@@ -162,8 +162,8 @@ export function DashboardRecomendadoPanel({
     <Card title="Dashboard recomendado" className={styles.tarjeta}>
       <p className={styles.mensaje}>
         Se crearán <strong>{seleccionadas.length} indicadores y gráficos</strong> a partir de los campos
-        fundamentales, obligatorios y con más valor analítico de este dataset. Puedes quitar los que no
-        necesites antes de crearlo.
+        marcados como fundamentales o importantes y de los que tienen más valor analítico. Puedes quitar los
+        que no necesites antes de crearlo.
       </p>
 
       <ErrorBanner mensaje={errorBackend} />

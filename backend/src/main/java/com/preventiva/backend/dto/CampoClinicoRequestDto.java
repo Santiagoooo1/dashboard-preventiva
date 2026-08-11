@@ -1,5 +1,6 @@
 package com.preventiva.backend.dto;
 
+import com.preventiva.backend.enums.PrioridadDashboardCampo;
 import com.preventiva.backend.enums.TipoDatoExcel;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -26,4 +27,11 @@ public class CampoClinicoRequestDto {
     private Boolean obligatorio;
 
     private Integer orden;
+
+    /**
+     * Relevancia para dashboards. Opcional: si no viene, se conserva la que
+     * tuviera el campo (o NORMAL al crearlo). Así un cliente que solo edite la
+     * etiqueta no borra sin querer una prioridad ya decidida.
+     */
+    private PrioridadDashboardCampo prioridadDashboard;
 }

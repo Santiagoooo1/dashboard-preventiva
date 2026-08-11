@@ -1,48 +1,41 @@
 package com.preventiva.backend.util;
 
 import com.preventiva.backend.entity.CampoClinico;
+import com.preventiva.backend.enums.PrioridadDashboardCampo;
 import com.preventiva.backend.enums.RolAnaliticoCampo;
 
 /**
- * Cuánto merece la pena que una columna aparezca en el dashboard inicial
- * (Fase 6.9I.4.1).
+ * Cuánto merece la pena que una columna aparezca en el dashboard inicial.
  *
- * <h2>Sobre «fundamental» e «importante»</h2>
+ * <h2>De dónde sale la importancia (Fase 6.9J.1)</h2>
  *
- * <p>{@link CampoClinico} NO tiene esos campos: sus únicos atributos son
- * {@code codigo}, {@code etiqueta}, {@code tipoDato}, {@code esComun},
- * {@code obligatorio}, {@code orden} y {@code activo}. Añadir dos banderas
- * nuevas obligaría además a construir la interfaz para marcarlas, y hasta que
- * alguien las marcara todos los datasets existentes valdrían lo mismo.
+ * <p>De {@code prioridadDashboard}, un atributo explícito de
+ * {@link CampoClinico} que el usuario decide. Antes se APROXIMABA con
+ * {@code esComun} («es del modelo común, luego será fundamental») y
+ * {@code obligatorio} («si es obligatorio, será importante»), y ninguna de las
+ * dos cosas es cierta: hay campos comunes que a un servicio concreto no le
+ * dicen nada, y campos opcionales que son justamente el indicador que se
+ * vigila.
  *
- * <p>Así que la importancia se DEDUCE de las señales que sí existen y que ya
- * están informadas en todos los datasets:
+ * <p>Los tres atributos son ahora independientes: {@code obligatorio} es una
+ * regla de calidad del dato, {@code esComun} una propiedad estructural del
+ * esquema y {@code prioridadDashboard} una decisión analítica.
  *
- * <ul>
- *   <li><b>fundamental</b> ≈ campo común del modelo clínico ({@code esComun}):
- *       paciente, fecha, procedimiento, diagnóstico, edad, sexo. Son los que el
- *       propio esquema reconoce como núcleo, no una opinión.</li>
- *   <li><b>importante</b> ≈ {@code obligatorio}: alguien decidió al definir el
- *       dataset que sin ese dato la fila no vale. Esa es exactamente la
- *       declaración de importancia que se busca.</li>
- *   <li>El resto se ordena por utilidad analítica: rol, cardinalidad y cuánto
- *       está realmente relleno.</li>
- * </ul>
- *
- * <p>La puntuación es determinista y está cubierta por tests: dos ejecuciones
- * sobre el mismo dataset proponen lo mismo, y el orden NO depende de la
- * posición física de la columna en el Excel.
+ * <p>El resto de la puntuación sigue igual: rol analítico, cardinalidad y
+ * cuánto está realmente relleno el campo. Es determinista y está cubierta por
+ * tests — dos ejecuciones sobre el mismo dataset proponen lo mismo, y el orden
+ * NO depende de la posición física de la columna en el Excel.
  */
 public class PrioridadCampoUtil {
 
     // --- Pesos. Separados por tramos para que el orden entre categorías sea
     // --- estable aunque se ajusten los detalles dentro de cada una.
 
-    /** Campo común del modelo clínico: el núcleo del dataset. */
+    /** Marcado FUNDAMENTAL para dashboards. */
     public static final int PESO_FUNDAMENTAL = 1000;
 
-    /** Declarado obligatorio al definir el dataset. */
-    public static final int PESO_OBLIGATORIO = 500;
+    /** Marcado IMPORTANTE para dashboards. */
+    public static final int PESO_IMPORTANTE = 500;
 
     /** Un booleano clínico es casi siempre el indicador que se quiere ver. */
     public static final int PESO_BOOLEANO = 200;
@@ -89,13 +82,13 @@ public class PrioridadCampoUtil {
 
         int puntos = 0;
 
-        if (Boolean.TRUE.equals(campo.getEsComun())) {
-            puntos += PESO_FUNDAMENTAL;
-        }
-
-        if (Boolean.TRUE.equals(campo.getObligatorio())) {
-            puntos += PESO_OBLIGATORIO;
-        }
+        // La relevancia la declara el usuario, no se infiere de cómo se
+        // importó el campo.
+        puntos += switch (campo.getPrioridadDashboard()) {
+            case FUNDAMENTAL -> PESO_FUNDAMENTAL;
+            case IMPORTANTE -> PESO_IMPORTANTE;
+            case NORMAL, EXCLUIR -> 0;
+        };
 
         puntos += switch (rol) {
             case BOOLEANO -> PESO_BOOLEANO;
@@ -116,10 +109,18 @@ public class PrioridadCampoUtil {
     /**
      * ¿Merece la pena proponer un widget sobre esta columna?
      *
-     * <p>Una columna casi vacía se descarta salvo que sea obligatoria: si lo es,
-     * su vacío ES el hallazgo y se propone precisamente su completitud.
+     * <p>EXCLUIR manda sobre todo lo demás: si alguien ha apartado la columna
+     * del análisis, no se propone aunque puntúe alto.
+     *
+     * <p>Una columna casi vacía se descarta, salvo que sea obligatoria: ahí su
+     * vacío ES el hallazgo y se propone precisamente su completitud. Nótese que
+     * este sigue siendo un uso legítimo de {@code obligatorio} —habla de la
+     * calidad del dato, no de su relevancia analítica.
      */
     public static boolean mereceWidget(CampoClinico campo, double completitud) {
+        if (campo.getPrioridadDashboard() == PrioridadDashboardCampo.EXCLUIR) {
+            return false;
+        }
         if (Boolean.TRUE.equals(campo.getObligatorio())) {
             return true;
         }
@@ -128,14 +129,11 @@ public class PrioridadCampoUtil {
 
     /** Etiqueta de por qué se propone, para que el usuario pueda decidir. */
     public static String motivo(CampoClinico campo, RolAnaliticoCampo rol) {
-        if (Boolean.TRUE.equals(campo.getEsComun()) && Boolean.TRUE.equals(campo.getObligatorio())) {
-            return "Campo fundamental y obligatorio del dataset";
+        if (campo.getPrioridadDashboard() == PrioridadDashboardCampo.FUNDAMENTAL) {
+            return "Campo marcado como fundamental";
         }
-        if (Boolean.TRUE.equals(campo.getEsComun())) {
-            return "Campo fundamental del modelo clínico";
-        }
-        if (Boolean.TRUE.equals(campo.getObligatorio())) {
-            return "Campo obligatorio del dataset";
+        if (campo.getPrioridadDashboard() == PrioridadDashboardCampo.IMPORTANTE) {
+            return "Campo marcado como importante";
         }
 
         return switch (rol) {

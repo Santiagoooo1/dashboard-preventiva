@@ -106,6 +106,7 @@ public class PerfilCampoServiceImpl implements PerfilCampoService {
                 .etiqueta(campo.getEtiqueta())
                 .tipoDato(campo.getTipoDato().name())
                 .activo(campo.getActivo())
+                .prioridadDashboard(campo.getPrioridadDashboard().name())
                 .rolSugerido(rol.name())
                 .rolesAlternativos(rolesAlternativos(campo, rol).stream().map(Enum::name).toList())
                 .totalRegistros(total)

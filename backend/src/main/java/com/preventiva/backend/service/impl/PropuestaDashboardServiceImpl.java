@@ -12,6 +12,7 @@ import com.preventiva.backend.entity.CampoClinico;
 import com.preventiva.backend.entity.DatasetClinico;
 import com.preventiva.backend.enums.Granularidad;
 import com.preventiva.backend.enums.OperadorFiltro;
+import com.preventiva.backend.enums.PrioridadDashboardCampo;
 import com.preventiva.backend.enums.RolAnaliticoCampo;
 import com.preventiva.backend.enums.TipoMetrica;
 import com.preventiva.backend.enums.TipoResultadoWidget;
@@ -97,13 +98,18 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
         // ---- 1. Elementos estructurales: van primero pase lo que pase ----
         propuestas.add(totalRegistros());
 
+        // Los estructurales también respetan EXCLUIR: si alguien ha apartado el
+        // identificador o la fecha del análisis, no se cuelan por la puerta de
+        // atrás por ser "de los que siempre van".
         perfil.getCampos().stream()
                 .filter(c -> Boolean.TRUE.equals(c.getEsIdentificadorIndividuo()))
+                .filter(c -> !excluido(c, porCodigo))
                 .findFirst()
                 .ifPresent(c -> propuestas.add(pacientesUnicos(c)));
 
         perfil.getCampos().stream()
                 .filter(c -> "FECHA".equals(c.getRolSugerido()))
+                .filter(c -> !excluido(c, porCodigo))
                 .max(Comparator.comparingInt(c -> prioridad(c, porCodigo)))
                 .ifPresent(c -> propuestas.add(evolucionTemporal(c)));
 
@@ -404,6 +410,12 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
                 .campoOrigenEtiqueta(campo.getEtiqueta())
                 .motivo(motivo)
                 .prioridad(prioridad);
+    }
+
+    /** El usuario ha apartado esta columna del análisis automático. */
+    private boolean excluido(PerfilCampoDto perfil, Map<String, CampoClinico> porCodigo) {
+        CampoClinico campo = porCodigo.get(perfil.getCodigo());
+        return campo != null && campo.getPrioridadDashboard() == PrioridadDashboardCampo.EXCLUIR;
     }
 
     private int prioridad(PerfilCampoDto perfil, Map<String, CampoClinico> porCodigo) {

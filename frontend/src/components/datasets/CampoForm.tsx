@@ -1,8 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router'
-import type { CampoClinicoRequestDto, OpcionCatalogoDto, TipoDato } from '../../api/types'
+import type {
+  CampoClinicoRequestDto,
+  OpcionCatalogoDto,
+  PrioridadDashboardCampo,
+  TipoDato,
+} from '../../api/types'
 import { FormField } from '../FormField'
 import { avisoCodigo } from '../../utils/validacion'
+import { AYUDA_PRIORIDAD, ETIQUETA_PRIORIDAD, ORDEN_PRIORIDAD } from './prioridadDashboard'
 import styles from './CampoForm.module.css'
 
 const CAMPOS_COMUNES_CONOCIDOS = [
@@ -23,6 +29,7 @@ export interface CampoFormValores {
   esComun: boolean
   obligatorio: boolean
   orden: string
+  prioridadDashboard: PrioridadDashboardCampo
 }
 
 interface CampoFormProps {
@@ -48,6 +55,9 @@ export function CampoForm({
   const [esComun, setEsComun] = useState(valorInicial.esComun)
   const [obligatorio, setObligatorio] = useState(valorInicial.obligatorio)
   const [orden, setOrden] = useState(valorInicial.orden)
+  const [prioridadDashboard, setPrioridadDashboard] = useState<PrioridadDashboardCampo>(
+    valorInicial.prioridadDashboard,
+  )
   const [errores, setErrores] = useState<Record<string, string>>({})
 
   const mostrarAvisoComun = esComun && codigo.trim() !== '' && !CAMPOS_COMUNES_CONOCIDOS.includes(codigo.trim())
@@ -67,6 +77,7 @@ export function CampoForm({
       esComun,
       obligatorio,
       orden: orden === '' ? null : Number(orden),
+      prioridadDashboard,
     })
   }
 
@@ -133,6 +144,27 @@ export function CampoForm({
         <label htmlFor="obligatorio">Obligatorio</label>
       </div>
       <p className={styles.ayuda}>Marca esta opción si el campo debe estar informado en cada registro importado.</p>
+
+      {/* La prioridad es una decisión analítica, distinta de "obligatorio"
+          (calidad del dato) y de "es campo común" (estructura del modelo). Va
+          después de ambas para que se lea como una tercera cosa, no como un
+          matiz de las anteriores. */}
+      <FormField
+        label="Prioridad en dashboards"
+        help="Cuánta relevancia tiene este campo al proponer indicadores y gráficos automáticamente. No afecta a si el dato es obligatorio ni a si es un campo común."
+      >
+        <select
+          value={prioridadDashboard}
+          onChange={(e) => setPrioridadDashboard(e.target.value as PrioridadDashboardCampo)}
+        >
+          {ORDEN_PRIORIDAD.map((p) => (
+            <option key={p} value={p}>
+              {ETIQUETA_PRIORIDAD[p]}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      <p className={styles.ayuda}>{AYUDA_PRIORIDAD[prioridadDashboard]}</p>
 
       <FormField label="Orden" help="Número opcional para ordenar los campos en la interfaz.">
         <input type="number" step={1} value={orden} onChange={(e) => setOrden(e.target.value)} />

@@ -1,5 +1,6 @@
 package com.preventiva.backend.config;
 
+import com.preventiva.backend.enums.PrioridadDashboardCampo;
 import com.preventiva.backend.enums.TipoMetrica;
 
 import jakarta.annotation.PostConstruct;
@@ -28,8 +29,15 @@ import java.util.stream.Collectors;
  * persistido. Es idempotente y conservadora — solo reescribe la restricción
  * cuando la lista de la base y la del enum difieren, y nunca borra datos.
  *
- * <p>Se registró al ampliar {@code TipoMetrica} en la Fase 6.9I.2. Si en el
- * futuro se amplía otro enum persistido, basta con añadirlo a la lista.
+ * <p>Cubre los dos casos en que {@code ddl-auto=update} se queda corto:
+ * ampliar un enum ya persistido (Fase 6.9I.2, {@code TipoMetrica}) y añadir una
+ * columna de enum a una tabla que ya existe (Fase 6.9J.1,
+ * {@code prioridad_dashboard}), donde Hibernate crea la columna pero no su
+ * CHECK. Si en el futuro aparece otro, basta con añadirlo a la lista.
+ *
+ * <p>La restricción es {@code columna IN (...)}, que en SQL deja pasar los
+ * NULL: una columna nullable recién añadida no bloquea el ALTER aunque todavía
+ * haya filas sin rellenar.
  */
 @Component
 @Slf4j
@@ -37,7 +45,11 @@ public class AlineadorRestriccionesEnum {
 
     /** Qué restricciones se vigilan: tabla, columna y enum del que salen los valores. */
     private static final List<RestriccionEnum> RESTRICCIONES = List.of(
-            new RestriccionEnum("metricas_clinicas", "tipo_metrica", TipoMetrica.class));
+            new RestriccionEnum("metricas_clinicas", "tipo_metrica", TipoMetrica.class),
+            // Añadida en 6.9J.1: al AÑADIR una columna de enum sobre una tabla
+            // que ya existe, Hibernate crea la columna pero no su CHECK, así que
+            // la base aceptaría cualquier texto. Aquí se crea.
+            new RestriccionEnum("campos_clinicos", "prioridad_dashboard", PrioridadDashboardCampo.class));
 
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;
