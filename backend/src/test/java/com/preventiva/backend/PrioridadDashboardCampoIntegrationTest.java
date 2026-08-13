@@ -434,9 +434,11 @@ class PrioridadDashboardCampoIntegrationTest {
                 .codigo("b").esComun(false).obligatorio(false)
                 .prioridadDashboard(PrioridadDashboardCampo.FUNDAMENTAL).build();
 
-        assertThat(PrioridadCampoUtil.motivo(comun, RolAnaliticoCampo.CATEGORICO))
+        assertThat(PrioridadCampoUtil.motivo(comun, RolAnaliticoCampo.CATEGORICO, 100.0))
                 .doesNotContain("fundamental");
-        assertThat(PrioridadCampoUtil.motivo(marcado, RolAnaliticoCampo.CATEGORICO))
-                .isEqualTo("Campo marcado como fundamental");
+        // Desde 6.9J.2 el motivo añade también la aptitud ("...adecuada para
+        // una distribución"); lo que aquí importa es que cite la prioridad.
+        assertThat(PrioridadCampoUtil.motivo(marcado, RolAnaliticoCampo.CATEGORICO, 100.0))
+                .startsWith("Campo marcado como fundamental");
     }
 }

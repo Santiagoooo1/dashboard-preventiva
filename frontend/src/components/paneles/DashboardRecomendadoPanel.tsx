@@ -208,6 +208,42 @@ export function DashboardRecomendadoPanel({
         ))}
       </ul>
 
+      {(propuesta.filtrosRecomendados?.length > 0 || propuesta.dimensionesRecomendadas?.length > 0) && (
+        // Informativo: el dashboard se crea igual sin esto. Plegado para no
+        // competir con la decisión principal, que es qué widgets entran.
+        <details className={styles.recomendaciones}>
+          <summary className={styles.recomendacionesResumen}>
+            Campos sugeridos para filtrar y agrupar
+          </summary>
+          <div className={styles.listasRecomendadas}>
+            {propuesta.filtrosRecomendados?.length > 0 && (
+              <div>
+                <p className={styles.listaTitulo}>Para filtrar</p>
+                <ul className={styles.listaCampos}>
+                  {propuesta.filtrosRecomendados.map((c) => (
+                    <li key={c.codigo} title={c.motivo}>
+                      {c.etiqueta}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {propuesta.dimensionesRecomendadas?.length > 0 && (
+              <div>
+                <p className={styles.listaTitulo}>Para agrupar o segmentar</p>
+                <ul className={styles.listaCampos}>
+                  {propuesta.dimensionesRecomendadas.map((c) => (
+                    <li key={c.codigo} title={c.motivo}>
+                      {c.etiqueta}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+
       {progreso && <p className={styles.progreso}>{progreso}</p>}
 
       <div className={styles.acciones}>

@@ -28,4 +28,13 @@ public class PropuestaDashboardResponseDto {
 
     /** El dataset admite además la plantilla clínica de ILQ. */
     private Boolean compatibleIlq;
+
+    /**
+     * Columnas recomendadas para filtrar, ya ordenadas (Fase 6.9J.2). No
+     * restringe nada: el usuario puede filtrar por cualquier campo compatible.
+     */
+    private List<CampoRecomendadoDto> filtrosRecomendados;
+
+    /** Columnas recomendadas para agrupar o segmentar, ya ordenadas. */
+    private List<CampoRecomendadoDto> dimensionesRecomendadas;
 }

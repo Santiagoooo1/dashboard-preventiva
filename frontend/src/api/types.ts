@@ -1012,7 +1012,21 @@ export interface PropuestaWidgetDto {
   advertencia: string | null
 }
 
+/** Columna recomendada como filtro o como dimensión de agrupación. */
+export interface CampoRecomendadoDto {
+  codigo: string
+  etiqueta: string
+  rol: RolAnaliticoCampo
+  prioridadDashboard: PrioridadDashboardCampo
+  motivo: string
+  orden: number
+}
+
 export interface PropuestaDashboardResponseDto {
+  /** Columnas sugeridas para filtrar, ya ordenadas. No restringe nada. */
+  filtrosRecomendados: CampoRecomendadoDto[]
+  /** Columnas sugeridas para agrupar o segmentar, ya ordenadas. */
+  dimensionesRecomendadas: CampoRecomendadoDto[]
   datasetId: number
   datasetCodigo: string
   suficiente: boolean

@@ -1,5 +1,6 @@
 package com.preventiva.backend.service.impl;
 
+import com.preventiva.backend.dto.CampoRecomendadoDto;
 import com.preventiva.backend.dto.ConfiguracionMetricaDto;
 import com.preventiva.backend.dto.ConfiguracionWidgetDto;
 import com.preventiva.backend.dto.FiltroGrupoDto;
@@ -31,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -54,11 +57,33 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PropuestaDashboardServiceImpl implements PropuestaDashboardService {
 
-    /** Un dashboard con más de doce widgets deja de leerse de un vistazo. */
-    public static final int MAXIMO_WIDGETS = 12;
+    /** Un dashboard con más de catorce widgets deja de leerse de un vistazo. */
+    public static final int MAXIMO_WIDGETS = 14;
+
+    /** Tope de indicadores numéricos (la cabecera del dashboard). */
+    public static final int MAXIMO_KPI = 8;
+
+    /** Tope de gráficos: más de seis y el dashboard pide scroll y comparación. */
+    public static final int MAXIMO_GRAFICOS = 6;
+
+    /**
+     * Una sola evolución temporal. Varias series del mismo dataset cuentan casi
+     * lo mismo con distinta fecha y llenan el dashboard sin añadir información.
+     */
+    public static final int MAXIMO_SERIES_TEMPORALES = 1;
+
+    /**
+     * Tope de completitudes. Son útiles —miden si el registro se rellena—, pero
+     * media docena convierten un dashboard clínico en un informe de calidad de
+     * datos.
+     */
+    public static final int MAXIMO_COMPLETITUDES = 2;
 
     /** Con menos de dos columnas activas no hay dashboard que componer. */
     private static final int MINIMO_CAMPOS = 2;
+
+    /** Cuántos filtros y dimensiones se recomiendan como mucho. */
+    private static final int MAXIMO_RECOMENDACIONES = 8;
 
     private final DatasetClinicoRepository datasetClinicoRepository;
     private final CampoClinicoRepository campoClinicoRepository;
@@ -94,6 +119,10 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
         }
 
         List<PropuestaWidgetDto> propuestas = new ArrayList<>();
+        // Columnas que ya tienen su widget: evita proponer dos veces lo mismo
+        // (la completitud de un identificador que ya se cuenta en distintos, por
+        // ejemplo).
+        Set<String> camposYaRepresentados = new HashSet<>();
 
         // ---- 1. Elementos estructurales: van primero pase lo que pase ----
         propuestas.add(totalRegistros());
@@ -105,13 +134,22 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
                 .filter(c -> Boolean.TRUE.equals(c.getEsIdentificadorIndividuo()))
                 .filter(c -> !excluido(c, porCodigo))
                 .findFirst()
-                .ifPresent(c -> propuestas.add(pacientesUnicos(c)));
+                .ifPresent(c -> {
+                    propuestas.add(pacientesUnicos(c));
+                    camposYaRepresentados.add(c.getCodigo());
+                });
 
         perfil.getCampos().stream()
                 .filter(c -> "FECHA".equals(c.getRolSugerido()))
                 .filter(c -> !excluido(c, porCodigo))
-                .max(Comparator.comparingInt(c -> prioridad(c, porCodigo)))
-                .ifPresent(c -> propuestas.add(evolucionTemporal(c)));
+                // La fecha más prioritaria, y solo esa: varias evoluciones
+                // temporales del mismo dataset son casi el mismo gráfico.
+                .max(Comparator.comparingInt((PerfilCampoDto c) -> prioridad(c, porCodigo))
+                        .thenComparing(PerfilCampoDto::getCodigo))
+                .ifPresent(c -> {
+                    propuestas.add(evolucionTemporal(c));
+                    camposYaRepresentados.add(c.getCodigo());
+                });
 
         // ---- 2. El resto, por prioridad ----
         // El orden sale de la puntuación, nunca del orden de las columnas.
@@ -130,14 +168,28 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
                         .thenComparing(PerfilCampoDto::getCodigo))
                 .toList();
 
+        // Cupos por tipo: sin ellos, un dataset con quince booleanos produce
+        // quince tasas y ningún gráfico, y uno con muchas columnas vacías se
+        // llena de completitudes.
+        Cupos cupos = new Cupos(propuestas);
+
         for (PerfilCampoDto campoPerfil : ordenados) {
             if (propuestas.size() >= MAXIMO_WIDGETS) break;
 
             CampoClinico campo = porCodigo.get(campoPerfil.getCodigo());
             if (campo == null) continue;
 
+            // Una columna, un widget: el identificador ya está representado por
+            // «Pacientes únicos» y la fecha por la evolución temporal.
+            if (camposYaRepresentados.contains(campoPerfil.getCodigo())) continue;
+
             PropuestaWidgetDto propuesta = propuestaPara(campoPerfil, campo);
-            if (propuesta != null) propuestas.add(propuesta);
+            if (propuesta == null) continue;
+            if (!cupos.admite(propuesta)) continue;
+
+            cupos.registrar(propuesta);
+            camposYaRepresentados.add(campoPerfil.getCodigo());
+            propuestas.add(propuesta);
         }
 
         // ---- 3. Orden final de presentación y anchos ----
@@ -150,7 +202,127 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
                 .propuestas(finales)
                 .maximoWidgets(MAXIMO_WIDGETS)
                 .compatibleIlq(compatibleIlq)
+                .filtrosRecomendados(recomendarFiltros(perfil, porCodigo))
+                .dimensionesRecomendadas(recomendarDimensiones(perfil, porCodigo))
                 .build();
+    }
+
+    // ------------------------------------------------------------------
+    // Filtros y dimensiones recomendados
+    // ------------------------------------------------------------------
+
+    /**
+     * Por qué campos conviene filtrar. Un identificador daría un desplegable con
+     * un valor por paciente y el texto libre uno con una observación por fila:
+     * ninguno de los dos es una pregunta que nadie le vaya a hacer al panel.
+     *
+     * <p>Las fechas SÍ entran, aunque no sirvan como dimensión de agrupación
+     * categórica: acotar un periodo es el filtro más habitual de todos.
+     */
+    private List<CampoRecomendadoDto> recomendarFiltros(
+            PerfilCamposResponseDto perfil, Map<String, CampoClinico> porCodigo) {
+
+        return perfil.getCampos().stream()
+                .filter(c -> {
+                    CampoClinico campo = porCodigo.get(c.getCodigo());
+                    if (campo == null || excluido(c, porCodigo)) return false;
+                    RolAnaliticoCampo rol = rolEfectivo(c);
+                    return rol == RolAnaliticoCampo.FECHA
+                            || PrioridadCampoUtil.sirveComoDimension(campo, rol, cardinalidadAlta(c));
+                })
+                .sorted(comparadorPorPrioridad(porCodigo))
+                .limit(MAXIMO_RECOMENDACIONES)
+                .map(c -> recomendado(c, porCodigo))
+                .toList();
+    }
+
+    /**
+     * Por qué campos conviene agrupar o segmentar. Igual que los filtros pero
+     * sin fechas: agrupar por fecha exacta produce una categoría por día.
+     */
+    private List<CampoRecomendadoDto> recomendarDimensiones(
+            PerfilCamposResponseDto perfil, Map<String, CampoClinico> porCodigo) {
+
+        return perfil.getCampos().stream()
+                .filter(c -> {
+                    CampoClinico campo = porCodigo.get(c.getCodigo());
+                    return campo != null
+                            && !excluido(c, porCodigo)
+                            && PrioridadCampoUtil.sirveComoDimension(
+                                    campo, rolEfectivo(c), cardinalidadAlta(c));
+                })
+                .sorted(comparadorPorPrioridad(porCodigo))
+                .limit(MAXIMO_RECOMENDACIONES)
+                .map(c -> recomendado(c, porCodigo))
+                .toList();
+    }
+
+    private CampoRecomendadoDto recomendado(PerfilCampoDto perfil, Map<String, CampoClinico> porCodigo) {
+        CampoClinico campo = porCodigo.get(perfil.getCodigo());
+        RolAnaliticoCampo rol = rolEfectivo(perfil);
+
+        return CampoRecomendadoDto.builder()
+                .codigo(perfil.getCodigo())
+                .etiqueta(perfil.getEtiqueta())
+                .rol(rol.name())
+                .prioridadDashboard(campo.getPrioridadDashboard().name())
+                .motivo(PrioridadCampoUtil.motivo(campo, rol, completitud(perfil)))
+                .build();
+    }
+
+    /** Orden estable: primero la puntuación, y a igualdad, el código. */
+    private Comparator<PerfilCampoDto> comparadorPorPrioridad(Map<String, CampoClinico> porCodigo) {
+        return Comparator.comparingInt((PerfilCampoDto c) -> prioridad(c, porCodigo)).reversed()
+                .thenComparing(PerfilCampoDto::getCodigo);
+    }
+
+    private boolean cardinalidadAlta(PerfilCampoDto perfil) {
+        return "ALTA".equals(perfil.getCardinalidad());
+    }
+
+    // ------------------------------------------------------------------
+    // Cupos por tipo de widget
+    // ------------------------------------------------------------------
+
+    /**
+     * Lleva la cuenta de cuántos widgets de cada clase se han propuesto ya, para
+     * que el dashboard salga variado en vez de quince veces lo mismo.
+     */
+    private static final class Cupos {
+        private int kpis;
+        private int graficos;
+        private int series;
+        private int completitudes;
+
+        Cupos(List<PropuestaWidgetDto> yaPropuestos) {
+            yaPropuestos.forEach(this::registrar);
+        }
+
+        boolean admite(PropuestaWidgetDto p) {
+            if (esSerie(p) && series >= MAXIMO_SERIES_TEMPORALES) return false;
+            if (esCompletitud(p) && completitudes >= MAXIMO_COMPLETITUDES) return false;
+            if (esKpi(p) && kpis >= MAXIMO_KPI) return false;
+            return esKpi(p) || graficos < MAXIMO_GRAFICOS;
+        }
+
+        void registrar(PropuestaWidgetDto p) {
+            if (esSerie(p)) series++;
+            if (esCompletitud(p)) completitudes++;
+            if (esKpi(p)) kpis++;
+            else graficos++;
+        }
+
+        private boolean esKpi(PropuestaWidgetDto p) {
+            return TipoVisualizacion.KPI.name().equals(p.getTipoVisualizacion());
+        }
+
+        private boolean esSerie(PropuestaWidgetDto p) {
+            return TipoResultadoWidget.SERIE_TEMPORAL.name().equals(p.getTipoResultado());
+        }
+
+        private boolean esCompletitud(PropuestaWidgetDto p) {
+            return TipoMetrica.COMPLETITUD.name().equals(p.getTipoMetrica());
+        }
     }
 
     // ------------------------------------------------------------------
@@ -230,9 +402,9 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
      * observaciones clínicas en una leyenda.
      */
     private PropuestaWidgetDto propuestaPara(PerfilCampoDto perfil, CampoClinico campo) {
-        RolAnaliticoCampo rol = RolAnaliticoCampo.valueOf(perfil.getRolSugerido());
+        RolAnaliticoCampo rol = rolEfectivo(perfil);
         int prioridad = prioridad(perfil, campo);
-        String motivo = PrioridadCampoUtil.motivo(campo, rol);
+        String motivo = PrioridadCampoUtil.motivo(campo, rol, completitud(perfil));
         boolean casiVacio = completitud(perfil) < PrioridadCampoUtil.COMPLETITUD_MINIMA;
 
         // Un campo obligatorio pero casi vacío: lo interesante NO es su reparto,
@@ -240,14 +412,6 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
         if (casiVacio) {
             return completitud(perfil, campo, prioridad,
                     "Campo obligatorio con muy pocos datos informados");
-        }
-
-        // Un campo con (casi) un valor distinto por registro no es una
-        // categoría aunque el umbral absoluto de cardinalidad no se alcance:
-        // en un dataset de 12 filas con 12 valores distintos, la "distribución"
-        // son doce barras de altura uno. Solo su completitud dice algo.
-        if (casiUnicoPorRegistro(perfil)) {
-            return completitud(perfil, campo, prioridad, motivo);
         }
 
         return switch (rol) {
@@ -424,9 +588,11 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
     }
 
     private int prioridad(PerfilCampoDto perfil, CampoClinico campo) {
+        // Rol EFECTIVO: se puntúa lo que se va a dibujar, no lo que el tipo de
+        // dato sugiere en abstracto.
         return PrioridadCampoUtil.puntuar(
                 campo,
-                RolAnaliticoCampo.valueOf(perfil.getRolSugerido()),
+                rolEfectivo(perfil),
                 completitud(perfil),
                 "ALTA".equals(perfil.getCardinalidad()));
     }
@@ -443,9 +609,33 @@ public class PropuestaDashboardServiceImpl implements PropuestaDashboardService 
      * registros o un dataset recién empezado.
      */
     private boolean casiUnicoPorRegistro(PerfilCampoDto perfil) {
+        // Solo tiene sentido en texto: que veinte edades o veinte fechas sean
+        // distintas es lo normal y no impide calcular su media ni su evolución.
+        RolAnaliticoCampo rol = RolAnaliticoCampo.valueOf(perfil.getRolSugerido());
+        if (rol != RolAnaliticoCampo.CATEGORICO && rol != RolAnaliticoCampo.TEXTO_LIBRE) {
+            return false;
+        }
+
         long informados = perfil.getValoresInformados();
         if (informados < 5) return false;
         return perfil.getValoresDistintos() >= informados * 0.9;
+    }
+
+    /**
+     * El rol con el que de verdad se va a representar la columna.
+     *
+     * <p>Un texto con (casi) un valor distinto por registro se clasifica como
+     * CATEGORICO mientras no pase del umbral absoluto de cardinalidad, pero no
+     * es una categoría: su «distribución» serían veinte barras de altura uno.
+     * Aquí se degrada a TEXTO_LIBRE, y eso es lo que se puntúa.
+     *
+     * <p>Sin esta corrección la aptitud se medía sobre un rol nominal distinto
+     * del que se acababa dibujando, y un texto irrepetible marcado FUNDAMENTAL
+     * adelantaba a un booleano que sí se puede representar.
+     */
+    private RolAnaliticoCampo rolEfectivo(PerfilCampoDto perfil) {
+        RolAnaliticoCampo rol = RolAnaliticoCampo.valueOf(perfil.getRolSugerido());
+        return casiUnicoPorRegistro(perfil) ? RolAnaliticoCampo.TEXTO_LIBRE : rol;
     }
 
     private double completitud(PerfilCampoDto perfil) {

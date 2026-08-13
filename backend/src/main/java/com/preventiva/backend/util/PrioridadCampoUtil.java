@@ -5,105 +5,120 @@ import com.preventiva.backend.enums.PrioridadDashboardCampo;
 import com.preventiva.backend.enums.RolAnaliticoCampo;
 
 /**
- * Cuánto merece la pena que una columna aparezca en el dashboard inicial.
+ * Cuánto merece la pena que una columna aparezca en el dashboard propuesto.
  *
- * <h2>De dónde sale la importancia (Fase 6.9J.1)</h2>
+ * <h2>Dos cosas distintas que antes iban juntas (Fase 6.9J.2)</h2>
  *
- * <p>De {@code prioridadDashboard}, un atributo explícito de
- * {@link CampoClinico} que el usuario decide. Antes se APROXIMABA con
- * {@code esComun} («es del modelo común, luego será fundamental») y
- * {@code obligatorio} («si es obligatorio, será importante»), y ninguna de las
- * dos cosas es cierta: hay campos comunes que a un servicio concreto no le
- * dicen nada, y campos opcionales que son justamente el indicador que se
- * vigila.
+ * <p><b>A) Relevancia clínica</b> — {@code prioridadDashboard}. La declara quien
+ * conoce el uso del dataset. Hasta la Fase 6.9J.1 se aproximaba con
+ * {@code esComun} y {@code obligatorio}, que son otra cosa: pertenencia al
+ * modelo común y calidad del dato.
  *
- * <p>Los tres atributos son ahora independientes: {@code obligatorio} es una
- * regla de calidad del dato, {@code esComun} una propiedad estructural del
- * esquema y {@code prioridadDashboard} una decisión analítica.
+ * <p><b>B) Aptitud para representarse</b> — qué tan bien se deja dibujar la
+ * columna: su rol analítico, su cardinalidad y cuánto está rellena. Un campo
+ * puede ser clínicamente importantísimo y aun así no dar un buen gráfico.
  *
- * <p>El resto de la puntuación sigue igual: rol analítico, cardinalidad y
- * cuánto está realmente relleno el campo. Es determinista y está cubierta por
- * tests — dos ejecuciones sobre el mismo dataset proponen lo mismo, y el orden
- * NO depende de la posición física de la columna en el Excel.
+ * <p>Se suman, con pesos elegidos para que <b>la aptitud pueda compensar un
+ * escalón de relevancia, pero no dos</b>. Es lo que hace que un FUNDAMENTAL de
+ * texto libre con cardinalidad altísima NO gane a un IMPORTANTE booleano —el
+ * primero no se puede dibujar—, mientras que a igualdad analítica un
+ * FUNDAMENTAL sí gana siempre a un IMPORTANTE.
+ *
+ * <p>La puntuación es determinista: dos ejecuciones sobre el mismo dataset
+ * proponen lo mismo, y el orden NO depende de la posición física de la columna
+ * en el Excel.
  */
 public class PrioridadCampoUtil {
 
-    // --- Pesos. Separados por tramos para que el orden entre categorías sea
-    // --- estable aunque se ajusten los detalles dentro de cada una.
+    // ---------------------------------------------------------------
+    // A) Relevancia clínica declarada
+    // ---------------------------------------------------------------
 
-    /** Marcado FUNDAMENTAL para dashboards. */
-    public static final int PESO_FUNDAMENTAL = 1000;
+    public static final int RELEVANCIA_FUNDAMENTAL = 300;
+    public static final int RELEVANCIA_IMPORTANTE = 200;
+    public static final int RELEVANCIA_NORMAL = 100;
 
-    /** Marcado IMPORTANTE para dashboards. */
-    public static final int PESO_IMPORTANTE = 500;
+    /** EXCLUIR no puntúa: ni siquiera entra en la propuesta (ver `mereceWidget`). */
+    public static final int RELEVANCIA_EXCLUIDO = 0;
 
-    /** Un booleano clínico es casi siempre el indicador que se quiere ver. */
-    public static final int PESO_BOOLEANO = 200;
+    // ---------------------------------------------------------------
+    // B) Aptitud para una visualización
+    // ---------------------------------------------------------------
 
-    /** Una categoría legible en un gráfico. */
-    public static final int PESO_CATEGORICO_LEGIBLE = 150;
+    /** Sí/No: la forma más limpia de una tasa. */
+    public static final int APTITUD_BOOLEANO = 140;
+
+    /** Pocas categorías: un donut o unas barras que se leen de un vistazo. */
+    public static final int APTITUD_CATEGORICO_BAJO = 130;
+
+    /** Bastantes categorías: legible en barras a ancho completo. */
+    public static final int APTITUD_CATEGORICO_MEDIO = 110;
 
     /** Una magnitud sobre la que promediar. */
-    public static final int PESO_NUMERICO = 120;
+    public static final int APTITUD_NUMERICO = 120;
 
     /** Una fecha da la evolución temporal. */
-    public static final int PESO_FECHA = 100;
+    public static final int APTITUD_FECHA = 115;
 
-    /** Identifica al individuo: imprescindible, pero para contar, no para repartir. */
-    public static final int PESO_IDENTIFICADOR = 90;
+    /** Sirve para contar individuos, no para repartirlos en un gráfico. */
+    public static final int APTITUD_IDENTIFICADOR = 60;
 
-    /** Categoría con demasiados valores: solo Top N, y con reservas. */
-    public static final int PESO_CATEGORICO_ALTO = 30;
+    /** Demasiadas categorías: solo Top N, y con reservas. */
+    public static final int APTITUD_CATEGORICO_ALTO = 45;
 
-    /** Texto libre: solo completitud. */
-    public static final int PESO_TEXTO_LIBRE = 10;
+    /** Texto libre: prácticamente solo su completitud dice algo. */
+    public static final int APTITUD_TEXTO_LIBRE = 10;
 
     /**
-     * Penalización por columna vacía. Un campo relleno al 5 % produce un
-     * indicador que parece clínico y solo mide que nadie lo rellena; que no
-     * abra el dashboard.
+     * Aporte máximo por estar bien relleno. Entre dos campos por lo demás
+     * iguales gana el que tiene datos; un campo al 5 % produce un indicador que
+     * parece clínico y solo mide que nadie lo rellena.
      */
-    public static final int PESO_MAXIMO_COMPLETITUD = 100;
+    public static final int APTITUD_MAXIMA_COMPLETITUD = 30;
 
-    /** Por debajo de esto, la columna no entra en el dashboard recomendado. */
+    /** Por debajo de esto, la columna no entra en el dashboard propuesto. */
     public static final double COMPLETITUD_MINIMA = 10.0;
 
     private PrioridadCampoUtil() {
     }
 
+    /** A) Lo que el usuario ha declarado sobre la relevancia del campo. */
+    public static int relevancia(CampoClinico campo) {
+        return switch (campo.getPrioridadDashboard()) {
+            case FUNDAMENTAL -> RELEVANCIA_FUNDAMENTAL;
+            case IMPORTANTE -> RELEVANCIA_IMPORTANTE;
+            case NORMAL -> RELEVANCIA_NORMAL;
+            case EXCLUIR -> RELEVANCIA_EXCLUIDO;
+        };
+    }
+
     /**
-     * Puntuación de una columna. Más alta = antes en el dashboard.
+     * B) Cuánto se deja representar la columna, con independencia de lo
+     * relevante que sea clínicamente.
+     */
+    public static int aptitud(RolAnaliticoCampo rol, double completitud, boolean cardinalidadAlta) {
+        int base = switch (rol) {
+            case BOOLEANO -> APTITUD_BOOLEANO;
+            case CATEGORICO -> cardinalidadAlta ? APTITUD_CATEGORICO_ALTO : APTITUD_CATEGORICO_BAJO;
+            case NUMERICO -> APTITUD_NUMERICO;
+            case FECHA -> APTITUD_FECHA;
+            case IDENTIFICADOR -> APTITUD_IDENTIFICADOR;
+            case TEXTO_LIBRE -> APTITUD_TEXTO_LIBRE;
+        };
+
+        double normalizada = Math.max(0, Math.min(100, completitud)) / 100.0;
+        return base + (int) Math.round(normalizada * APTITUD_MAXIMA_COMPLETITUD);
+    }
+
+    /**
+     * Puntuación total de una columna. Más alta = antes en el dashboard.
      *
      * @param completitud porcentaje de registros con el campo informado (0-100)
      * @param cardinalidadAlta el campo tiene demasiados valores distintos
      */
     public static int puntuar(
             CampoClinico campo, RolAnaliticoCampo rol, double completitud, boolean cardinalidadAlta) {
-
-        int puntos = 0;
-
-        // La relevancia la declara el usuario, no se infiere de cómo se
-        // importó el campo.
-        puntos += switch (campo.getPrioridadDashboard()) {
-            case FUNDAMENTAL -> PESO_FUNDAMENTAL;
-            case IMPORTANTE -> PESO_IMPORTANTE;
-            case NORMAL, EXCLUIR -> 0;
-        };
-
-        puntos += switch (rol) {
-            case BOOLEANO -> PESO_BOOLEANO;
-            case CATEGORICO -> cardinalidadAlta ? PESO_CATEGORICO_ALTO : PESO_CATEGORICO_LEGIBLE;
-            case NUMERICO -> PESO_NUMERICO;
-            case FECHA -> PESO_FECHA;
-            case IDENTIFICADOR -> PESO_IDENTIFICADOR;
-            case TEXTO_LIBRE -> PESO_TEXTO_LIBRE;
-        };
-
-        // Proporcional a lo relleno que esté: entre dos campos por lo demás
-        // iguales, gana el que tiene datos.
-        puntos += (int) Math.round((Math.max(0, Math.min(100, completitud)) / 100.0) * PESO_MAXIMO_COMPLETITUD);
-
-        return puntos;
+        return relevancia(campo) + aptitud(rol, completitud, cardinalidadAlta);
     }
 
     /**
@@ -127,22 +142,59 @@ public class PrioridadCampoUtil {
         return completitud >= COMPLETITUD_MINIMA;
     }
 
-    /** Etiqueta de por qué se propone, para que el usuario pueda decidir. */
-    public static String motivo(CampoClinico campo, RolAnaliticoCampo rol) {
-        if (campo.getPrioridadDashboard() == PrioridadDashboardCampo.FUNDAMENTAL) {
-            return "Campo marcado como fundamental";
-        }
-        if (campo.getPrioridadDashboard() == PrioridadDashboardCampo.IMPORTANTE) {
-            return "Campo marcado como importante";
+    /**
+     * ¿Sirve esta columna como filtro o como dimensión de agrupación?
+     *
+     * <p>Un identificador produciría un desplegable con un valor por paciente;
+     * el texto libre, uno con una observación clínica por fila. Ninguno de los
+     * dos es una pregunta que nadie vaya a hacerle a un dashboard.
+     */
+    public static boolean sirveComoDimension(
+            CampoClinico campo, RolAnaliticoCampo rol, boolean cardinalidadAlta) {
+        if (campo.getPrioridadDashboard() == PrioridadDashboardCampo.EXCLUIR) {
+            return false;
         }
 
         return switch (rol) {
-            case BOOLEANO -> "Variable clínica de sí/no";
-            case CATEGORICO -> "Variable categórica";
-            case NUMERICO -> "Variable numérica";
-            case FECHA -> "Campo de fecha";
-            case IDENTIFICADOR -> "Identificador de paciente";
-            case TEXTO_LIBRE -> "Texto libre";
+            case BOOLEANO, NUMERICO -> true;
+            // Con cardinalidad extrema deja de ser una dimensión: son etiquetas,
+            // no categorías.
+            case CATEGORICO -> !cardinalidadAlta;
+            case FECHA, IDENTIFICADOR, TEXTO_LIBRE -> false;
         };
+    }
+
+    /**
+     * Por qué se propone, en lenguaje clínico. Nunca la puntuación: al usuario
+     * le sirve saber que es «una variable binaria apta para una tasa», no que
+     * ha sacado 340 puntos.
+     */
+    public static String motivo(CampoClinico campo, RolAnaliticoCampo rol, double completitud) {
+        String porRelevancia = switch (campo.getPrioridadDashboard()) {
+            case FUNDAMENTAL -> "Campo marcado como fundamental";
+            case IMPORTANTE -> "Campo marcado como importante";
+            case NORMAL, EXCLUIR -> null;
+        };
+
+        String porAptitud = switch (rol) {
+            case BOOLEANO -> "variable binaria adecuada para una tasa";
+            case CATEGORICO -> "variable categórica adecuada para una distribución";
+            case NUMERICO -> "variable numérica con valor de resumen";
+            case FECHA -> "campo temporal adecuado para ver la evolución";
+            case IDENTIFICADOR -> "identificador de paciente";
+            case TEXTO_LIBRE -> "texto libre: solo se mide su completitud";
+        };
+
+        if (porRelevancia != null) {
+            return porRelevancia + ", " + porAptitud;
+        }
+
+        // Sin relevancia declarada, lo que justifica la propuesta es su aptitud;
+        // se menciona la cobertura solo cuando de verdad es buena.
+        if (completitud >= 90.0) {
+            return "Alta completitud y " + porAptitud;
+        }
+
+        return porAptitud.substring(0, 1).toUpperCase() + porAptitud.substring(1);
     }
 }

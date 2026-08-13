@@ -111,3 +111,39 @@
   flex-wrap: wrap;
   gap: var(--spacing-sm);
 }
+
+/* Sugerencias de filtros y dimensiones: información de apoyo, plegada para no
+   competir con la decisión principal (qué widgets entran). */
+.recomendaciones {
+  margin-bottom: var(--spacing-sm);
+  font-size: 0.9rem;
+}
+
+.recomendacionesResumen {
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.listasRecomendadas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-sm);
+}
+
+.listaTitulo {
+  margin: 0 0 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.listaCampos {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
