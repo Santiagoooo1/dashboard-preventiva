@@ -1,6 +1,7 @@
 package com.preventiva.backend.config;
 
 import com.preventiva.backend.enums.PrioridadDashboardCampo;
+import com.preventiva.backend.enums.TipoEventoImportacionTrabajo;
 import com.preventiva.backend.enums.TipoMetrica;
 
 import jakarta.annotation.PostConstruct;
@@ -49,7 +50,11 @@ public class AlineadorRestriccionesEnum {
             // Añadida en 6.9J.1: al AÑADIR una columna de enum sobre una tabla
             // que ya existe, Hibernate crea la columna pero no su CHECK, así que
             // la base aceptaría cualquier texto. Aquí se crea.
-            new RestriccionEnum("campos_clinicos", "prioridad_dashboard", PrioridadDashboardCampo.class));
+            new RestriccionEnum("campos_clinicos", "prioridad_dashboard", PrioridadDashboardCampo.class),
+            // Añadida en 6.9K: el enum de eventos crece con COPIA_RECUPERADA, y
+            // sin esto la base seguiría rechazando ese valor con el CHECK que se
+            // generó cuando se creó la tabla.
+            new RestriccionEnum("eventos_importacion_trabajo", "tipo_evento", TipoEventoImportacionTrabajo.class));
 
     private final EntityManager entityManager;
     private final TransactionTemplate transactionTemplate;

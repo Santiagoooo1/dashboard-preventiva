@@ -1,4 +1,13 @@
-import type { CampoMetricaMetadataDto, ConfiguracionMetricaDto, TipoMetrica, TipoVisualizacion } from '../../api/types'
+import type {
+  BaseEvaluableDashboardDto,
+  CampoMetricaMetadataDto,
+  ConfiguracionMetricaDto,
+  ConfiguracionWidgetDto,
+  PropuestaWidgetDto,
+  TipoMetrica,
+  TipoResultado,
+  TipoVisualizacion,
+} from '../../api/types'
 import { normalizarTexto } from '../importacionGuiada/sugerenciasColumnas'
 
 /**
@@ -12,15 +21,22 @@ export const MAX_WIDGETS_DASHBOARD_INICIAL = 14
 export interface PropuestaWidget {
   tipoVisualizacion: TipoVisualizacion
   ancho: number
-  /** Solo el widget de evolución temporal necesita fijar granularidad tras crearse. */
-  requiereGranularidad?: boolean
+  /**
+   * Forma del resultado. Se aplica tras crear el widget, porque el endpoint de
+   * alta solo acepta la visualización y el ancho. Ausente = ACTUAL.
+   */
+  tipoResultado?: TipoResultado
+  configuracionWidget?: ConfiguracionWidgetDto
 }
 
 export interface PropuestaMetrica {
   codigo: string
   nombre: string
+  descripcion?: string | null
   tipoMetrica: TipoMetrica
   configuracion: ConfiguracionMetricaDto
+  unidad?: string | null
+  decimales?: number | null
   widget: PropuestaWidget
 }
 
@@ -126,19 +142,88 @@ function metricaDistribucion(
 }
 
 /**
+ * Convierte una propuesta del backend en la forma que usa el orquestador.
+ *
+ * Los widgets clínicos prioritarios se definen en el backend, junto al resto
+ * del conocimiento de ILQ, y no se recalculan aquí: duplicar esas reglas en el
+ * frontend acabaría con dos versiones que se separan a la primera corrección.
+ */
+function desdePropuestaBackend(propuesta: PropuestaWidgetDto): PropuestaMetrica {
+  return {
+    codigo: propuesta.codigoMetrica,
+    nombre: propuesta.nombre,
+    descripcion: propuesta.descripcion,
+    tipoMetrica: propuesta.tipoMetrica,
+    configuracion: propuesta.configuracion,
+    unidad: propuesta.unidad,
+    decimales: propuesta.decimales,
+    widget: {
+      tipoVisualizacion: propuesta.tipoVisualizacion,
+      ancho: propuesta.ancho,
+      tipoResultado: propuesta.tipoResultado,
+      configuracionWidget: propuesta.configuracionWidget ?? undefined,
+    },
+  }
+}
+
+/**
  * Propone las métricas iniciales del dashboard a partir de la metadata real
  * del dataset (no del estado del asistente): funciona igual para datasets
  * importados desde /crear-dashboard o creados en modo avanzado.
+ *
+ * `bloqueClinico` son los indicadores prioritarios que el backend propone para
+ * datasets de infección quirúrgica (Fase 6.9L). Van delante de todo y NO se
+ * descuentan del tope: el médico pidió esos cinco, y que un widget genérico los
+ * desplace es justamente el fallo que se está corrigiendo.
  */
-export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMetrica[] {
+export function proponerMetricas(
+  campos: CampoMetricaMetadataDto[],
+  bloqueClinico: PropuestaWidgetDto[] = [],
+  baseEvaluable?: BaseEvaluableDashboardDto,
+): PropuestaMetrica[] {
+  // Población sobre la que cuentan los indicadores de ACTIVIDAD (volumen,
+  // pacientes, completitud). Cuando el dataset tiene fecha de evento, una fila
+  // sin fecha no es una intervención: es una ficha a medio rellenar, y contarla
+  // convierte «46 intervenciones con el dato completo» en «55 registros al
+  // 84 %». El resto de métricas no lo llevan — las clínicas ya definen su
+  // propia base y las distribuciones describen categorías, no actividad.
+  const filtrosActividad = baseEvaluable?.filtros ?? []
+  const prioritarias = bloqueClinico.map(desdePropuestaBackend)
+
+  // Campos que el bloque clínico ya explica: repetirlos como distribución
+  // genérica daría dos gráficos del mismo campo, uno de ellos sin el filtro
+  // clínico que lo hace legible.
+  const camposYaCubiertos = new Set(
+    bloqueClinico.map((p) => p.configuracion.campoAgrupacion).filter((c): c is string => Boolean(c)),
+  )
+
+  // Y campos que el bloque ya mide como porcentaje. Sin esto el dashboard
+  // abriría con dos KPI sobre la infección: la tasa clínica (sobre las
+  // intervenciones documentadas) y un «% Infección» genérico calculado sobre
+  // todos los registros. Dos cifras distintas para lo mismo, y la segunda
+  // siempre más baja porque cuenta como sanos los casos sin documentar.
+  const camposYaMedidos = new Set(
+    bloqueClinico
+      .flatMap((p) => p.configuracion.numerador?.filtros ?? [])
+      .map((f) => f.campo)
+      .filter((c): c is string => Boolean(c)),
+  )
+
+  // La evolución mensual de ILQ ocupa el sitio de "Registros por mes": son el
+  // mismo hueco del dashboard y la clínica es más informativa. La métrica
+  // genérica no desaparece del sistema, solo de este dashboard concreto.
+  const hayEvolucionClinica = prioritarias.some((p) => p.widget.tipoResultado === 'SERIE_TEMPORAL')
+  const codigosPrioritarios = new Set(prioritarias.map((p) => p.codigo))
+
   const propuestas: PropuestaMetrica[] = []
 
-  // 1. Total de registros (siempre).
+  // 1. Volumen (siempre). El código se mantiene estable aunque cambie la
+  // etiqueta: es el identificador de la métrica dentro del dataset.
   propuestas.push({
     codigo: 'total_registros',
-    nombre: 'Total de registros',
+    nombre: baseEvaluable?.etiquetaVolumen ?? 'Total de registros',
     tipoMetrica: 'CONTEO',
-    configuracion: { filtros: [] },
+    configuracion: { filtros: filtrosActividad },
     widget: { tipoVisualizacion: 'KPI', ancho: 3 },
   })
 
@@ -153,7 +238,9 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
       codigo: 'pacientes_unicos',
       nombre: 'Pacientes únicos',
       tipoMetrica: 'CONTEO_DISTINTO',
-      configuracion: { campoValor: 'pacienteCodigo', filtros: [] },
+      // Un paciente que solo consta en una ficha vacía no es un paciente
+      // intervenido.
+      configuracion: { campoValor: 'pacienteCodigo', filtros: filtrosActividad },
       widget: { tipoVisualizacion: 'KPI', ancho: 3 },
     })
   }
@@ -172,7 +259,7 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
 
   // Booleanos clínicos, ordenados por prioridad clínica.
   const booleanos = campos
-    .filter((c) => c.tipoDato === 'BOOLEANO' && !estaExcluido(c))
+    .filter((c) => c.tipoDato === 'BOOLEANO' && !estaExcluido(c) && !camposYaMedidos.has(c.codigo))
     .map((campo) => ({ campo, prioridad: prioridadBooleano(campo) }))
     .sort((a, b) => a.prioridad - b.prioridad)
     .map(({ campo }) => metricaPorcentaje(campo))
@@ -195,21 +282,31 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
       codigo: `completitud_${generarCodigoSnakeCase(campoParaCompletitud.codigo)}`,
       nombre: `Completitud de ${campoParaCompletitud.etiqueta}`,
       tipoMetrica: 'COMPLETITUD',
-      configuracion: { campoValor: campoParaCompletitud.codigo, filtros: [] },
+      // El denominador es la población evaluable, no el total de filas: si no,
+      // las fichas sin datos parecen un problema de registro que no existe.
+      configuracion: { campoValor: campoParaCompletitud.codigo, filtros: filtrosActividad },
       widget: { tipoVisualizacion: 'KPI', ancho: 3 },
     })
   }
 
-  // Registros por mes (siempre): métrica CONTEO propia, distinta de
-  // total_registros, porque el backend no permite la misma métrica en dos
-  // widgets del mismo panel.
-  propuestas.push({
-    codigo: 'registros_por_mes',
-    nombre: 'Registros por mes',
-    tipoMetrica: 'CONTEO',
-    configuracion: { filtros: [] },
-    widget: { tipoVisualizacion: 'LINEAS', ancho: 12, requiereGranularidad: true },
-  })
+  // Registros por mes: métrica CONTEO propia, distinta de total_registros,
+  // porque el backend no permite la misma métrica en dos widgets del mismo
+  // panel. Se omite cuando ya hay una evolución clínica, que responde a la
+  // misma pregunta y además dice la tasa en vez del volumen.
+  if (!hayEvolucionClinica) {
+    propuestas.push({
+      codigo: 'registros_por_mes',
+      nombre: 'Registros por mes',
+      tipoMetrica: 'CONTEO',
+      configuracion: { filtros: [] },
+      widget: {
+        tipoVisualizacion: 'LINEAS',
+        ancho: 12,
+        tipoResultado: 'SERIE_TEMPORAL',
+        configuracionWidget: { granularidad: 'MES', campoFecha: null, campoSegmentacion: null, campoAgrupacion: null },
+      },
+    })
+  }
 
   // Servicio.
   const campoServicio = buscarCampo(campos, 'servicio')
@@ -251,6 +348,7 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
     .filter(
       (c) =>
         c.tipoDato === 'TEXTO' &&
+        !camposYaCubiertos.has(c.codigo) &&
         !CODIGOS_CAMPOS_CLAVE.has(c.codigo) &&
         !estaExcluido(c) &&
         c.utilizableComoCampoAgrupacion &&
@@ -264,5 +362,11 @@ export function proponerMetricas(campos: CampoMetricaMetadataDto[]): PropuestaMe
     propuestas.push(propuesta)
   }
 
-  return propuestas.slice(0, MAX_WIDGETS_DASHBOARD_INICIAL)
+  // El tope recorta lo genérico, nunca lo clínico: los prioritarios se añaden
+  // después del recorte, delante de todo, y ninguno puede quedarse fuera.
+  const genericas = propuestas
+    .filter((p) => !codigosPrioritarios.has(p.codigo))
+    .slice(0, MAX_WIDGETS_DASHBOARD_INICIAL)
+
+  return [...prioritarias, ...genericas]
 }

@@ -10,9 +10,12 @@ import com.preventiva.backend.repository.DatasetClinicoRepository;
 import com.preventiva.backend.service.interfaces.CampoClinicoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -119,6 +122,64 @@ public class CampoClinicoServiceImpl implements CampoClinicoService {
         }
 
         return campo;
+    }
+
+    /**
+     * Reutiliza los campos que ya existan y crea solo los que falten.
+     *
+     * <p>Un campo ya existente se devuelve TAL CUAL: no se le tocan
+     * {@code esComun}, {@code obligatorio} ni {@code prioridadDashboard}. Son
+     * decisiones que pudo tomar el usuario después de la primera importación, y
+     * reimportar el mismo Excel no es motivo para deshacerlas. Tampoco se
+     * cambia el tipo de dato: hay métricas que dependen de él.
+     *
+     * <p>Sí se reactiva si estaba archivado, porque si no la importación
+     * escribiría en un campo que ningún análisis ve.
+     */
+    @Override
+    @Transactional
+    public List<CampoClinicoResponseDto> asegurarParaImportacion(
+            Long datasetId, List<CampoClinicoRequestDto> solicitados) {
+        DatasetClinico dataset = obtenerDatasetOLanzar(datasetId);
+        List<CampoClinicoResponseDto> resultado = new ArrayList<>();
+
+        for (CampoClinicoRequestDto request : solicitados) {
+            // Misma comparación que usa la validación de duplicados: si aquí se
+            // buscara distinto, se crearía un campo que `crear` habría
+            // rechazado.
+            Optional<CampoClinico> existente =
+                    campoClinicoRepository.findByDatasetIdAndCodigoIgnoreCase(datasetId, request.getCodigo());
+
+            if (existente.isPresent()) {
+                CampoClinico campo = existente.get();
+
+                if (!Boolean.TRUE.equals(campo.getActivo())) {
+                    campo.setActivo(true);
+                    campo = campoClinicoRepository.save(campo);
+                }
+
+                resultado.add(mapToDto(campo));
+                continue;
+            }
+
+            CampoClinico nuevo = CampoClinico.builder()
+                    .dataset(dataset)
+                    .codigo(request.getCodigo())
+                    .etiqueta(request.getEtiqueta())
+                    .tipoDato(request.getTipoDato())
+                    .esComun(Boolean.TRUE.equals(request.getEsComun()))
+                    .obligatorio(Boolean.TRUE.equals(request.getObligatorio()))
+                    .orden(request.getOrden())
+                    .prioridadDashboard(request.getPrioridadDashboard() != null
+                            ? request.getPrioridadDashboard()
+                            : PrioridadDashboardCampo.NORMAL)
+                    .activo(true)
+                    .build();
+
+            resultado.add(mapToDto(campoClinicoRepository.save(nuevo)));
+        }
+
+        return resultado;
     }
 
     private CampoClinicoResponseDto mapToDto(CampoClinico campo) {

@@ -50,8 +50,12 @@ const TAMANIO_PAGINA = 100
 interface CorreccionFilasTrabajoPanelProps {
   importacionTrabajoId: number
   onImportado: (resultado: ImportarDesdeTrabajoResponseDto) => void
-  /** "Volver y subir otro archivo": descarta la copia de trabajo y vuelve al inicio del asistente. */
-  onVolver: () => void
+  /**
+   * "Sustituir archivo": el usuario decide cambiar el Excel de esta
+   * importación. Descarta la copia de trabajo (previa confirmación) y vuelve al
+   * paso de subida CONSERVANDO el mismo dataset borrador.
+   */
+  onSustituirArchivo: () => void
   /**
    * "Volver a columnas": descarta la copia de trabajo y vuelve a revisar los
    * mapeos. Ausente cuando no hay columnas reconstruidas que mostrar (p. ej.
@@ -62,12 +66,19 @@ interface CorreccionFilasTrabajoPanelProps {
   onVolverAColumnas?: () => void
   /** Mensaje mostrado en vez del botón "Volver a columnas" cuando no está disponible. */
   avisoVolverAColumnasNoDisponible?: string
-  /** "Cancelar creación": descarta la copia de trabajo y el dataset BORRADOR asociado. */
+  /** "Cancelar creación": descarta el dataset BORRADOR y, en cascada, todo su trabajo. */
   onCancelarCreacion: () => void
+  /**
+   * "Guardar y salir": abandona la corrección conservando la copia de trabajo
+   * intacta, para retomarla desde /datasets. Ausente fuera de la reanudación,
+   * donde el borrador todavía no aparece en ese listado.
+   */
+  onGuardarYSalir?: () => void
 }
 
-const CONFIRMACION_PERDER_CORRECCIONES =
-  'Se perderán las correcciones hechas en esta copia interna. El archivo original no se modificará.'
+const CONFIRMACION_SUSTITUIR_ARCHIVO =
+  'Vas a sustituir el archivo de esta importación. Se perderán las correcciones hechas dentro de la aplicación, ' +
+  'pero el borrador y sus columnas se conservan. El archivo original no se modifica. ¿Continuar?'
 
 function claveGrupo(severidad: string, nombreColumna: string): string {
   return `${severidad}|${nombreColumna}`
@@ -94,10 +105,11 @@ function estrategiaParaTipoDato(tipoDato: string | undefined): EstrategiaNormali
 export function CorreccionFilasTrabajoPanel({
   importacionTrabajoId,
   onImportado,
-  onVolver,
+  onSustituirArchivo,
   onVolverAColumnas,
   avisoVolverAColumnasNoDisponible,
   onCancelarCreacion,
+  onGuardarYSalir,
 }: CorreccionFilasTrabajoPanelProps) {
   const [trabajo, setTrabajo] = useState<ImportacionTrabajoResponseDto | null>(null)
   const [tiposPorColumna, setTiposPorColumna] = useState<Map<string, string>>(new Map())
@@ -307,24 +319,37 @@ export function CorreccionFilasTrabajoPanel({
     }
   }
 
-  // Las tres formas de salir de esta pantalla descartan la copia de trabajo
-  // actual (no tiene sentido conservar correcciones de un archivo que se va a
-  // dejar de corregir); solo cambia a dónde se navega después.
-  const descartarCopiaYSalir = async (salir: () => void) => {
-    if (!window.confirm(CONFIRMACION_PERDER_CORRECCIONES)) return
+  // Salir de esta pantalla NO descarta nada.
+  //
+  // Antes sí: las tres salidas llamaban a descartarImportacionTrabajo, así que
+  // volver a columnas o irse a /datasets dejaba la copia en DESCARTADA y, al
+  // volver por "Continuar creación", la reanudación ya no la encontraba y
+  // pedía el Excel otra vez. Las correcciones estaban en la base de datos,
+  // pero eran inalcanzables. Salir es navegación, no una decisión sobre los
+  // datos: el trabajo se queda donde está, guardado.
+  const handleVolverAColumnas = onVolverAColumnas
+
+  // Sustituir el archivo sí es una decisión: el usuario dice que ese Excel ya
+  // no vale. Se le avisa de lo que pierde y, si acepta, se descarta la copia de
+  // forma explícita (el dataset se conserva; no se crea otro).
+  const handleSustituirArchivo = async () => {
+    if (!window.confirm(CONFIRMACION_SUSTITUIR_ARCHIVO)) return
+    setAccionEnCurso('Preparando la sustitución del archivo…')
     try {
       await descartarImportacionTrabajo(importacionTrabajoId)
     } catch {
-      // Si no se pudo descartar, igual dejamos que el usuario continúe: no es bloqueante.
+      // Si no se pudo descartar, igual dejamos que el usuario continúe: no es
+      // bloqueante, y el archivo nuevo creará su propia copia.
+    } finally {
+      setAccionEnCurso(null)
     }
-    salir()
+    onSustituirArchivo()
   }
 
-  const handleVolver = () => descartarCopiaYSalir(onVolver)
-  const handleVolverAColumnas = onVolverAColumnas
-    ? () => descartarCopiaYSalir(onVolverAColumnas)
-    : undefined
-  const handleCancelarCreacion = () => descartarCopiaYSalir(onCancelarCreacion)
+  // "Cancelar creación" borra el borrador entero (dataset incluido), así que no
+  // hace falta descartar la copia aquí: se va con él en cascada. Su propia
+  // confirmación la pide el wizard.
+  const handleCancelarCreacion = onCancelarCreacion
 
   const toggleGrupoExpandido = (clave: string) => {
     setGruposExpandidos((actual) => {
@@ -416,8 +441,8 @@ export function CorreccionFilasTrabajoPanel({
       <Card title="Copia interna descartada">
         <p>Esta copia interna fue descartada.</p>
         <div className={styles.acciones}>
-          <button type="button" className="btn btnSecondary" onClick={onVolver}>
-            Volver
+          <button type="button" className="btn btnSecondary" onClick={onSustituirArchivo}>
+            Subir otro archivo
           </button>
         </div>
       </Card>
@@ -429,8 +454,8 @@ export function CorreccionFilasTrabajoPanel({
       <Card title="Copia interna ya importada">
         <p>Esta copia interna ya fue importada.</p>
         <div className={styles.acciones}>
-          <button type="button" className="btn btnSecondary" onClick={onVolver}>
-            Volver
+          <button type="button" className="btn btnSecondary" onClick={onSustituirArchivo}>
+            Subir otro archivo
           </button>
         </div>
       </Card>
@@ -498,7 +523,7 @@ export function CorreccionFilasTrabajoPanel({
                 bloqueante
                 disabled={bloqueado}
                 onVolverAColumnas={handleVolverAColumnas}
-                onVolver={handleVolver}
+                onSustituirArchivo={handleSustituirArchivo}
               />
             ))}
           </section>
@@ -591,7 +616,7 @@ export function CorreccionFilasTrabajoPanel({
                     bloqueante={false}
                     disabled={bloqueado}
                     onVolverAColumnas={handleVolverAColumnas}
-                    onVolver={handleVolver}
+                    onSustituirArchivo={handleSustituirArchivo}
                   />
                 ))}
               </section>
@@ -802,7 +827,16 @@ export function CorreccionFilasTrabajoPanel({
             Importar datos corregidos
           </button>
         </div>
+        <p className={styles.notaGuardado}>
+          Las correcciones se guardan solas. Puedes salir y volver más tarde desde «Continuar creación» sin perder
+          nada; el archivo original no se modifica.
+        </p>
         <div className={styles.acciones}>
+          {onGuardarYSalir && (
+            <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={onGuardarYSalir}>
+              Guardar y salir
+            </button>
+          )}
           {handleVolverAColumnas ? (
             <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={handleVolverAColumnas}>
               Volver a columnas
@@ -812,8 +846,8 @@ export function CorreccionFilasTrabajoPanel({
               <p className={styles.notaAdvertencia}>{avisoVolverAColumnasNoDisponible}</p>
             )
           )}
-          <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={handleVolver}>
-            Volver y subir otro archivo
+          <button type="button" className="btn btnSecondary" disabled={bloqueado} onClick={handleSustituirArchivo}>
+            Sustituir archivo
           </button>
           <button type="button" className="btn btnDanger" disabled={bloqueado} onClick={handleCancelarCreacion}>
             Cancelar creación

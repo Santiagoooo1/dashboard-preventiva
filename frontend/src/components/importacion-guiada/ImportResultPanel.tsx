@@ -100,7 +100,16 @@ export function ImportResultPanel({
               <p>{detalleTecnico}</p>
             </details>
           )}
-          {datasetId !== null && <p>Se creó un dashboard parcial, pero no se importaron registros.</p>}
+          {datasetId !== null && (
+            // Antes decía "se creó un dashboard parcial", que no era cierto: no
+            // se crea ningún dashboard hasta que la importación termina bien.
+            // Lo que queda es el dataset en borrador con sus columnas, listo
+            // para reanudar sin perder la configuración ya hecha.
+            <p>
+              No se ha importado ningún registro. La configuración de columnas queda guardada como borrador,
+              así que puedes corregir el archivo y continuar desde donde lo dejaste.
+            </p>
+          )}
           {validacionFilas && validacionFilas.errores.length > 0 && (
             <>
               <h4>Errores en las filas</h4>

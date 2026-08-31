@@ -12,4 +12,19 @@ public class ColumnaDetectadaResponseDto {
     private Integer indiceColumna;
     private String nombreOriginal;
     private String nombreNormalizado;
+
+    /**
+     * Campo clínico que es esta columna, cuando la aplicación la reconoce por
+     * su nombre. Null si no está en el catálogo.
+     *
+     * <p>Cuando viene relleno, manda sobre la heurística del asistente: si
+     * sabemos qué es la columna, no hay nada que adivinar.
+     */
+    private String codigoCanonico;
+
+    /** Tipo que corresponde al campo canónico. Null si la columna no se reconoce. */
+    private String tipoDatoCanonico;
+
+    /** Si el campo canónico es de los comunes a todos los datasets. */
+    private Boolean esComunCanonico;
 }

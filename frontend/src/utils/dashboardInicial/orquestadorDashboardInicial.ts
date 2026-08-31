@@ -1,5 +1,6 @@
 import type { CampoMetricaMetadataDto, PanelClinicoResponseDto, PanelMetricaConfiguracionWidgetRequestDto } from '../../api/types'
 import { crearMetrica, obtenerMetadataMetricas, previewMetrica } from '../../api/metricasApi'
+import { obtenerBaseEvaluableDashboard, obtenerBloqueInicialIlq } from '../../api/datasetApi'
 import { actualizarConfiguracionWidget, anadirWidget, crearPanel, listarPaneles } from '../../api/panelesApi'
 import { proponerMetricas } from './reglasMetricas'
 
@@ -124,15 +125,25 @@ export async function crearDashboardInicial(
   }
 
   onProgreso('preparar-indicadores', 'en-curso')
-  const propuestas = proponerMetricas(campos)
+  // El bloque clínico prioritario lo decide el backend, que es donde vive el
+  // resto del conocimiento de ILQ. Si falla, se sigue con el dashboard
+  // genérico: es peor no crear nada que crear uno sin los widgets clínicos.
+  const bloqueClinico = await obtenerBloqueInicialIlq(datasetId).catch(() => [])
+  // Sobre qué población cuentan los indicadores de actividad. Si falla, se
+  // cuenta sobre todo, que es el comportamiento de siempre.
+  const baseEvaluable = await obtenerBaseEvaluableDashboard(datasetId).catch(() => undefined)
+  const propuestas = proponerMetricas(campos, bloqueClinico, baseEvaluable)
   const idsPorCodigo = new Map<string, number>()
   for (const propuesta of propuestas) {
     try {
       const metrica = await crearMetrica(datasetId, {
         codigo: propuesta.codigo,
         nombre: propuesta.nombre,
+        descripcion: propuesta.descripcion ?? null,
         tipoMetrica: propuesta.tipoMetrica,
         configuracion: propuesta.configuracion,
+        unidad: propuesta.unidad ?? null,
+        decimales: propuesta.decimales ?? null,
       })
       idsPorCodigo.set(propuesta.codigo, metrica.id)
       resultado.metricasCreadas += 1
@@ -171,15 +182,13 @@ export async function crearDashboardInicial(
         orden,
         ancho: propuesta.widget.ancho,
       })
-      if (propuesta.widget.requiereGranularidad) {
+      // La forma del resultado (serie temporal, comparativa…) vive en el
+      // widget, no en la métrica, y el alta solo acepta visualización y ancho:
+      // por eso se ajusta en una segunda llamada.
+      if (propuesta.widget.tipoResultado && propuesta.widget.tipoResultado !== 'ACTUAL') {
         const payload: PanelMetricaConfiguracionWidgetRequestDto = {
-          tipoResultado: 'SERIE_TEMPORAL',
-          configuracionWidget: {
-            granularidad: 'MES',
-            campoFecha: null,
-            campoSegmentacion: null,
-            campoAgrupacion: null,
-          },
+          tipoResultado: propuesta.widget.tipoResultado,
+          configuracionWidget: propuesta.widget.configuracionWidget ?? null,
         }
         await actualizarConfiguracionWidget(panelId, widget.id, payload)
       }

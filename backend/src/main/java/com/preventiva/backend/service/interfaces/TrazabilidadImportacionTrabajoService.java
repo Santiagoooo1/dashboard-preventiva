@@ -78,6 +78,12 @@ public interface TrazabilidadImportacionTrabajoService {
 
     void registrarCopiaDescartada(ImportacionTrabajo trabajo);
 
+    /**
+     * Deja constancia de que una copia que estaba DESCARTADA sin que el usuario
+     * lo pidiera se ha devuelto a un estado reanudable.
+     */
+    void registrarCopiaRecuperada(ImportacionTrabajo trabajo, String estadoNuevo);
+
     // ---- Consulta ----
 
     TrazabilidadImportacionTrabajoResponseDto obtenerTrazabilidad(Long importacionTrabajoId);

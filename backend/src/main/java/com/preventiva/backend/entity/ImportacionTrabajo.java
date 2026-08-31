@@ -84,6 +84,21 @@ public class ImportacionTrabajo {
     @JoinColumn(name = "importacion_generica_id")
     private ImportacionGenerica importacionGenerica;
 
+    /**
+     * Marca que el descarte lo pidió el usuario de forma explícita (descartar
+     * la copia, sustituir el archivo…). Solo tiene sentido cuando
+     * {@code estado == DESCARTADA}.
+     *
+     * <p>Existe para poder distinguir un descarte querido de uno que no lo
+     * fue. Hasta la Fase 6.9K, salir de la pantalla de corrección descartaba
+     * la copia por su cuenta, así que hay copias DESCARTADA en las que el
+     * usuario nunca pidió descartar nada. Esas quedan con {@code null} —el
+     * valor que tenían antes de existir esta columna— y son las únicas que la
+     * reanudación puede recuperar; con {@code TRUE} no se recupera jamás.
+     */
+    @Column(name = "descarte_explicito")
+    private Boolean descarteExplicito;
+
     @Column(name = "fecha_creacion", nullable = false)
     private LocalDateTime fechaCreacion;
 

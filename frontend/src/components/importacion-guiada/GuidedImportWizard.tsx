@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { detectarColumnasPlantilla } from '../../api/plantillasImportacionApi'
 import {
@@ -6,7 +6,12 @@ import {
   descartarImportacionTrabajo,
   obtenerColumnasReanudacion,
 } from '../../api/importacionesTrabajoApi'
-import { activarDataset, descartarDatasetBorrador, reanudarDatasetBorrador } from '../../api/datasetApi'
+import {
+  activarDataset,
+  descartarDatasetBorrador,
+  reanudarDatasetBorrador,
+  recuperarTrabajoAnterior,
+} from '../../api/datasetApi'
 import { obtenerImportacionGenerica } from '../../api/importacionesApi'
 import type { ImportarDesdeTrabajoResponseDto, ReanudarBorradorDatasetDto } from '../../api/types'
 import {
@@ -56,6 +61,45 @@ interface GuidedImportWizardProps {
   borradorId?: number
 }
 
+/**
+ * Qué se ha conservado del intento anterior, dicho en términos de lo que el
+ * médico reconoce: su archivo y sus correcciones.
+ *
+ * Sustituye al viejo "el archivo original no está cargado en el navegador",
+ * que era cierto pero irrelevante: el archivo está en el servidor desde que se
+ * subió, y las filas y correcciones también.
+ */
+function textoTrabajoConservado(datos: ReanudarBorradorDatasetDto): string {
+  const archivo = datos.nombreArchivoOriginal
+    ? `Se ha recuperado ${datos.nombreArchivoOriginal}`
+    : 'Se ha recuperado el archivo que subiste'
+  const correcciones = datos.totalCorrecciones
+    ? `, con ${datos.totalCorrecciones} ${datos.totalCorrecciones === 1 ? 'corrección' : 'correcciones'} ya hechas`
+    : ''
+  return `${archivo}${correcciones}. No hace falta volver a subirlo.`
+}
+
+/**
+ * Anuncia la revisión anterior sin afirmar por qué se descartó.
+ *
+ * No sabemos si fue un accidente del asistente o una decisión del usuario, así
+ * que se describe lo que hay —el archivo, sus filas, sus correcciones— y se le
+ * deja decidir.
+ */
+function textoTrabajoHistorico(datos: ReanudarBorradorDatasetDto): string {
+  const archivo = datos.nombreArchivoHistorico ?? 'un archivo anterior'
+  const filas = datos.totalFilasHistoricas ? ` con ${datos.totalFilasHistoricas} filas` : ''
+  const correcciones = datos.totalCorreccionesHistoricas
+    ? ` y ${datos.totalCorreccionesHistoricas} ${
+        datos.totalCorreccionesHistoricas === 1 ? 'corrección ya hecha' : 'correcciones ya hechas'
+      }`
+    : ''
+  return (
+    `Se conserva una revisión anterior de ${archivo}${filas}${correcciones}. ` +
+    'Puedes recuperarla para continuar con las correcciones que quedaron guardadas.'
+  )
+}
+
 export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {}) {
   const navigate = useNavigate()
   const [paso, setPaso] = useState<ClaveWizard>('subir')
@@ -102,17 +146,13 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
   // un borrador sin copia de trabajo (pasoRecomendado SUBIR_ARCHIVO/COLUMNAS).
   const [datasetIdReutilizable, setDatasetIdReutilizable] = useState<number | null>(null)
   const [avisoReanudacion, setAvisoReanudacion] = useState<string | null>(null)
+  const [recuperandoHistorico, setRecuperandoHistorico] = useState(false)
   // true solo cuando se intentó reconstruir columnas (paso CORREGIR_FILAS/IMPORTAR
   // al reanudar) y no se pudo: permite avisar en vez de dejar "Volver a columnas"
   // llevar a una pantalla vacía (Fase 6.8E.2.1).
   const [columnasNoReconstruibles, setColumnasNoReconstruibles] = useState(false)
 
   const modoReanudacion = borradorId !== undefined
-
-  // Código base sugerido (sin sufijo) e intento actual: en cada revalidación se
-  // usa un código nuevo (base_2, base_3…) para no chocar con el dataset parcial.
-  const [codigoBase, setCodigoBase] = useState('')
-  const [intentoNumero, setIntentoNumero] = useState(1)
 
   // Problemas del último intento de validación, agrupados por columna. Se
   // recalculan en cada render: cuando el usuario aplica una corrección, la
@@ -176,15 +216,12 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
   // Cambiar de archivo reinicia el asistente: cualquier análisis o resultado
   // previo deja de corresponder al fichero actual.
   const cambiarArchivo = (nuevo: File | null) => {
-    // Defensivo: normalmente ya se descartó al salir de "Corregir filas", pero
-    // si quedara una copia de trabajo colgando no debe sobrevivir al cambio de archivo.
-    if (importacionTrabajoId !== null) {
-      descartarImportacionTrabajo(importacionTrabajoId).catch(() => {})
-    }
+    // No se descarta nada aquí. Elegir un archivo en el selector no es decidir
+    // tirar el trabajo anterior: quien quiere eso pulsa "Sustituir archivo",
+    // que sí descarta de forma explícita y avisa antes.
     setArchivo(nuevo)
     setColumnas([])
     setError(null)
-    setIntentoNumero(1)
     setResultado(null)
     setMostrarErroresTecnicos(false)
     setImportacionTrabajoId(null)
@@ -216,6 +253,9 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
       datos.importacionTrabajoId != null
     ) {
       setImportacionTrabajoId(datos.importacionTrabajoId)
+      // Cualquier reintento posterior debe caer sobre este mismo dataset, no
+      // sobre uno nuevo: es la misma importación clínica.
+      setDatasetIdReutilizable(datos.datasetId)
       // Intenta reconstruir las columnas para que "Volver a columnas" muestre
       // datos reales; si falla o no hay suficiente información, no bloquea la
       // corrección de filas (que no depende de esto), pero sí evita ofrecer
@@ -263,7 +303,7 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
       setDatasetIdReutilizable(datos.datasetId)
       setAvisoReanudacion(
         datos.pasoRecomendado === 'COLUMNAS'
-          ? 'No se puede reconstruir la revisión de columnas desde este borrador porque el archivo original no está cargado en el navegador.'
+          ? 'Las columnas ya configuradas se conservan; solo falta el archivo con los datos.'
           : null,
       )
       setPaso('subir')
@@ -274,8 +314,16 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
     // en datosReanudacion y el render muestra ReanudacionBorradorInfo.
   }
 
+  // Reanudar es una acción que puede escribir (rescata una copia descartada por
+  // error), así que se emite una sola vez por borrador abierto: el doble montaje
+  // de StrictMode o un re-render no deben mandar la misma mutación dos veces.
+  // Aunque el backend es idempotente, pedirla dos veces sería pedirla de más.
+  const borradorYaReanudado = useRef<number | null>(null)
+
   useEffect(() => {
     if (borradorId === undefined) return
+    if (borradorYaReanudado.current === borradorId) return
+    borradorYaReanudado.current = borradorId
     let cancelado = false
 
     reanudarDatasetBorrador(borradorId)
@@ -315,15 +363,22 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
       })
       const cols = inicializarCamposClave(
         sugerirColumnas(
-          deteccion.columnas.map((c) => ({ indiceColumna: c.indiceColumna, nombreOriginal: c.nombreOriginal })),
+          deteccion.columnas.map((c) => ({
+            indiceColumna: c.indiceColumna,
+            nombreOriginal: c.nombreOriginal,
+            // Lo que el backend reconoce del nombre de la columna manda sobre
+            // la heurística del asistente (ver aplicarCanonico).
+            codigoCanonico: c.codigoCanonico,
+            tipoDatoCanonico: c.tipoDatoCanonico,
+            esComunCanonico: c.esComunCanonico,
+          })),
         ),
       )
       setColumnas(cols)
       setResultado(null)
       setMostrarErroresTecnicos(false)
       const nombreSugerido = sugerirNombreDataset(archivo.name)
-      setIntentoNumero(1)
-      setConfig({ nombre: nombreSugerido, codigo: sugerirCodigoDataset(nombreSugerido), descripcion: '' })
+        setConfig({ nombre: nombreSugerido, codigo: sugerirCodigoDataset(nombreSugerido), descripcion: '' })
       setPaso('columnas')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo analizar el archivo.')
@@ -379,7 +434,12 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
           descripcion: configEjecucion.descripcion.trim(),
         },
         columnas,
-        datasetIdExistente: datasetIdReutilizable ?? undefined,
+        // Un reintento continúa el mismo borrador. Si el intento anterior llegó
+        // a crear el dataset, se reutiliza su id: repetir la creación chocaría
+        // con el código ya usado ("Ya existe un dataset con el código: …") y
+        // sufijarlo dejaría CESAREAS_2026, CESAREAS_2026_2, CESAREAS_2026_3…
+        // para una sola importación clínica.
+        datasetIdExistente: datasetIdReutilizable ?? resultado?.datasetId ?? undefined,
       },
       (clave, estado, mensaje) => {
         setProgreso((actual) => actual.map((p) => (p.clave === clave ? { ...p, estado, mensaje } : p)))
@@ -401,14 +461,14 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
       setPaso('columnas')
       return
     }
-    // El código del primer intento es la base para sufijar las revalidaciones
-    // (respeta lo que el usuario haya editado, p. ej. CARDIO_2026 → CARDIO_2026_2).
-    if (intentoNumero === 1) setCodigoBase(config.codigo.trim())
     await ejecutarImportacionConConfig(config)
   }
 
-  // Revalida desde Columnas: mismo archivo, columnas ya corregidas, código con
-  // el siguiente sufijo (no se reutiliza el dataset parcial del intento previo).
+  // Revalida desde Columnas: mismo archivo, mismas columnas ya corregidas y
+  // MISMO dataset. Antes cada revalidación creaba un dataset con el sufijo
+  // siguiente (CODIGO_2, CODIGO_3…), de modo que tres reintentos de una única
+  // importación dejaban tres borradores. Ahora el intento se repite sobre el
+  // que ya existe.
   const revalidarCambios = async () => {
     if (!archivo) return
     const mensajeInvalido = validarColumnasParaCrear(columnas)
@@ -416,12 +476,7 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
       setError(mensajeInvalido)
       return
     }
-    const siguiente = intentoNumero + 1
-    setIntentoNumero(siguiente)
-    const nuevoCodigo = `${codigoBase}_${siguiente}`
-    const configSiguiente = { ...config, codigo: nuevoCodigo }
-    setConfig(configSiguiente)
-    await ejecutarImportacionConConfig(configSiguiente)
+    await ejecutarImportacionConConfig(config)
   }
 
   // "Corregir errores en la app": crea una copia interna de trabajo con el
@@ -490,25 +545,6 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
   // quedar como una prueba huérfana. Si en cambio se está reanudando un
   // borrador ya existente, el dataset NO se descarta: se reutiliza para el
   // archivo nuevo (ver Fase 6.8E.2.1, punto 6 — no crear duplicados).
-  const volverASubirDesdeCorreccion = async () => {
-    const datasetIdActual = resultado?.datasetId ?? null
-    setImportacionTrabajoId(null)
-    cambiarArchivo(null)
-    setPaso('subir')
-    if (modoReanudacion) {
-      if (datasetIdActual !== null) setDatasetIdReutilizable(datasetIdActual)
-      return
-    }
-    if (datasetIdActual !== null) {
-      try {
-        await descartarDatasetBorrador(datasetIdActual)
-      } catch {
-        // Puede fallar si ya no está en BORRADOR/VALIDANDO; no es bloqueante
-        // y el dataset seguirá disponible en "Pruebas y borradores".
-      }
-    }
-  }
-
   // Reinicio completo del asistente: usado tanto por "Cancelar creación"
   // (tras descartar lo que hubiera) como por "Crear otro dashboard" desde el
   // resultado (ahí no hay nada que descartar: el dataset ya quedó ACTIVO).
@@ -521,7 +557,6 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
     setMostrarErroresTecnicos(false)
     setImportacionTrabajoId(null)
     setExtraResultadoTrabajo(null)
-    setIntentoNumero(1)
     setDatasetIdReutilizable(null)
     setAvisoReanudacion(null)
     setPaso('subir')
@@ -616,23 +651,64 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
   // algo y se descartó", para no dar la sensación de que se está creando un
   // dashboard nuevo (Fase 6.8E.2.2).
   const mensajeReanudacionSubir = datosReanudacion?.huboCopiaDescartada
-    ? 'Este borrador tenía una copia interna anterior, pero fue descartada. Puedes subir otro archivo para continuar con el mismo borrador o descartar la prueba.'
-    : 'Este borrador tiene configuración guardada, pero no tiene una importación en curso. Sube un archivo para continuar con este mismo borrador.'
+    ? 'El archivo anterior de este borrador se descartó a petición tuya, así que no queda nada que corregir. Sube otro archivo para continuar con el mismo borrador, o descártalo.'
+    : 'Este borrador tiene sus columnas configuradas, pero todavía no se ha subido ningún archivo. Súbelo para continuar con este mismo borrador.'
 
-  // Alternativa cuando no hay columnas reconstruidas que revisar (solo se usa
-  // en la pantalla defensiva del paso Columnas, ver más abajo): descarta la
-  // copia de trabajo actual y reutiliza el mismo dataset para un archivo nuevo.
-  const subirOtroArchivoParaBorrador = () => {
-    if (importacionTrabajoId !== null) {
-      descartarImportacionTrabajo(importacionTrabajoId).catch(() => {})
+  // "Recuperar trabajo anterior": la única vía que resucita una copia
+  // descartada. Reanudar solo avisa de que existe, porque no se puede saber si
+  // se descartó por el defecto del asistente o a propósito; quien lo sabe es el
+  // usuario, y lo dice pulsando aquí.
+  const recuperarTrabajoHistorico = async () => {
+    if (borradorId === undefined) return
+    setRecuperandoHistorico(true)
+    setError(null)
+    try {
+      const trabajo = await recuperarTrabajoAnterior(borradorId)
+      setImportacionTrabajoId(trabajo.id)
+      setDatasetIdReutilizable(borradorId)
+      // Se recarga el estado del borrador para entrar en el paso que
+      // corresponda ahora, con las columnas reconstruidas si es posible.
+      borradorYaReanudado.current = null
+      const datos = await reanudarDatasetBorrador(borradorId)
+      setDatosReanudacion(datos)
+      borradorYaReanudado.current = borradorId
+      if (datos.puedeReanudarse) {
+        await aplicarReanudacion(datos)
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `No se pudo recuperar la revisión anterior. ${err.message}`
+          : 'No se pudo recuperar la revisión anterior.',
+      )
+    } finally {
+      setRecuperandoHistorico(false)
     }
+  }
+
+  // "Sustituir archivo": el usuario decide que ese Excel ya no vale. Es la
+  // única vía del asistente que descarta una copia de trabajo, y lo hace de
+  // forma explícita. El dataset se conserva: se vuelve a "Subir archivo" con
+  // datasetIdReutilizable puesto, así que el archivo nuevo entra en el mismo
+  // borrador y no genera un CODIGO_2.
+  const sustituirArchivo = async () => {
+    const idTrabajo = importacionTrabajoId
     if (resultado?.datasetId != null) {
       setDatasetIdReutilizable(resultado.datasetId)
     }
     setImportacionTrabajoId(null)
+    setArchivo(null)
     setColumnas([])
     setColumnasNoReconstruibles(false)
+    setError(null)
     setPaso('subir')
+    if (idTrabajo !== null) {
+      try {
+        await descartarImportacionTrabajo(idTrabajo)
+      } catch {
+        // No bloquea: el archivo nuevo creará su propia copia de trabajo.
+      }
+    }
   }
 
   // Pantallas de reanudación: se muestran en vez del asistente normal mientras
@@ -679,7 +755,32 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
               <p className={styles.avisoReanudacionTitulo}>
                 Continuando borrador: {datosReanudacion?.nombre ?? config.nombre}
               </p>
-              <p>{mensajeReanudacionSubir}</p>
+              {/*
+                Con una revisión anterior guardada, esa es la opción principal:
+                subir otro archivo tirando lo ya corregido sería lo raro. No se
+                afirma que se descartara por error —no se sabe—, solo que está
+                ahí y que se puede recuperar.
+              */}
+              {datosReanudacion?.hayTrabajoHistoricoRecuperable ? (
+                <>
+                  <p>{textoTrabajoHistorico(datosReanudacion)}</p>
+                  <div className={styles.acciones}>
+                    <button
+                      type="button"
+                      className="btn btnPrimary"
+                      disabled={recuperandoHistorico}
+                      onClick={recuperarTrabajoHistorico}
+                    >
+                      {recuperandoHistorico ? 'Recuperando…' : 'Recuperar trabajo anterior'}
+                    </button>
+                  </div>
+                  <p className={styles.campoClaveAyuda}>
+                    Si prefieres empezar de nuevo con este mismo borrador, sube otro archivo aquí abajo.
+                  </p>
+                </>
+              ) : (
+                <p>{mensajeReanudacionSubir}</p>
+              )}
               <p>
                 <strong>No se creará un dataset nuevo.</strong>
               </p>
@@ -770,8 +871,8 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
                 Volver a corregir filas
               </button>
             )}
-            <button type="button" className="btn btnSecondary" onClick={subirOtroArchivoParaBorrador}>
-              Subir otro archivo para este borrador
+            <button type="button" className="btn btnSecondary" onClick={sustituirArchivo}>
+              Sustituir archivo
             </button>
             <button
               type="button"
@@ -920,10 +1021,20 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
       )}
 
       {paso === 'correccion-filas' && importacionTrabajoId !== null && (
-        <CorreccionFilasTrabajoPanel
+        <>
+          {modoReanudacion && datosReanudacion && (
+            <div className={styles.avisoReanudacion}>
+              <p className={styles.avisoReanudacionTitulo}>
+                Continuando la importación de {datosReanudacion.nombre}
+              </p>
+              <p>{textoTrabajoConservado(datosReanudacion)}</p>
+            </div>
+          )}
+          <CorreccionFilasTrabajoPanel
           importacionTrabajoId={importacionTrabajoId}
           onImportado={onImportadoDesdeTrabajo}
-          onVolver={volverASubirDesdeCorreccion}
+          onSustituirArchivo={sustituirArchivo}
+          onGuardarYSalir={modoReanudacion ? () => navigate('/datasets') : undefined}
           onVolverAColumnas={
             permiteVolverAColumnas
               ? () => {
@@ -934,11 +1045,12 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
           }
           avisoVolverAColumnasNoDisponible={
             !permiteVolverAColumnas && columnasNoReconstruibles
-              ? 'No se puede volver a la revisión de columnas porque el archivo ya no está cargado en el navegador. Puedes seguir corrigiendo la copia interna o subir otro archivo para este borrador.'
+              ? 'La revisión de columnas de este intento no puede reconstruirse. Puedes seguir corrigiendo aquí —los datos y tus correcciones están guardados— o sustituir el archivo.'
               : undefined
           }
-          onCancelarCreacion={cancelarCreacion}
-        />
+            onCancelarCreacion={cancelarCreacion}
+          />
+        </>
       )}
 
       {paso === 'configuracion' && (

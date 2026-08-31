@@ -163,6 +163,14 @@
   margin: var(--spacing-xs) 0 0 0;
 }
 
+/* Tranquiliza antes de que el usuario decida irse: las correcciones persisten
+   solas, así que salir no es una decisión arriesgada. */
+.notaGuardado {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: var(--spacing-md) 0 var(--spacing-xs) 0;
+}
+
 /* Secciones y grupos por problema */
 .seccion {
   margin-bottom: var(--spacing-md);

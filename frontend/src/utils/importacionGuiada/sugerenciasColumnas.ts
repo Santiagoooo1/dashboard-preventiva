@@ -226,8 +226,52 @@ function ignorarBanderasDeSexoRedundantes(columnas: ColumnaConfigurada[]): Colum
  * Aplica las sugerencias a todas las columnas detectadas, en orden, para que la
  * regla de "primera fecha → fechaEvento" funcione, y desambigua códigos repetidos.
  */
-export function sugerirColumnas(cabeceras: { indiceColumna: number; nombreOriginal: string }[]): ColumnaConfigurada[] {
-  const columnas = cabeceras.map((c) => construirColumnaConfigurada(c.indiceColumna, c.nombreOriginal))
+/**
+ * Columna reconocida por el backend: ya sabemos qué campo es y de qué tipo.
+ * Los tres campos van juntos o no van.
+ */
+export interface ColumnaCanonica {
+  codigoCanonico?: string | null
+  tipoDatoCanonico?: TipoDato | null
+  esComunCanonico?: boolean | null
+}
+
+/**
+ * Aplica lo que el backend ya sabe de la columna por encima de la heurística.
+ *
+ * Deducir por el nombre está bien cuando no hay más remedio, pero es
+ * exactamente lo que convirtió «LOCALIZACIÓN DE LA INFECCIÓN» en un Sí/No: la
+ * palabra «infección» activaba la regla de booleano y se perdían las filas de
+ * los pacientes infectados, que son las únicas que traen localización. Si la
+ * columna está en el catálogo clínico, no hay nada que adivinar.
+ */
+function aplicarCanonico(columna: ColumnaConfigurada, canonica: ColumnaCanonica): ColumnaConfigurada {
+  if (!canonica.codigoCanonico || !canonica.tipoDatoCanonico) return columna
+  return {
+    ...columna,
+    codigoInterno: canonica.codigoCanonico,
+    tipoDato: canonica.tipoDatoCanonico,
+    esComun: canonica.esComunCanonico ?? columna.esComun,
+    // El rol guía la UI (qué controles se ofrecen); se alinea con el tipo real
+    // para que un campo de texto no siga ofreciendo opciones de Sí/No.
+    rol: rolDesdeTipoCanonico(canonica.tipoDatoCanonico),
+    usar: true,
+  }
+}
+
+function rolDesdeTipoCanonico(tipoDato: TipoDato): RolClinico {
+  if (tipoDato === 'FECHA') return 'fecha'
+  if (tipoDato === 'BOOLEANO') return 'booleano'
+  if (tipoDato === 'ENTERO' || tipoDato === 'DECIMAL') return 'numero'
+  return 'texto'
+}
+
+export function sugerirColumnas(
+  cabeceras: ({ indiceColumna: number; nombreOriginal: string } & ColumnaCanonica)[],
+): ColumnaConfigurada[] {
+  const columnas = cabeceras.map((c) =>
+    aplicarCanonico(construirColumnaConfigurada(c.indiceColumna, c.nombreOriginal), c),
+  )
   return desambiguarCodigos(ignorarBanderasDeSexoRedundantes(columnas))
 }
 

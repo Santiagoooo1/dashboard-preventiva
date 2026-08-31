@@ -9,6 +9,7 @@ import com.preventiva.backend.entity.PlantillaImportacion;
 import com.preventiva.backend.repository.DatasetClinicoRepository;
 import com.preventiva.backend.repository.PlantillaImportacionRepository;
 import com.preventiva.backend.service.interfaces.PlantillaImportacionService;
+import com.preventiva.backend.util.CatalogoColumnasClinicas;
 import com.preventiva.backend.util.TextNormalizer;
 import com.preventiva.backend.util.WorkbookLoader;
 import lombok.RequiredArgsConstructor;
@@ -90,11 +91,21 @@ public class PlantillaImportacionServiceImpl implements PlantillaImportacionServ
 
         List<ColumnaDetectadaResponseDto> columnas = cabeceras.entrySet()
                 .stream()
-                .map(entry -> ColumnaDetectadaResponseDto.builder()
-                        .indiceColumna(entry.getKey())
-                        .nombreOriginal(entry.getValue())
-                        .nombreNormalizado(TextNormalizer.normalize(entry.getValue()))
-                        .build())
+                .map(entry -> {
+                    ColumnaDetectadaResponseDto.ColumnaDetectadaResponseDtoBuilder builder =
+                            ColumnaDetectadaResponseDto.builder()
+                                    .indiceColumna(entry.getKey())
+                                    .nombreOriginal(entry.getValue())
+                                    .nombreNormalizado(TextNormalizer.normalize(entry.getValue()));
+                    // Columnas clínicas conocidas: se resuelven aquí para que el
+                    // asistente no tenga que deducir por el nombre algo que ya
+                    // sabemos con certeza.
+                    CatalogoColumnasClinicas.resolver(entry.getValue()).ifPresent(canonica -> builder
+                            .codigoCanonico(canonica.codigo())
+                            .tipoDatoCanonico(canonica.tipoDato().name())
+                            .esComunCanonico(canonica.esComun()));
+                    return builder.build();
+                })
                 .toList();
 
         return DeteccionColumnasResponseDto.builder()

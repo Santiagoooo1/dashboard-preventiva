@@ -6,6 +6,7 @@ import com.preventiva.backend.dto.ImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.ReanudarBorradorDatasetDto;
 import com.preventiva.backend.entity.CampoClinico;
 import com.preventiva.backend.entity.DatasetClinico;
+import com.preventiva.backend.entity.FilaImportacionTrabajo;
 import com.preventiva.backend.entity.Hospital;
 import com.preventiva.backend.entity.ImportacionGenerica;
 import com.preventiva.backend.entity.ImportacionTrabajo;
@@ -33,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -217,24 +219,25 @@ public class DatasetClinicoServiceImpl implements DatasetClinicoService {
                     .build();
         }
 
-        // BORRADOR/VALIDANDO: busca la copia de trabajo más relevante para reanudar.
-        // No se consideran útiles las copias DESCARTADA: no reflejan nada que el
-        // usuario pueda seguir corrigiendo.
+        // BORRADOR/VALIDANDO: busca la copia de trabajo más relevante para
+        // reanudar. Se prefiere la que ya está lista para importar (al usuario
+        // solo le queda pulsar un botón) sobre la que aún tiene correcciones
+        // pendientes, y dentro de cada estado la más reciente.
         List<ImportacionTrabajo> trabajos = importacionTrabajoRepository.findByDatasetIdOrderByFechaCreacionDesc(id);
-        ImportacionTrabajo trabajo = trabajos.stream()
-                .filter(t -> t.getEstado() == EstadoImportacionTrabajo.EN_EDICION)
-                .findFirst()
-                .or(() -> trabajos.stream()
-                        .filter(t -> t.getEstado() == EstadoImportacionTrabajo.LISTA_PARA_IMPORTAR)
-                        .findFirst())
-                .or(() -> trabajos.stream()
-                        .filter(t -> t.getEstado() == EstadoImportacionTrabajo.IMPORTADA)
-                        .findFirst())
+        ImportacionTrabajo trabajo = primeroConEstado(trabajos, EstadoImportacionTrabajo.LISTA_PARA_IMPORTAR)
+                .or(() -> primeroConEstado(trabajos, EstadoImportacionTrabajo.EN_EDICION))
+                .or(() -> primeroConEstado(trabajos, EstadoImportacionTrabajo.IMPORTADA))
                 .orElse(null);
 
         if (trabajo != null) {
             return construirReanudacionConTrabajo(base, trabajo);
         }
+
+        // Sin copia viva, puede quedar una descartada que el usuario querría de
+        // vuelta. Aquí solo se anuncia: continuar un borrador no debe resucitar
+        // por su cuenta un trabajo que quizá se tiró a propósito. Reactivarla es
+        // una decisión suya, y tiene su propia acción.
+        anotarTrabajoHistorico(base, id);
 
         // Sin copia de trabajo útil: ¿hay al menos una plantilla o campos ya
         // definidos? Entonces se puede volver a revisar columnas; si no, no hay
@@ -266,6 +269,39 @@ public class DatasetClinicoServiceImpl implements DatasetClinicoService {
                 .build();
     }
 
+    /**
+     * Anuncia, si la hay, una revisión anterior que el usuario podría recuperar.
+     *
+     * <p>Deliberadamente no cambia nada: la copia sigue descartada hasta que
+     * alguien pulse el botón. {@code descarteExplicito == null} no distingue un
+     * descarte accidental de uno anterior a esa marca, y ante la duda no se
+     * decide por el usuario.
+     */
+    private void anotarTrabajoHistorico(
+            ReanudarBorradorDatasetDto.ReanudarBorradorDatasetDtoBuilder base, Long datasetId) {
+        importacionTrabajoService.buscarTrabajoHistoricoRecuperable(datasetId).ifPresent(historico ->
+                base.hayTrabajoHistoricoRecuperable(true)
+                        .trabajoHistoricoId(historico.getId())
+                        .nombreArchivoHistorico(historico.getNombreArchivoOriginal())
+                        .totalFilasHistoricas(historico.getTotalFilasLeidas())
+                        .totalCorreccionesHistoricas(contarCorrecciones(historico.getId())));
+    }
+
+    /** Celdas corregidas a mano dentro de la aplicación, sumadas sobre todas las filas. */
+    private int contarCorrecciones(Long importacionTrabajoId) {
+        return filaImportacionTrabajoRepository
+                .findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(importacionTrabajoId).stream()
+                .map(FilaImportacionTrabajo::getValoresCorregidos)
+                .filter(java.util.Objects::nonNull)
+                .mapToInt(java.util.Map::size)
+                .sum();
+    }
+
+    private Optional<ImportacionTrabajo> primeroConEstado(
+            List<ImportacionTrabajo> trabajos, EstadoImportacionTrabajo estado) {
+        return trabajos.stream().filter(t -> t.getEstado() == estado).findFirst();
+    }
+
     private ReanudarBorradorDatasetDto construirReanudacionConTrabajo(
             ReanudarBorradorDatasetDto.ReanudarBorradorDatasetDtoBuilder base, ImportacionTrabajo trabajo) {
         EstadoImportacionTrabajo estadoTrabajo = trabajo.getEstado();
@@ -280,6 +316,8 @@ public class DatasetClinicoServiceImpl implements DatasetClinicoService {
         base.importacionTrabajoId(trabajo.getId())
                 .plantillaId(trabajo.getPlantilla().getId())
                 .importacionGenericaId(importacionGenericaId)
+                .nombreArchivoOriginal(trabajo.getNombreArchivoOriginal())
+                .totalCorrecciones(contarCorrecciones(trabajo.getId()))
                 .totalFilasLeidas(resumenTrabajo.getTotalFilasLeidas())
                 .totalErrores(resumenTrabajo.getTotalErrores())
                 .totalAdvertencias(resumenTrabajo.getTotalAdvertencias())

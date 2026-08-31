@@ -334,6 +334,13 @@ export interface ColumnaDetectadaResponseDto {
   indiceColumna: number
   nombreOriginal: string
   nombreNormalizado: string
+  /**
+   * Campo clínico que es esta columna, cuando el backend la reconoce por su
+   * nombre. Manda sobre la heurística del asistente.
+   */
+  codigoCanonico: string | null
+  tipoDatoCanonico: TipoDato | null
+  esComunCanonico: boolean | null
 }
 
 export interface DeteccionColumnasResponseDto {
@@ -875,6 +882,19 @@ export interface ReanudarBorradorDatasetDto {
   estadoImportacionTrabajo: string | null
   mensaje: string
   huboCopiaDescartada: boolean
+  /** Archivo que se subió en su día; null si esa copia ya no existe. */
+  nombreArchivoOriginal: string | null
+  /** Celdas ya corregidas dentro de la app que se conservan al reanudar. */
+  totalCorrecciones: number | null
+  /**
+   * Hay una revisión anterior guardada que el usuario puede recuperar. No se
+   * reactiva sola: consta como descartada y no se sabe si fue a propósito.
+   */
+  hayTrabajoHistoricoRecuperable: boolean
+  trabajoHistoricoId: number | null
+  nombreArchivoHistorico: string | null
+  totalFilasHistoricas: number | null
+  totalCorreccionesHistoricas: number | null
 }
 
 // --- Fase 6.8E.2.1: reconstrucción de columnas al reanudar ---
@@ -918,6 +938,7 @@ export type TipoEventoImportacionTrabajo =
   | 'DATASET_ACTIVADO'
   | 'BORRADOR_DESCARTADO'
   | 'COPIA_DESCARTADA'
+  | 'COPIA_RECUPERADA'
 
 export interface EventoImportacionTrabajoDto {
   id: number
@@ -989,6 +1010,17 @@ export interface AplicacionDashboardIlqDto {
 }
 
 // --- Fase 6.9I.4.1: dashboard recomendado ---
+
+/**
+ * Sobre qué población cuentan los indicadores de actividad del dashboard
+ * inicial. Lo decide el backend a partir de si el dataset tiene fechaEvento.
+ */
+export interface BaseEvaluableDashboardDto {
+  aplicaFechaEvento: boolean
+  filtros: FiltroMetricaDto[]
+  etiquetaVolumen: string
+  motivo: string
+}
 
 export interface PropuestaWidgetDto {
   codigoMetrica: string

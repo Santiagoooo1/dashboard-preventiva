@@ -10,6 +10,9 @@ public interface CampoClinicoRepository extends JpaRepository<CampoClinico, Long
 
     List<CampoClinico> findByDatasetIdAndActivoTrue(Long datasetId);
 
+    /** Todos los campos del dataset, archivados incluidos. */
+    List<CampoClinico> findByDatasetId(Long datasetId);
+
     boolean existsByDatasetIdAndCodigoIgnoreCase(Long datasetId, String codigo);
 
     Optional<CampoClinico> findByDatasetIdAndCodigoIgnoreCase(Long datasetId, String codigo);

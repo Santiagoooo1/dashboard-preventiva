@@ -4,7 +4,7 @@ import type {
   ValidacionFilasImportacionGenericaResponseDto,
   ValidacionImportacionGenericaResponseDto,
 } from '../../api/types'
-import { activarDataset, crearCampo, crearDataset } from '../../api/datasetApi'
+import { activarDataset, asegurarCampos, crearDataset } from '../../api/datasetApi'
 import { crearMapeoPlantilla, crearPlantillaImportacion } from '../../api/plantillasImportacionApi'
 import {
   importarGenerico,
@@ -135,21 +135,28 @@ export async function ejecutarAsistente(
   }
 
   // 2. Campos (guarda código → id para los mapeos)
+  //
+  // Se «aseguran», no se crean uno a uno: al reanudar un borrador el asistente
+  // vuelve a declarar las mismas columnas, y crearlas otra vez chocaba con la
+  // protección de códigos únicos ("Ya existe un campo clínico con el código
+  // 'pacienteCodigo'"). El backend reutiliza los que ya existan —conservando su
+  // id y su configuración— y crea solo los que falten.
   onProgreso('campos', 'en-curso')
   const idPorCodigo = new Map<string, number>()
   try {
-    for (const columna of columnasUsadas) {
-      const campo = await crearCampo(datasetId, {
+    const campos = await asegurarCampos(
+      datasetId,
+      columnasUsadas.map((columna) => ({
         codigo: columna.codigoInterno,
         etiqueta: columna.nombreVisible,
         tipoDato: columna.tipoDato,
         esComun: columna.esComun,
         obligatorio: columna.obligatorio,
         orden: columna.indiceColumna,
-      })
-      idPorCodigo.set(columna.codigoInterno, campo.id)
-      resultado.camposCreados += 1
-    }
+      })),
+    )
+    campos.forEach((campo) => idPorCodigo.set(campo.codigo, campo.id))
+    resultado.camposCreados = campos.length
     onProgreso('campos', 'correcto')
   } catch (err) {
     return fallar('campos', err)

@@ -8,7 +8,8 @@ interface ProblemaGlobalImportacionProps {
   disabled: boolean
   /** Ausente cuando no hay columnas reconstruidas que revisar (ver Fase 6.8E.2.1). */
   onVolverAColumnas?: () => void
-  onVolver: () => void
+  /** "Sustituir archivo": descarta esta copia a petición del usuario y vuelve a pedir un Excel. */
+  onSustituirArchivo: () => void
 }
 
 // Errores sin columna asociada (p. ej. el archivo no tiene ninguna fila
@@ -20,7 +21,7 @@ export function ProblemaGlobalImportacion({
   bloqueante,
   disabled,
   onVolverAColumnas,
-  onVolver,
+  onSustituirArchivo,
 }: ProblemaGlobalImportacionProps) {
   return (
     <div className={styles.grupoProblema}>
@@ -40,8 +41,8 @@ export function ProblemaGlobalImportacion({
             Volver a columnas
           </button>
         )}
-        <button type="button" className="btn btnSecondary" disabled={disabled} onClick={onVolver}>
-          Volver y subir otro archivo
+        <button type="button" className="btn btnSecondary" disabled={disabled} onClick={onSustituirArchivo}>
+          Sustituir archivo
         </button>
       </div>
     </div>

@@ -11,12 +11,14 @@ import com.preventiva.backend.dto.ImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.ImportarDesdeTrabajoResponseDto;
 import com.preventiva.backend.dto.PaginaFilasImportacionTrabajoResponseDto;
 import com.preventiva.backend.dto.RevalidarImportacionTrabajoResponseDto;
+import com.preventiva.backend.entity.DatasetClinico;
 import com.preventiva.backend.entity.ErrorImportacionGenerica;
 import com.preventiva.backend.entity.FilaImportacionTrabajo;
 import com.preventiva.backend.entity.ImportacionGenerica;
 import com.preventiva.backend.entity.ImportacionTrabajo;
 import com.preventiva.backend.entity.MapeoCampoImportacion;
 import com.preventiva.backend.entity.PlantillaImportacion;
+import com.preventiva.backend.enums.EstadoDatasetClinico;
 import com.preventiva.backend.enums.EstadoImportacion;
 import com.preventiva.backend.enums.EstadoImportacionTrabajo;
 import com.preventiva.backend.enums.OrigenImportacion;
@@ -60,6 +62,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -355,8 +358,105 @@ public class ImportacionTrabajoServiceImpl implements ImportacionTrabajoService 
         }
 
         trabajo.setEstado(EstadoImportacionTrabajo.DESCARTADA);
+        // Queda constancia de que el descarte se pidió: la reanudación no debe
+        // resucitar después una copia que el usuario tiró a conciencia.
+        trabajo.setDescarteExplicito(true);
         importacionTrabajoRepository.save(trabajo);
         trazabilidadService.registrarCopiaDescartada(trabajo);
+    }
+
+    /**
+     * Busca —sin tocar nada— una copia descartada que podría rescatarse.
+     *
+     * <p>Solo detecta. La ambigüedad de {@code descarteExplicito == null} es
+     * insalvable: esa copia puede venir del defecto del asistente, que
+     * descartaba al salir de la pantalla de corrección, o de un usuario que la
+     * descartó a conciencia antes de que existiera la marca. No hay forma de
+     * distinguirlas, así que decide el usuario, no el sistema.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ImportacionTrabajo> buscarTrabajoHistoricoRecuperable(Long datasetId) {
+        List<ImportacionTrabajo> trabajos =
+                importacionTrabajoRepository.findByDatasetIdOrderByFechaCreacionDesc(datasetId);
+
+        // Si hay una copia viva, no hay nada que ofrecer: esa es la buena.
+        boolean hayCopiaAprovechable = trabajos.stream()
+                .anyMatch(t -> t.getEstado() != EstadoImportacionTrabajo.DESCARTADA);
+        if (hayCopiaAprovechable) {
+            return Optional.empty();
+        }
+
+        return trabajos.stream().filter(this::esRecuperable).findFirst();
+    }
+
+    /**
+     * Rescata la copia anterior, a petición expresa del usuario.
+     *
+     * <p>Esto sí escribe, y por eso hace falta que alguien lo pida: nunca se
+     * dispara al consultar ni al continuar un borrador. Las precondiciones son
+     * las mismas que en la detección; se vuelven a comprobar aquí porque entre
+     * ver el aviso y pulsar el botón el estado pudo cambiar.
+     */
+    @Override
+    @Transactional
+    public ImportacionTrabajoResponseDto recuperarTrabajoAnterior(Long datasetId) {
+        Optional<ImportacionTrabajo> candidata = buscarTrabajoHistoricoRecuperable(datasetId);
+
+        if (candidata.isEmpty()) {
+            // Puede ser que ya se recuperara (dos clics seguidos): si hay una
+            // copia viva, se devuelve esa en vez de un error. Recuperar dos
+            // veces no debe romper nada ni duplicar eventos.
+            Optional<ImportacionTrabajo> vigente =
+                    importacionTrabajoRepository.findByDatasetIdOrderByFechaCreacionDesc(datasetId).stream()
+                            .filter(t -> t.getEstado() == EstadoImportacionTrabajo.EN_EDICION
+                                    || t.getEstado() == EstadoImportacionTrabajo.LISTA_PARA_IMPORTAR)
+                            .findFirst();
+            if (vigente.isPresent()) {
+                return construirResumen(vigente.get(), filaImportacionTrabajoRepository
+                        .findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(vigente.get().getId()));
+            }
+            throw new IllegalArgumentException(
+                    "Este borrador no tiene ninguna revisión anterior que se pueda recuperar.");
+        }
+
+        ImportacionTrabajo trabajo = candidata.get();
+        List<FilaImportacionTrabajo> filas = filaImportacionTrabajoRepository
+                .findByImportacionTrabajoIdOrderByNumeroFilaOriginalAsc(trabajo.getId());
+        List<MapeoCampoImportacion> mapeos = obtenerMapeosActivosOLanzar(trabajo.getPlantilla().getId());
+
+        // El estado al que vuelve no se adivina: se recalcula con las
+        // correcciones que la copia ya tenía guardadas, igual que una
+        // revalidación normal. Así una copia ya corregida vuelve directamente a
+        // LISTA_PARA_IMPORTAR en vez de fingir que sigue teniendo errores.
+        revalidarInterno(trabajo, filas, mapeos);
+        trabajo.setDescarteExplicito(null);
+        importacionTrabajoRepository.save(trabajo);
+        filaImportacionTrabajoRepository.saveAll(filas);
+
+        trazabilidadService.registrarCopiaRecuperada(trabajo, trabajo.getEstado().name());
+        return construirResumen(trabajo, filas);
+    }
+
+    /** Condiciones que debe cumplir una copia DESCARTADA para poder rescatarse. */
+    private boolean esRecuperable(ImportacionTrabajo trabajo) {
+        if (trabajo.getEstado() != EstadoImportacionTrabajo.DESCARTADA) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(trabajo.getDescarteExplicito())) {
+            return false;
+        }
+        if (trabajo.getContenidoArchivo() == null || trabajo.getContenidoArchivo().length == 0) {
+            return false;
+        }
+        // Un dataset que ya tiene registros no está a medio importar: no hay
+        // ningún trabajo pendiente que reanudar.
+        DatasetClinico dataset = trabajo.getDataset();
+        EstadoDatasetClinico estadoDataset = dataset != null ? dataset.getEstadoDataset() : null;
+        if (estadoDataset != EstadoDatasetClinico.BORRADOR && estadoDataset != EstadoDatasetClinico.VALIDANDO) {
+            return false;
+        }
+        return filaImportacionTrabajoRepository.countByImportacionTrabajoId(trabajo.getId()) > 0;
     }
 
     // ------------------------------------------------------------------

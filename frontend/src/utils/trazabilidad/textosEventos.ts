@@ -20,6 +20,7 @@ const TEXTOS_EVENTO: Record<TipoEventoImportacionTrabajo, string> = {
   DATASET_ACTIVADO: 'El dataset pasó a estar activo.',
   BORRADOR_DESCARTADO: 'Se descartó el borrador.',
   COPIA_DESCARTADA: 'Se descartó la copia interna.',
+  COPIA_RECUPERADA: 'Se recuperó una copia interna que había quedado descartada sin querer.',
 }
 
 export function textoEvento(tipoEvento: string): string {
@@ -53,6 +54,7 @@ const CATEGORIA_POR_EVENTO: Record<TipoEventoImportacionTrabajo, CategoriaEvento
   REVALIDACION_EJECUTADA: 'otro',
   BORRADOR_DESCARTADO: 'otro',
   COPIA_DESCARTADA: 'otro',
+  COPIA_RECUPERADA: 'otro',
 }
 
 export function categoriaEvento(tipoEvento: string): CategoriaEvento {

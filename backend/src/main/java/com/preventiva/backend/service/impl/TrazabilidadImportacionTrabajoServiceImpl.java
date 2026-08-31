@@ -220,6 +220,13 @@ public class TrazabilidadImportacionTrabajoServiceImpl implements TrazabilidadIm
         registrarEvento(trabajo, TipoEventoImportacionTrabajo.COPIA_DESCARTADA, null, null, null, null, null);
     }
 
+    @Override
+    public void registrarCopiaRecuperada(ImportacionTrabajo trabajo, String estadoNuevo) {
+        Map<String, Object> detalle = new LinkedHashMap<>();
+        detalle.put("estadoNuevo", estadoNuevo);
+        registrarEvento(trabajo, TipoEventoImportacionTrabajo.COPIA_RECUPERADA, null, null, null, null, detalle);
+    }
+
     // ------------------------------------------------------------------
     // Consulta
     // ------------------------------------------------------------------
