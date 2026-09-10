@@ -27,4 +27,13 @@ public class ColumnaDetectadaResponseDto {
 
     /** Si el campo canónico es de los comunes a todos los datasets. */
     private Boolean esComunCanonico;
+
+    /** Nombre recomendado para mostrar cuando el del archivo es críptico («ILQ»). */
+    private String etiquetaCanonica;
+
+    /**
+     * Por qué se reconoció: CANONICA_EXACTA o ALIAS. Sirve para auditar la
+     * decisión; el asistente no necesita enseñárselo al médico.
+     */
+    private String origenReconocimiento;
 }

@@ -1,0 +1,57 @@
+/* Tabla temporal (Fase 6.9N). Reutiliza los tokens de la app: aquí solo está
+   lo que DataTable no cubre — la fila de totales y la matriz por categorías. */
+
+.totales {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.totales th,
+.totales td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: right;
+  /* La línea superior separa el resumen de las filas que resume. */
+  border-top: 2px solid var(--color-border);
+  font-weight: 600;
+}
+
+.totales th {
+  text-align: left;
+}
+
+/* Con muchas categorías la matriz se desborda: scrolla ella, no la página. */
+.contenedorMatriz {
+  overflow-x: auto;
+}
+
+.matriz {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.matriz th,
+.matriz td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: right;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.matriz thead th,
+.matriz tbody th {
+  text-align: left;
+}
+
+.matriz thead th {
+  border-bottom: 2px solid var(--color-border);
+  font-weight: 600;
+}
+
+.matriz tfoot th,
+.matriz tfoot td {
+  border-top: 2px solid var(--color-border);
+  border-bottom: none;
+  font-weight: 600;
+}

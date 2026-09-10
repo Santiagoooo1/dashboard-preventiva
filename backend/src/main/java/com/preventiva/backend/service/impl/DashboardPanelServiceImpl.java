@@ -142,7 +142,22 @@ public class DashboardPanelServiceImpl implements DashboardPanelService {
             case LINEAS -> tipoMetrica == TipoMetrica.DISTRIBUCION
                     ? TipoResultadoWidget.ACTUAL
                     : TipoResultadoWidget.SERIE_TEMPORAL;
-            case BARRAS, TABLA, DONUT, PIE -> {
+            case TABLA -> {
+                if (tipoMetrica == TipoMetrica.DISTRIBUCION) {
+                    yield TipoResultadoWidget.ACTUAL;
+                }
+                // Una tabla con granularidad es una tabla temporal: una fila por
+                // periodo (Fase 6.9N). Se resuelve como serie para que use el
+                // mismo motor que la gráfica y no pueda dar otros números.
+                if (config != null && config.getGranularidad() != null) {
+                    yield TipoResultadoWidget.SERIE_TEMPORAL;
+                }
+                String campoAgrupacionTabla = config != null ? config.getCampoAgrupacion() : null;
+                yield (campoAgrupacionTabla != null && !campoAgrupacionTabla.isBlank())
+                        ? TipoResultadoWidget.COMPARATIVA
+                        : TipoResultadoWidget.ACTUAL;
+            }
+            case BARRAS, DONUT, PIE -> {
                 if (tipoMetrica == TipoMetrica.DISTRIBUCION) {
                     yield TipoResultadoWidget.ACTUAL;
                 }

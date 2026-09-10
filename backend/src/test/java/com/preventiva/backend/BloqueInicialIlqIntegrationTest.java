@@ -72,6 +72,7 @@ class BloqueInicialIlqIntegrationTest {
     private static final String COD_ADECUACION = BloqueInicialIlq.PREFIJO + "adecuacion";
     private static final String COD_MOTIVOS = BloqueInicialIlq.PREFIJO + "motivos_inadecuacion";
     private static final String COD_TASA_MENSUAL = BloqueInicialIlq.PREFIJO + "tasa_mensual";
+    private static final String COD_DETALLE = BloqueInicialIlq.PREFIJO + "detalle_mensual";
 
     // ------------------------------------------------------------------
     // Utilidades
@@ -170,7 +171,7 @@ class BloqueInicialIlqIntegrationTest {
 
         assertThat(propuestas).extracting(PropuestaWidgetDto::getCodigoMetrica)
                 .containsExactly(COD_CASOS, COD_TASA, COD_LOCALIZACION, COD_ADECUACION, COD_MOTIVOS,
-                        COD_TASA_MENSUAL);
+                        COD_TASA_MENSUAL, COD_DETALLE);
         assertThat(propuestas).extracting(PropuestaWidgetDto::getNombre)
                 .containsExactly(
                         "Casos de ILQ",
@@ -178,8 +179,9 @@ class BloqueInicialIlqIntegrationTest {
                         "Localización de la infección",
                         "Adecuación de profilaxis",
                         "Motivos de inadecuación",
-                        "Evolución mensual de infección de localización quirúrgica");
-        assertThat(propuestas).extracting(PropuestaWidgetDto::getOrden).containsExactly(1, 2, 3, 4, 5, 6);
+                        "Evolución mensual de infección de localización quirúrgica",
+                        "Detalle mensual de ILQ");
+        assertThat(propuestas).extracting(PropuestaWidgetDto::getOrden).containsExactly(1, 2, 3, 4, 5, 6, 7);
 
         // B: el recuento va primero y es un CONTEO, no un porcentaje.
         assertThat(propuestas.get(0).getTipoMetrica()).isEqualTo("CONTEO");
@@ -462,12 +464,16 @@ class BloqueInicialIlqIntegrationTest {
 
         List<PropuestaWidgetDto> propuestas = bloqueInicialIlqService.proponerBloqueInicial(datasetId);
 
+        // Dos series temporales: la gráfica y su tabla de detalle. Ambas son
+        // PORCENTAJE, así que «Registros por mes» sigue sin hacer falta.
         assertThat(propuestas).filteredOn(p -> "SERIE_TEMPORAL".equals(p.getTipoResultado()))
+                .hasSize(2)
+                .allSatisfy(p -> assertThat(p.getTipoMetrica()).isEqualTo("PORCENTAJE"))
+                .extracting(com.preventiva.backend.dto.PropuestaWidgetDto::getCodigoMetrica)
+                .containsExactly(COD_TASA_MENSUAL, COD_DETALLE);
+        assertThat(propuestas).filteredOn(p -> "TABLA".equals(p.getTipoVisualizacion()))
                 .singleElement()
-                .satisfies(p -> {
-                    assertThat(p.getCodigoMetrica()).isEqualTo(COD_TASA_MENSUAL);
-                    assertThat(p.getTipoMetrica()).isEqualTo("PORCENTAJE");
-                });
+                .satisfies(p -> assertThat(p.getAncho()).isEqualTo(12));
     }
 
     /**
@@ -511,10 +517,10 @@ class BloqueInicialIlqIntegrationTest {
 
         List<PropuestaWidgetDto> propuestas = bloqueInicialIlqService.proponerBloqueInicial(datasetId);
 
-        assertThat(propuestas).hasSize(6);
+        assertThat(propuestas).hasSize(7);
         assertThat(propuestas).extracting(PropuestaWidgetDto::getCodigoMetrica)
                 .containsExactly(COD_CASOS, COD_TASA, COD_LOCALIZACION, COD_ADECUACION, COD_MOTIVOS,
-                        COD_TASA_MENSUAL);
+                        COD_TASA_MENSUAL, COD_DETALLE);
     }
 
     // ------------------------------------------------------------------
@@ -532,8 +538,8 @@ class BloqueInicialIlqIntegrationTest {
         List<PropuestaWidgetDto> propuestas = bloqueInicialIlqService.proponerBloqueInicial(datasetId);
 
         assertThat(propuestas).extracting(PropuestaWidgetDto::getCodigoMetrica)
-                .containsExactly(COD_CASOS, COD_TASA, COD_ADECUACION, COD_MOTIVOS, COD_TASA_MENSUAL);
-        assertThat(propuestas).extracting(PropuestaWidgetDto::getOrden).containsExactly(1, 2, 3, 4, 5);
+                .containsExactly(COD_CASOS, COD_TASA, COD_ADECUACION, COD_MOTIVOS, COD_TASA_MENSUAL, COD_DETALLE);
+        assertThat(propuestas).extracting(PropuestaWidgetDto::getOrden).containsExactly(1, 2, 3, 4, 5, 6);
     }
 
     /** K: sin motivos se pierde ese widget y solo ese. */
@@ -547,7 +553,7 @@ class BloqueInicialIlqIntegrationTest {
         List<PropuestaWidgetDto> propuestas = bloqueInicialIlqService.proponerBloqueInicial(datasetId);
 
         assertThat(propuestas).extracting(PropuestaWidgetDto::getCodigoMetrica)
-                .containsExactly(COD_CASOS, COD_TASA, COD_LOCALIZACION, COD_ADECUACION, COD_TASA_MENSUAL);
+                .containsExactly(COD_CASOS, COD_TASA, COD_LOCALIZACION, COD_ADECUACION, COD_TASA_MENSUAL, COD_DETALLE);
     }
 
     /** K (variante): sin fechaEvento no hay evolución mensual, pero sí el resto. */
@@ -576,7 +582,7 @@ class BloqueInicialIlqIntegrationTest {
         List<PropuestaWidgetDto> propuestas = bloqueInicialIlqService.proponerBloqueInicial(datasetId);
 
         assertThat(propuestas).extracting(PropuestaWidgetDto::getCodigoMetrica)
-                .containsExactly(COD_CASOS, COD_TASA, COD_TASA_MENSUAL);
+                .containsExactly(COD_CASOS, COD_TASA, COD_TASA_MENSUAL, COD_DETALLE);
     }
 
     // ------------------------------------------------------------------

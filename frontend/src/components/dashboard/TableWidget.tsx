@@ -23,7 +23,9 @@ export function TableWidget({ widget, nota, seleccion }: TableWidgetProps) {
 
   if (widget.serieTemporal) {
     // Las series se agrupan por periodo: la selección temporal es 6.9H.2.
-    cuerpo = <WidgetSerieTemporal serie={widget.serieTemporal} />
+    // La unidad viaja en el resultado actual cuando existe; sirve para rotular
+    // la columna de valor como «Tasa» y añadir el % a cada celda.
+    cuerpo = <WidgetSerieTemporal serie={widget.serieTemporal} unidad={widget.resultadoActual?.unidad} />
   } else if (widget.comparativa) {
     cuerpo = <WidgetComparativa comparativa={widget.comparativa} seleccion={seleccion} />
   } else if (widget.resultadoActual) {

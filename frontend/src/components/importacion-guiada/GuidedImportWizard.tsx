@@ -23,6 +23,7 @@ import {
   sugerirCodigoDataset,
   sugerirColumnas,
   sugerirNombreDataset,
+  detectarConceptosDuplicados,
 } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import type { ColumnaConfigurada } from '../../utils/importacionGuiada/sugerenciasColumnas'
 import {
@@ -204,6 +205,10 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
   // Revisiones clínicas no bloqueantes (heurísticas por nombre), recalculadas
   // cada vez que cambian las columnas para reflejar ediciones al instante.
   const revisionesClinicas = useMemo(() => detectarRevisionesClinicas(columnas), [columnas])
+  // Columnas con nombres distintos que describen el mismo campo clínico (p. ej.
+  // «LOCALIZACIÓN ILQ» y «LOCALIZACIÓN DE LA INFECCIÓN»). No se resuelve solo:
+  // fusionar datos clínicos por nuestra cuenta sería peor que preguntar.
+  const conceptosDuplicados = useMemo(() => detectarConceptosDuplicados(columnas), [columnas])
 
   const modoCorreccion = problemasPorColumna.size > 0
   const listaProblemas = [...problemasPorColumna.values()]
@@ -371,6 +376,8 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
             codigoCanonico: c.codigoCanonico,
             tipoDatoCanonico: c.tipoDatoCanonico,
             esComunCanonico: c.esComunCanonico,
+            etiquetaCanonica: c.etiquetaCanonica,
+            origenReconocimiento: c.origenReconocimiento,
           })),
         ),
       )
@@ -945,6 +952,27 @@ export function GuidedImportWizard({ borradorId }: GuidedImportWizardProps = {})
                   Ver errores técnicos
                 </button>
               </div>
+            </Card>
+          )}
+
+          {conceptosDuplicados.size > 0 && (
+            <Card title="Columnas que parecen el mismo dato clínico">
+              <p className={styles.intro}>
+                Estas columnas tienen nombres distintos pero representan el mismo campo clínico. Deja marcada solo la
+                que quieras usar: si se importan las dos, el dato queda repartido entre dos campos y los gráficos
+                salen incompletos.
+              </p>
+              <ul className={styles.listaProgreso}>
+                {[...conceptosDuplicados.values()].map((grupo) => (
+                  <li key={grupo[0].codigoCanonico}>
+                    <strong>{grupo[0].nombreVisible}</strong>:{' '}
+                    {grupo.map((c) => `«${c.nombreOriginal}»`).join(' y ')}
+                  </li>
+                ))}
+              </ul>
+              <p className={styles.campoClaveAyuda}>
+                Puedes desmarcar la que sobre en la tabla de columnas, más abajo.
+              </p>
             </Card>
           )}
 

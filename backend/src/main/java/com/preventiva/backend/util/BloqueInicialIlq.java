@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * Los seis indicadores que un servicio de medicina preventiva quiere ver
+ * Los siete indicadores que un servicio de medicina preventiva quiere ver
  * primero cuando el dataset habla de infección quirúrgica (Fase 6.9L).
  *
  * <p>Nace de una petición concreta: el dashboard automático abría con «Total de
@@ -94,9 +94,9 @@ public final class BloqueInicialIlq {
     }
 
     /**
-     * Los seis, en el orden en que el médico los pidió: primero cuántos casos
-     * hay y sobre cuántos, después dónde se localizan, luego la profilaxis y
-     * sus fallos, y al final la evolución.
+     * En el orden en que el médico los pidió: primero cuántos casos hay y sobre
+     * cuántos, después dónde se localizan, luego la profilaxis y sus fallos, y
+     * al final la evolución con su detalle numérico.
      */
     public static List<ElementoInicial> elementos() {
         return List.of(
@@ -215,7 +215,33 @@ public final class BloqueInicialIlq {
                             w.setCampoFecha(C_FECHA);
                         }),
                         List.of(C_ILQ, C_FECHA),
-                        "Tendencia de la infección quirúrgica"));
+                        "Tendencia de la infección quirúrgica"),
+
+                // 7. Los números detrás de la línea (Fase 6.9N).
+                //
+                // La gráfica dibuja la tasa pero no dice sobre cuántas
+                // intervenciones se calcula, y esa es justo la pregunta
+                // siguiente: un 12,5 % sobre 8 y un 12,5 % sobre 200 no se leen
+                // igual. Es la misma serie y el mismo motor —métrica propia
+                // porque el panel mantiene una relación 1:1 con sus widgets—,
+                // así que la tabla no puede discrepar de la línea.
+                new ElementoInicial(
+                        PREFIJO + "detalle_mensual", "Detalle mensual de ILQ",
+                        "Intervenciones evaluadas, casos y tasa de cada mes, con el total del periodo.",
+                        TipoMetrica.PORCENTAJE, config(c -> {
+                            c.setFiltros(List.of());
+                            c.setNumerador(grupo(filtro(C_ILQ, OperadorFiltro.EQ, true)));
+                            c.setDenominador(grupo(filtro(C_ILQ, OperadorFiltro.NOT_NULL, null)));
+                            c.setEtiquetaNumerador("Casos de ILQ del mes");
+                            c.setEtiquetaDenominador("Intervenciones del mes con ILQ documentada");
+                        }),
+                        "%", 2, TipoVisualizacion.TABLA, 12, TipoResultadoWidget.SERIE_TEMPORAL,
+                        configWidget(w -> {
+                            w.setGranularidad(Granularidad.MES);
+                            w.setCampoFecha(C_FECHA);
+                        }),
+                        List.of(C_ILQ, C_FECHA),
+                        "Los números que hay detrás de la evolución"));
     }
 
     // ------------------------------------------------------------------

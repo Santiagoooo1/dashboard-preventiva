@@ -341,6 +341,10 @@ export interface ColumnaDetectadaResponseDto {
   codigoCanonico: string | null
   tipoDatoCanonico: TipoDato | null
   esComunCanonico: boolean | null
+  /** Nombre recomendado cuando el del archivo es una sigla ilegible. */
+  etiquetaCanonica: string | null
+  /** CANONICA_EXACTA | ALIAS. Para auditar por qué se reconoció. */
+  origenReconocimiento: string | null
 }
 
 export interface DeteccionColumnasResponseDto {
@@ -603,6 +607,8 @@ export interface PuntoSerieDto {
 export interface SerieSegmentadaDto {
   etiqueta: string
   puntos: PuntoSerieDto[]
+  /** Fila TOTAL del segmento, acumulada sobre todo el rango. */
+  total: PuntoSerieDto | null
 }
 
 export interface SerieTemporalResponseDto {
@@ -613,6 +619,76 @@ export interface SerieTemporalResponseDto {
   segmentadoPor: string | null
   puntos: PuntoSerieDto[] | null
   series: SerieSegmentadaDto[] | null
+  /**
+   * Fila TOTAL de la serie, calculada de una vez sobre todo el rango. No es el
+   * promedio de los puntos: en un porcentaje, promediar tasas mensuales
+   * pondera igual un mes de 8 casos y uno de 22.
+   */
+  total: PuntoSerieDto | null
+}
+
+// --- Fase 6.9O/6.9P: comparación entre años ---
+
+export type TipoComparacionInteranual = 'TASA' | 'RECUENTO' | 'DISTRIBUCION' | 'RESUMEN_NUMERICO'
+
+export interface ValorCategoriaDto {
+  categoria: string
+  valor: number
+}
+
+/** Un valor de la matriz: lo que vale un periodo de un año. */
+export interface CeldaComparacionDto {
+  periodo: string
+  valor: number | null
+  numerador: number | null
+  denominador: number | null
+  estado: EstadoResultadoMetrica | string
+  categorias: ValorCategoriaDto[] | null
+  media: number | null
+  minimo: number | null
+  maximo: number | null
+}
+
+/** Una línea de la comparación: un año de un dataset. */
+export interface SerieAnualDto {
+  datasetId: number
+  datasetCodigo: string
+  datasetNombre: string
+  anio: number
+  etiqueta: string
+  celdas: CeldaComparacionDto[]
+  total: CeldaComparacionDto
+  variacion: CeldaComparacionDto[] | null
+  variacionTotal: CeldaComparacionDto | null
+  /** «pp» para porcentajes, «absoluta» para recuentos y numéricos. */
+  unidadVariacion: string
+}
+
+export interface AdvertenciaComparacionDto {
+  codigo: string
+  mensaje: string
+}
+
+export interface ComparacionInteranualRequestDto {
+  datasetIds: number[]
+  codigoCanonico: string
+  tipoComparacion: TipoComparacionInteranual
+  granularidad: Granularidad
+  filtros?: FiltroMetricaDto[]
+  anios?: number[]
+}
+
+export interface ComparacionInteranualResponseDto {
+  codigoCanonico: string
+  etiquetaConcepto: string
+  tipoComparacion: TipoComparacionInteranual
+  granularidad: string
+  periodos: string[]
+  series: SerieAnualDto[]
+  categorias: string[]
+  comparable: boolean
+  motivoNoComparable: string | null
+  advertencias: AdvertenciaComparacionDto[]
 }
 
 export interface ItemComparativaDto {

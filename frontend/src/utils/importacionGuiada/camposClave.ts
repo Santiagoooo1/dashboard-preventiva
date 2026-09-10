@@ -1,6 +1,12 @@
 import type { TipoDato } from '../../api/types'
 import type { ColumnaConfigurada, RolClinico } from './sugerenciasColumnas'
-import { CODIGO_CANONICO, desambiguarCodigos, normalizarTexto, sugerirCodigoInterno } from './sugerenciasColumnas'
+import {
+  CODIGO_CANONICO,
+  desambiguarCodigos,
+  detectarConceptosDuplicados,
+  normalizarTexto,
+  sugerirCodigoInterno,
+} from './sugerenciasColumnas'
 
 // Roles que se asignan a una única columna a la vez ("fecha" se gestiona
 // aparte, con su propia lógica de fecha principal / fechas secundarias).
@@ -36,12 +42,20 @@ function esNombreCirugia(nombreOriginal: string): boolean {
   return /(^|\W)cirugia(\W|$)/.test(normalizarTexto(nombreOriginal))
 }
 
-/** Índice de la fecha recomendada como principal: la de cirugía si existe, si no la primera. */
+/**
+ * Índice de la fecha recomendada como principal.
+ *
+ * Manda lo que el catálogo clínico ya reconoció: si una cabecera dice «FECHA DE
+ * INTERVENCIÓN», esa es la fecha del evento aunque en el archivo aparezca
+ * después de «FECHA INGRESO». Solo cuando no hay ninguna reconocida se recurre
+ * al nombre («cirugía») y, en último término, a la primera que haya.
+ */
 export function sugerirFechaPrincipal(columnas: ColumnaConfigurada[]): number | null {
   const fechas = columnas.filter((c) => c.usar && c.rol === 'fecha')
   if (fechas.length === 0) return null
+  const canonica = fechas.find((c) => c.codigoCanonico === 'fechaEvento')
   const cirugia = fechas.find((c) => esNombreCirugia(c.nombreOriginal))
-  return (cirugia ?? fechas[0]).indiceColumna
+  return (canonica ?? cirugia ?? fechas[0]).indiceColumna
 }
 
 /**
@@ -55,7 +69,15 @@ export function establecerFechaPrincipal(columnas: ColumnaConfigurada[], indiceC
       return { ...c, rol: 'fecha' as RolClinico, codigoInterno: 'fechaEvento', esComun: true, obligatorio: true }
     }
     if (c.codigoInterno === 'fechaEvento') {
-      return { ...c, codigoInterno: sugerirCodigoInterno(c.nombreOriginal), esComun: false, obligatorio: false }
+      // Deja de reclamar el concepto: el usuario ha decidido que la fecha del
+      // evento es otra, y mantener la marca la haría aparecer como duplicada.
+      return {
+        ...c,
+        codigoInterno: sugerirCodigoInterno(c.nombreOriginal),
+        codigoCanonico: undefined,
+        esComun: false,
+        obligatorio: false,
+      }
     }
     return c
   })
@@ -137,7 +159,10 @@ export function detectarRevisionesClinicas(columnas: ColumnaConfigurada[]): Map<
 
   const principal = columnas.find((c) => c.usar && c.codigoInterno === 'fechaEvento')
   const cirugia = columnas.find((c) => c.usar && c.rol === 'fecha' && esNombreCirugia(c.nombreOriginal))
-  if (principal && cirugia && principal.indiceColumna !== cirugia.indiceColumna) {
+  // Si la principal es la que el catálogo reconoció, no hay nada que revisar:
+  // sabemos qué es, no lo hemos deducido del nombre.
+  if (principal?.codigoCanonico !== 'fechaEvento'
+      && principal && cirugia && principal.indiceColumna !== cirugia.indiceColumna) {
     revisiones.set(principal.indiceColumna, {
       mensaje: `La fecha principal es "${principal.nombreOriginal}", pero el archivo también tiene "${cirugia.nombreOriginal}". Revisa cuál debería ser la fecha principal.`,
       indiceFechaSugerida: cirugia.indiceColumna,
@@ -261,6 +286,16 @@ export function validarColumnasParaCrear(columnas: ColumnaConfigurada[]): string
   const duplicadas = detectarColumnasDuplicadas(columnas)
   if (columnas.some((c) => c.usar && duplicadas.has(c.indiceColumna))) {
     return 'Hay columnas repetidas en el archivo. Cambia la fila de cabecera o desmarca columnas duplicadas antes de continuar.'
+  }
+  // Dos columnas que significan lo mismo repartirían el dato entre dos campos
+  // medio vacíos, y el usuario lo descubriría al ver un gráfico incompleto.
+  // Se avisa arriba y aquí se bloquea: es él quien decide cuál conserva, porque
+  // fusionarlas por nuestra cuenta sería decidir sobre datos clínicos.
+  const conceptosDuplicados = detectarConceptosDuplicados(columnas)
+  if (conceptosDuplicados.size > 0) {
+    const [grupo] = [...conceptosDuplicados.values()]
+    const nombres = grupo.map((c) => `«${c.nombreOriginal}»`).join(' y ')
+    return `${nombres} representan el mismo campo clínico. Desmarca una de las dos antes de continuar.`
   }
   if (!usadas.some((c) => c.codigoInterno === 'pacienteCodigo')) {
     return 'Falta el identificador del paciente. Selecciónalo en «Campos clave del dashboard».'

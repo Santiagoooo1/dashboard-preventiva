@@ -41,6 +41,14 @@ export interface ColumnaConfigurada {
   rol: RolClinico
   esComun: boolean
   obligatorio: boolean
+  /**
+   * Concepto clínico que el backend reconoció en la cabecera, si lo reconoció.
+   *
+   * Se conserva aunque `codigoInterno` cambie después (por desambiguación o
+   * por pasar a ser la fecha principal): es lo que permite detectar que dos
+   * columnas distintas del mismo archivo describen el mismo campo.
+   */
+  codigoCanonico?: string
 }
 
 /** Quita acentos, colapsa espacios y pasa a minúsculas para poder comparar. */
@@ -234,6 +242,8 @@ export interface ColumnaCanonica {
   codigoCanonico?: string | null
   tipoDatoCanonico?: TipoDato | null
   esComunCanonico?: boolean | null
+  etiquetaCanonica?: string | null
+  origenReconocimiento?: string | null
 }
 
 /**
@@ -250,8 +260,15 @@ function aplicarCanonico(columna: ColumnaConfigurada, canonica: ColumnaCanonica)
   return {
     ...columna,
     codigoInterno: canonica.codigoCanonico,
+    codigoCanonico: canonica.codigoCanonico,
     tipoDato: canonica.tipoDatoCanonico,
     esComun: canonica.esComunCanonico ?? columna.esComun,
+    // Solo se sustituye el nombre visible cuando el del archivo es una sigla
+    // ilegible («ILQ»). Si el hospital escribió algo con sentido, se respeta:
+    // es el nombre por el que su gente reconoce la columna.
+    nombreVisible: canonica.etiquetaCanonica && columna.nombreOriginal.trim().length <= 4
+      ? canonica.etiquetaCanonica
+      : columna.nombreVisible,
     // El rol guía la UI (qué controles se ofrecen); se alinea con el tipo real
     // para que un campo de texto no siga ofreciendo opciones de Sí/No.
     rol: rolDesdeTipoCanonico(canonica.tipoDatoCanonico),
@@ -273,6 +290,30 @@ export function sugerirColumnas(
     aplicarCanonico(construirColumnaConfigurada(c.indiceColumna, c.nombreOriginal), c),
   )
   return desambiguarCodigos(ignorarBanderasDeSexoRedundantes(columnas))
+}
+
+/**
+ * Columnas distintas del archivo que describen el mismo campo clínico.
+ *
+ * Pasa de verdad: un Excel con «LOCALIZACIÓN ILQ» y «LOCALIZACIÓN DE LA
+ * INFECCIÓN» tiene dos veces lo mismo. `desambiguarCodigos` las salvaría
+ * renombrando la segunda a `localizacionInfeccion2`, pero eso deja dos campos
+ * medio vacíos y ningún aviso: el usuario descubre el problema al ver un
+ * gráfico incompleto. Mejor decirlo antes de importar y que decida él.
+ *
+ * @returns código canónico → columnas que lo reclaman (solo cuando hay más de una)
+ */
+export function detectarConceptosDuplicados(
+  columnas: ColumnaConfigurada[],
+): Map<string, ColumnaConfigurada[]> {
+  const porConcepto = new Map<string, ColumnaConfigurada[]>()
+  for (const columna of columnas) {
+    if (!columna.usar || !columna.codigoCanonico) continue
+    const grupo = porConcepto.get(columna.codigoCanonico) ?? []
+    grupo.push(columna)
+    porConcepto.set(columna.codigoCanonico, grupo)
+  }
+  return new Map([...porConcepto].filter(([, grupo]) => grupo.length > 1))
 }
 
 /** Garantiza códigos únicos entre las columnas usadas (el backend los exige únicos). */

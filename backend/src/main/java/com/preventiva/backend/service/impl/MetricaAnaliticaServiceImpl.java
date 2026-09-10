@@ -151,12 +151,21 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
                             metrica, resolverCampo))
                     .toList();
 
+            // El total se calcula de una vez sobre todos los registros, no
+            // sumando ni promediando los puntos: para un porcentaje, la media
+            // de las tasas mensuales pondera igual un mes de 8 casos y uno de
+            // 22, y no es la tasa del periodo.
+            PuntoSerieDto total = construirTotal(
+                    rango, registrosConFecha.stream().map(RegistroConFecha::registro).toList(),
+                    metrica, resolverCampo);
+
             return SerieTemporalResponseDto.builder()
                     .metricaId(metrica.getId())
                     .codigo(metrica.getCodigo())
                     .tipoMetrica(metrica.getTipoMetrica().name())
                     .granularidad(request.getGranularidad().name())
                     .puntos(puntos)
+                    .total(total)
                     .build();
         }
 
@@ -178,7 +187,14 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
                                     periodo, porPeriodo.getOrDefault(periodo.etiqueta(), List.of()),
                                     metrica, resolverCampo))
                             .toList();
-                    return SerieSegmentadaDto.builder().etiqueta(segmento).puntos(puntos).build();
+                    List<RegistroClinicoGenerico> todosDelSegmento = porPeriodo.values().stream()
+                            .flatMap(List::stream)
+                            .toList();
+                    return SerieSegmentadaDto.builder()
+                            .etiqueta(segmento)
+                            .puntos(puntos)
+                            .total(construirTotal(rango, todosDelSegmento, metrica, resolverCampo))
+                            .build();
                 })
                 .toList();
 
@@ -189,6 +205,9 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
                 .granularidad(request.getGranularidad().name())
                 .segmentadoPor(request.getCampoSegmentacion())
                 .series(series)
+                .total(construirTotal(
+                        rango, registrosConFecha.stream().map(RegistroConFecha::registro).toList(),
+                        metrica, resolverCampo))
                 .build();
     }
 
@@ -233,6 +252,18 @@ public class MetricaAnaliticaServiceImpl implements MetricaAnaliticaService {
                 .agrupadoPor(request.getCampoAgrupacion())
                 .items(items)
                 .build();
+    }
+
+    /**
+     * Fila TOTAL: el mismo cálculo que un punto, pero sobre todos los registros
+     * del rango a la vez. Reutiliza {@link #construirPunto} para que la fila de
+     * totales no pueda separarse nunca de las filas que resume.
+     */
+    private PuntoSerieDto construirTotal(
+            RangoEfectivo rango, List<RegistroClinicoGenerico> registros,
+            MetricaClinica metrica, Function<String, CampoClinico> resolverCampo) {
+        Periodo periodoTotal = new Periodo("TOTAL", rango.desde(), rango.hasta());
+        return construirPunto(periodoTotal, registros, metrica, resolverCampo);
     }
 
     private PuntoSerieDto construirPunto(

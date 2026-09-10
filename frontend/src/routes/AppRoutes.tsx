@@ -3,6 +3,7 @@ import { MainLayout } from '../layout/MainLayout'
 import { HomePage } from '../pages/HomePage'
 import { CrearDashboardPage } from '../pages/CrearDashboardPage'
 import { DatasetsPage } from '../pages/DatasetsPage'
+import { ComparacionInteranualPage } from '../pages/ComparacionInteranualPage'
 import { DatasetFormPage } from '../pages/DatasetFormPage'
 import { DatasetDetailPage } from '../pages/DatasetDetailPage'
 import { DatasetCamposPage } from '../pages/DatasetCamposPage'
@@ -33,6 +34,7 @@ export function AppRoutes() {
         <Route path="/crear-dashboard" element={<CrearDashboardPage />} />
         <Route path="/crear-dashboard/borrador/:datasetId" element={<CrearDashboardPage />} />
         <Route path="/datasets" element={<DatasetsPage />} />
+        <Route path="/comparar-anios" element={<ComparacionInteranualPage />} />
         <Route path="/datasets/nuevo" element={<DatasetFormPage />} />
         <Route path="/datasets/:datasetId" element={<DatasetDetailPage />} />
         <Route path="/datasets/:datasetId/editar" element={<DatasetFormPage />} />

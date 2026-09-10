@@ -103,7 +103,9 @@ public class PlantillaImportacionServiceImpl implements PlantillaImportacionServ
                     CatalogoColumnasClinicas.resolver(entry.getValue()).ifPresent(canonica -> builder
                             .codigoCanonico(canonica.codigo())
                             .tipoDatoCanonico(canonica.tipoDato().name())
-                            .esComunCanonico(canonica.esComun()));
+                            .esComunCanonico(canonica.esComun())
+                            .etiquetaCanonica(canonica.etiquetaRecomendada())
+                            .origenReconocimiento(canonica.origen().name()));
                     return builder.build();
                 })
                 .toList();
