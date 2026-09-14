@@ -627,6 +627,123 @@ export interface SerieTemporalResponseDto {
   total: PuntoSerieDto | null
 }
 
+// --- Fase 6.9Q.1: catálogo de lo insertable en un informe ---
+
+/** Un widget ya configurado en un dashboard, listo para llevar a un informe. */
+export interface WidgetDisponibleDto {
+  panelMetricaId: number
+  metricaId: number
+  /** Lo que se lee en el dashboard: título propio o, si no hay, nombre de la métrica. */
+  titulo: string
+  /** Solo si el widget tiene título propio: el bloque no congela el nombre de la métrica. */
+  tituloPersonalizado: string | null
+  tipoVisualizacion: TipoVisualizacion | null
+  tipoResultadoWidget: TipoResultado | null
+  configuracionWidget: ConfiguracionWidgetDto | null
+  ancho: number
+}
+
+export interface DashboardDisponibleDto {
+  panelId: number
+  panelNombre: string
+  datasetId: number
+  datasetNombre: string
+  widgets: WidgetDisponibleDto[]
+}
+
+/** Métrica que no está en ningún dashboard: al insertarla hay que elegir vista. */
+export interface IndicadorDisponibleDto {
+  metricaId: number
+  nombre: string
+  tipoMetrica: TipoMetrica
+  datasetId: number
+  datasetNombre: string
+}
+
+export interface CatalogoInformeResponseDto {
+  dashboards: DashboardDisponibleDto[]
+  indicadoresSinDashboard: IndicadorDisponibleDto[]
+}
+
+// --- Fase 6.9Q: informes clínicos ---
+
+export type TipoBloqueInforme =
+  | 'KPI'
+  | 'GRAFICA'
+  | 'TABLA'
+  | 'COMPARACION_INTERANUAL'
+  | 'TITULO'
+  | 'SUBTITULO'
+  | 'TEXTO'
+  | 'SEPARADOR'
+  | 'SALTO_PAGINA'
+
+export interface BloqueInformeRequestDto {
+  tipoBloque: TipoBloqueInforme
+  ancho?: number | null
+  orden?: number | null
+  metricaId?: number | null
+  tipoVisualizacion?: TipoVisualizacion | null
+  tipoResultadoWidget?: TipoResultado | null
+  configuracionWidget?: ConfiguracionWidgetDto | null
+  configuracionComparacion?: ComparacionInteranualRequestDto | null
+  contenidoTexto?: string | null
+  tituloPersonalizado?: string | null
+}
+
+export interface BloqueInformeResponseDto {
+  id: number
+  tipoBloque: TipoBloqueInforme
+  orden: number
+  ancho: number
+  metricaId: number | null
+  tipoVisualizacion: TipoVisualizacion | null
+  tipoResultadoWidget: TipoResultado | null
+  configuracionWidget: ConfiguracionWidgetDto | null
+  configuracionComparacion: ComparacionInteranualRequestDto | null
+  contenidoTexto: string | null
+  tituloPersonalizado: string | null
+  datasetId: number | null
+  datasetNombre: string | null
+  /** Resultado ya calculado; solo llega al pedir el informe con resultados. */
+  widget: DashboardWidgetDto | null
+  comparacion: ComparacionInteranualResponseDto | null
+  /** false cuando lo que referenciaba ya no existe. */
+  disponible: boolean
+  motivoNoDisponible: string | null
+}
+
+export interface PaginaInformeResponseDto {
+  id: number
+  orden: number
+  orientacion: string
+  bloques: BloqueInformeResponseDto[]
+}
+
+export interface InformeClinicoRequestDto {
+  nombre: string
+  titulo?: string | null
+  descripcion?: string | null
+}
+
+export interface InformeClinicoResponseDto {
+  id: number
+  /** El unico titulo que la UI enseña (6.9Q.2). `titulo` si existe, si no `nombre`. */
+  tituloVisible: string
+  /** @deprecated compatibilidad; la UI usa `tituloVisible`. */
+  nombre: string
+  /** @deprecated compatibilidad; la UI usa `tituloVisible`. */
+  titulo: string | null
+  descripcion: string | null
+  creadoEn: string
+  actualizadoEn: string
+  totalPaginas: number
+  paginas: PaginaInformeResponseDto[] | null
+  /** Trazabilidad del pie: cuándo se consultó y de qué datasets sale. */
+  generadoEn: string | null
+  datasetsUtilizados: string[] | null
+}
+
 // --- Fase 6.9O/6.9P: comparación entre años ---
 
 export type TipoComparacionInteranual = 'TASA' | 'RECUENTO' | 'DISTRIBUCION' | 'RESUMEN_NUMERICO'

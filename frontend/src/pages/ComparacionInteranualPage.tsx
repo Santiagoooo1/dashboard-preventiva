@@ -16,6 +16,11 @@ import { MatrizCategoriasInteranual, MatrizInteranual } from '../components/comp
 import { ResumenAnual } from '../components/comparacion/ResumenAnual'
 import { GraficaInteranual } from '../components/comparacion/GraficaInteranual'
 import { SelectorDatasets } from '../components/comparacion/SelectorDatasets'
+import {
+  ETIQUETA_COMPARACION,
+  comparacionesPara,
+  conceptosComunes as interseccionConceptos,
+} from '../components/comparacion/conceptosComparables'
 import styles from '../components/comparacion/Comparacion.module.css'
 
 /**
@@ -26,21 +31,6 @@ import styles from '../components/comparacion/Comparacion.module.css'
 const MAX_CATEGORIAS_LEGIBLES = 25
 
 type Vista = 'tabla' | 'grafica'
-
-/** Qué comparaciones admite cada tipo de dato; el backend rechaza el resto. */
-function comparacionesPara(tipoDato: string): TipoComparacionInteranual[] {
-  if (tipoDato === 'BOOLEANO') return ['TASA', 'RECUENTO', 'DISTRIBUCION']
-  if (tipoDato === 'TEXTO') return ['DISTRIBUCION']
-  if (tipoDato === 'ENTERO' || tipoDato === 'DECIMAL') return ['RESUMEN_NUMERICO']
-  return []
-}
-
-const ETIQUETA_COMPARACION: Record<TipoComparacionInteranual, string> = {
-  TASA: 'Tasa (% de casos sobre los documentados)',
-  RECUENTO: 'Casos (recuento)',
-  DISTRIBUCION: 'Distribución por categorías',
-  RESUMEN_NUMERICO: 'Resumen numérico (N, media, mínimo, máximo)',
-}
 
 /**
  * Comparación de un concepto clínico entre años (Fase 6.9P).
@@ -90,25 +80,13 @@ export function ComparacionInteranualPage() {
       .catch((e) => setError(e instanceof Error ? e.message : 'No se pudieron leer los campos.'))
   }, [seleccionados, camposPorDataset])
 
-  /**
-   * Conceptos presentes en todos los datasets marcados, con el mismo tipo.
-   *
-   * Se intersecta por código canónico, no por etiqueta: «LOCALIZACIÓN DE LA
-   * INFECCIÓN», «SITIO DE LA INFECCIÓN» y «LOCALIZACIÓN ILQ» son el mismo
-   * concepto y deben aparecer como una sola opción.
-   */
-  const conceptosComunes = useMemo(() => {
-    if (seleccionados.length === 0) return []
-    const listas = seleccionados.map((id) => camposPorDataset.get(id))
-    if (listas.some((l) => l === undefined)) return []
-
-    const [primera, ...resto] = listas as CampoMetricaMetadataDto[][]
-    return primera.filter((campo) =>
-      resto.every((otros) =>
-        otros.some((c) => c.codigo === campo.codigo && c.tipoDato === campo.tipoDato),
-      ),
-    )
-  }, [seleccionados, camposPorDataset])
+  // La intersección vive en un módulo compartido con el editor de informes: son
+  // las mismas reglas clínicas y duplicarlas acabaría ofreciendo opciones
+  // distintas en cada pantalla.
+  const conceptosComunes = useMemo(
+    () => interseccionConceptos(seleccionados, camposPorDataset),
+    [seleccionados, camposPorDataset],
+  )
 
   const campoElegido = conceptosComunes.find((c) => c.codigo === codigo)
   // Memoizado: es dependencia de un efecto, y recrear el array en cada render

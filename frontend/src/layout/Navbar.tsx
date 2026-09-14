@@ -16,6 +16,9 @@ export function Navbar() {
         <NavLink to="/comparar-anios" className={({ isActive }) => (isActive ? styles.active : undefined)}>
           Comparar años
         </NavLink>
+        <NavLink to="/informes" className={({ isActive }) => (isActive ? styles.active : undefined)}>
+          Informes
+        </NavLink>
         <span className={styles.grupoAvanzado}>
           <span className={styles.grupoAvanzadoEtiqueta}>Avanzado:</span>
           <NavLink to="/datasets" className={({ isActive }) => (isActive ? styles.active : undefined)}>

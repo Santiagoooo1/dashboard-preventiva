@@ -31,8 +31,8 @@ import com.preventiva.backend.service.interfaces.MetricaClinicaService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -55,10 +55,10 @@ public class DashboardPanelServiceImpl implements DashboardPanelService {
 
         DashboardPanelRequestDto filtros = request != null ? request : new DashboardPanelRequestDto();
 
-        List<DashboardWidgetDto> widgets = panelMetricaRepository.findByPanelIdAndActivaTrue(panelId)
+        List<DashboardWidgetDto> widgets = panelMetricaRepository
+                .findByPanelIdAndActivaTrueOrderByOrdenAscIdAsc(panelId)
                 .stream()
                 .filter(pm -> Boolean.TRUE.equals(pm.getMetrica().getActiva()))
-                .sorted(Comparator.comparing(PanelMetrica::getOrden))
                 .map(pm -> construirWidget(pm, filtros))
                 .toList();
 
@@ -93,6 +93,12 @@ public class DashboardPanelServiceImpl implements DashboardPanelService {
                 .widgets(widgets)
                 .resumen(resumen)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DashboardWidgetDto calcularWidget(PanelMetrica panelMetrica, DashboardPanelRequestDto filtros) {
+        return construirWidget(panelMetrica, filtros);
     }
 
     private DashboardWidgetDto construirWidget(PanelMetrica pm, DashboardPanelRequestDto filtros) {

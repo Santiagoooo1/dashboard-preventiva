@@ -1,0 +1,378 @@
+/* Informes clínicos (Fase 6.9Q).
+   Las hojas se dibujan con proporciones A4 reales y medidas en milímetros, para
+   que la vista previa se parezca al PDF de 6.9R y no haya que rehacer el
+   maquetado al exportar. */
+
+.editor {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--spacing-lg);
+  align-items: start;
+}
+
+/* En pantalla estrecha la biblioteca pasa arriba; la hoja no cambia de
+   estructura, solo escala. */
+@media (max-width: 900px) {
+  .editor {
+    grid-template-columns: 1fr;
+  }
+}
+
+.biblioteca {
+  position: sticky;
+  top: var(--spacing-md);
+  max-height: calc(100vh - 2 * var(--spacing-md));
+  overflow-y: auto;
+}
+
+.lienzo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+/* --- La hoja --- */
+
+.hoja {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 18mm 16mm;
+  background: #fff;
+  color: #111;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 8%);
+  box-sizing: border-box;
+  /* Rejilla de 12 columnas: los bloques se alinean solos y el resultado es
+     predecible al imprimir. Nada de posiciones absolutas en píxeles. */
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 6mm;
+  align-content: start;
+}
+
+.hojaHorizontal {
+  width: 297mm;
+  min-height: 210mm;
+}
+
+/* La hoja mantiene su tamaño lógico y se escala para caber en pantallas
+   pequeñas: cambiar su estructura según el viewport haría que la vista previa
+   dejara de predecir el PDF. */
+@media (max-width: 1100px) {
+  .lienzo {
+    align-items: flex-start;
+    overflow-x: auto;
+    width: 100%;
+  }
+}
+
+.bloque {
+  /* Cada bloque declara cuántas columnas ocupa con --span. */
+  grid-column: span var(--span, 12);
+  min-width: 0;
+}
+
+.cabeceraHoja {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: var(--spacing-xs);
+  margin-bottom: var(--spacing-sm);
+  font-size: 0.78rem;
+  color: #666;
+}
+
+.pieHoja {
+  grid-column: 1 / -1;
+  margin-top: auto;
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid #ddd;
+  font-size: 0.72rem;
+  color: #666;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+/* --- Contenido de los bloques --- */
+
+.titulo {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.25;
+}
+
+.subtitulo {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #333;
+}
+
+.tituloBloque {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 0.95rem;
+}
+
+.texto {
+  margin: 0;
+  /* Conserva los saltos de línea sin interpretar marcado. */
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.separador {
+  border: none;
+  border-top: 1px solid #ccc;
+  margin: var(--spacing-sm) 0;
+}
+
+.saltoPagina {
+  break-after: page;
+  page-break-after: always;
+  height: 0;
+}
+
+.bloqueWidget {
+  min-width: 0;
+}
+
+.bloqueNoDisponible {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.pendiente {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-style: italic;
+  margin: 0;
+}
+
+.hojaVacia {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #888;
+  padding: var(--spacing-lg);
+}
+
+/* --- Controles de edición (nunca se imprimen) --- */
+
+.controlesBloque {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+  font-size: 0.75rem;
+}
+
+.controlesBloque button {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface, #fff);
+  border-radius: var(--radius-sm);
+  padding: 2px var(--spacing-xs);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.controlesBloque button:hover {
+  border-color: var(--color-text-muted);
+}
+
+.marcoEdicion {
+  border: 1px dashed transparent;
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs);
+}
+
+.marcoEdicion:hover {
+  border-color: var(--color-border);
+}
+
+.cabeceraPagina {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 210mm;
+  max-width: 100%;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.acciones {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.seccionBiblioteca {
+  margin-bottom: var(--spacing-md);
+}
+
+.seccionBiblioteca h4 {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.listaElementos {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.elemento {
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.elemento:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-alt, rgb(0 0 0 / 4%));
+}
+
+.elementoOrigen {
+  display: block;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+/* Filtros de la biblioteca: dataset y tipo caben en una fila de 280px. */
+.filtros {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.filtros select {
+  min-width: 0;
+  font-size: 0.8rem;
+}
+
+.grupoDashboard {
+  margin-bottom: var(--spacing-sm);
+}
+
+/* El dashboard de origen se ve siempre: dos hospitales pueden tener una
+   «Tasa de ILQ» en paneles distintos y no son el mismo widget. */
+.nombreDashboard {
+  margin: 0 0 2px 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.filaWidget {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+}
+
+.marcaWidget {
+  display: flex;
+  align-items: center;
+  padding-top: var(--spacing-xs);
+}
+
+/* Aviso de recálculo: cabe junto a los botones y no tapa el documento, que
+   sigue enseñando las cifras anteriores mientras llegan las nuevas. */
+.calculando {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Hueco con la altura aproximada de un widget, para que la hoja no salte
+   cuando el resultado entra. */
+.esqueleto {
+  min-height: 70px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, #f2f2f2 25%, #e8e8e8 37%, #f2f2f2 63%);
+  background-size: 400% 100%;
+  animation: esqueletoBrillo 1.4s ease infinite;
+}
+
+@keyframes esqueletoBrillo {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* Sin animación para quien la haya desactivado en su sistema. */
+@media (prefers-reduced-motion: reduce) {
+  .esqueleto {
+    animation: none;
+  }
+}
+
+.estadoGuardado {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.sinGuardar {
+  font-size: 0.82rem;
+  color: var(--color-warning, #d97706);
+  font-weight: 600;
+}
+
+/* --- Impresión ---
+   Base para 6.9R: la hoja ya está en milímetros, así que imprimir es sobre todo
+   quitar el cromo de la aplicación. */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  .biblioteca,
+  .controlesBloque,
+  .cabeceraPagina,
+  .acciones {
+    display: none !important;
+  }
+
+  .editor {
+    display: block;
+  }
+
+  .lienzo {
+    gap: 0;
+  }
+
+  .hoja {
+    border: none;
+    box-shadow: none;
+    /* Una hoja por página, y que no se parta por la mitad. */
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+  }
+
+  .hoja:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .bloque {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
