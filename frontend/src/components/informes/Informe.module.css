@@ -34,17 +34,28 @@
 
 /* --- La hoja --- */
 
+/* Área útil del A4 (6.9R.1). El alto de página se reparte en tres bandas:
+   cabecera, contenido y pie. Los bloques viven solo en la del medio, así que no
+   pueden invadir el pie ni pisar el título. */
 .hoja {
   width: 210mm;
   min-height: 297mm;
-  padding: 18mm 16mm;
+  padding: 14mm 12mm;
   background: #fff;
   color: #111;
   border: 1px solid var(--color-border);
   box-shadow: 0 2px 12px rgb(0 0 0 / 8%);
   box-sizing: border-box;
-  /* Rejilla de 12 columnas: los bloques se alinean solos y el resultado es
-     predecible al imprimir. Nada de posiciones absolutas en píxeles. */
+  display: flex;
+  flex-direction: column;
+}
+
+/* La rejilla de 12 columnas vive en el cuerpo: los bloques se alinean solos y
+   el resultado es predecible al imprimir. Nada de posiciones absolutas. */
+.cuerpoHoja {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   gap: 6mm;
@@ -73,8 +84,53 @@
   min-width: 0;
 }
 
+/* Indivisible: si no cabe en lo que queda de hoja, pasa entero a la siguiente.
+   Una gráfica partida por la mitad son dos imágenes ilegibles, no media
+   gráfica. */
+.bloqueAtomico {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Puede continuar en la hoja siguiente: tablas largas y el bloque compuesto de
+   comparación. Se deja explícito `auto` para no heredar un `avoid` de nadie. */
+.bloqueDivisible {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+/* Cada parte del bloque compuesto de comparación es una unidad de paginación:
+   el resumen, la matriz y la gráfica pueden separarse entre hojas, pero
+   ninguna se parte por dentro. */
+.unidadImpresion {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: var(--spacing-sm);
+}
+
+.comparacionCompuesta {
+  min-width: 0;
+}
+
+/* Matriz con más categorías de las que caben: letra reducida hasta un suelo
+   legible, nunca columnas recortadas ni categorías ocultas. */
+.tablaComprimida table {
+  font-size: 0.72rem;
+}
+
+.tablaComprimida th,
+.tablaComprimida td {
+  padding: 2px 4px;
+}
+
+.avisoAnchura {
+  margin: 0 0 var(--spacing-xs) 0;
+  font-size: 0.75rem;
+  color: #8a6100;
+}
+
 .cabeceraHoja {
-  grid-column: 1 / -1;
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: baseline;
@@ -85,9 +141,14 @@
   color: #666;
 }
 
+.pieDatasets {
+  text-align: right;
+  /* Que un nombre larguísimo no empuje la fecha fuera del pie. */
+  overflow-wrap: anywhere;
+}
+
 .pieHoja {
-  grid-column: 1 / -1;
-  margin-top: auto;
+  flex: 0 0 auto;
   padding-top: var(--spacing-sm);
   border-top: 1px solid #ddd;
   font-size: 0.72rem;
@@ -129,9 +190,25 @@
   margin: var(--spacing-sm) 0;
 }
 
+/* En el editor se dibuja para que el hueco tenga explicación. */
 .saltoPagina {
-  break-after: page;
-  page-break-after: always;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: #999;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.saltoPagina::before,
+.saltoPagina::after {
+  content: '';
+  flex: 1;
+  border-top: 1px dashed #bbb;
+}
+
+.saltoPaginaImpreso {
   height: 0;
 }
 
@@ -152,6 +229,49 @@
   font-size: 0.82rem;
   font-style: italic;
   margin: 0;
+}
+
+/* Marca visible de dónde acaba el A4 mientras se edita. Se apoya en el cuerpo,
+   que ya es la banda útil, así que la línea cae donde caerá el corte real. */
+.limitePagina {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: calc(297mm - 28mm - 14mm);
+  border-bottom: 2px dashed #d08b00;
+  pointer-events: none;
+}
+
+.hojaDesbordada {
+  border-color: #d08b00;
+}
+
+.avisoDesbordamiento {
+  flex: 0 0 auto;
+  margin: var(--spacing-xs) 0 0 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: #fff6e5;
+  border-left: 3px solid #d08b00;
+  color: #8a6100;
+  font-size: 0.78rem;
+}
+
+.avisoImpresion {
+  margin: 0;
+  padding: var(--spacing-lg);
+  font-family: system-ui, sans-serif;
+  color: #444;
+}
+
+.documento {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-lg);
+  background: #f4f4f5;
+  padding: var(--spacing-lg) 0;
+  min-height: 100vh;
 }
 
 .hojaVacia {
@@ -302,6 +422,14 @@
 
 /* Hueco con la altura aproximada de un widget, para que la hoja no salte
    cuando el resultado entra. */
+/* Recordatorio junto a los botones de página: la hoja también lo avisa, pero
+   con el lienzo desplazado ese aviso puede quedar fuera de pantalla. */
+.avisoInline {
+  color: #8a6100;
+  font-style: normal;
+  font-weight: 600;
+}
+
 .esqueleto {
   min-height: 70px;
   border-radius: var(--radius-sm);
@@ -333,37 +461,48 @@
   font-weight: 600;
 }
 
-/* --- Impresión ---
-   Base para 6.9R: la hoja ya está en milímetros, así que imprimir es sobre todo
-   quitar el cromo de la aplicación. */
+/* --- Impresión (6.9R.1) ---
+   Todas las reglas de impresión del módulo de informes viven aquí. Están
+   acotadas a `.hoja` y a `.documento`, así que no pueden alcanzar a los
+   dashboards ni al resto de la aplicación. */
 @media print {
   @page {
     size: A4 portrait;
+    /* El margen lo pone la página, no un padding interno: así el contenido que
+       pasa a la hoja siguiente conserva el mismo margen. Esto es lo que permite
+       que una tabla larga continúe bien maquetada. */
+    margin: 14mm 12mm;
+  }
+
+  html,
+  body {
+    background: #fff;
     margin: 0;
+    padding: 0;
   }
 
-  .biblioteca,
-  .controlesBloque,
-  .cabeceraPagina,
-  .acciones {
-    display: none !important;
-  }
-
-  .editor {
+  .documento {
     display: block;
-  }
-
-  .lienzo {
+    background: none;
+    padding: 0;
+    min-height: 0;
     gap: 0;
   }
 
+  /* La hoja deja de tener alto físico fijo: el que pagina es el navegador.
+     Mantener 297mm aquí recortaría en silencio lo que sobrase, y en un informe
+     clínico perder filas sin avisar es el peor resultado posible. */
   .hoja {
+    width: auto;
+    min-height: 0;
+    padding: 0;
     border: none;
     box-shadow: none;
-    /* Una hoja por página, y que no se parta por la mitad. */
+    display: block;
+    /* Cada página lógica empieza en hoja nueva; cuántas hojas físicas ocupe lo
+       decide su contenido. */
     break-after: page;
     page-break-after: always;
-    break-inside: avoid;
   }
 
   .hoja:last-child {
@@ -371,8 +510,85 @@
     page-break-after: auto;
   }
 
-  .bloque {
+  .cuerpoHoja {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 6mm;
+  }
+
+  /* Cromo del editor y de la vista previa: nunca se imprime. */
+  .biblioteca,
+  .controlesBloque,
+  .cabeceraPagina,
+  .acciones,
+  .limitePagina,
+  .avisoDesbordamiento,
+  .calculando,
+  .marcoEdicion {
+    display: none !important;
+  }
+
+  /* `marcoEdicion` envuelve el contenido: ocultarlo se llevaría el bloque por
+     delante, así que solo se le quita el marco. */
+  .marcoEdicion {
+    display: block !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  /* Numeración lógica oculta: con una tabla larga, la hoja «1 de 2» lógica
+     puede ser la física «1 de 3». Imprimir un número que no corresponde es
+     peor que no imprimir ninguno. La numeración física llega en 6.9R.2. */
+  .numeracionLogica {
+    display: none;
+  }
+
+  /* Ningún contenedor con scroll dentro del documento: un `overflow` distinto
+     de `visible` crea un contexto que el navegador NO puede fragmentar, y al
+     imprimir recorta en vez de continuar en la hoja siguiente. Esta regla es la
+     que hace que una tabla de 36 meses se imprima entera. */
+  .hoja * {
+    overflow: visible !important;
+    max-height: none !important;
+  }
+
+  /* Tablas divisibles: cabecera repetida en cada hoja y filas sin partir. */
+  .hoja thead {
+    display: table-header-group;
+  }
+
+  .hoja tfoot {
+    display: table-footer-group;
+  }
+
+  .hoja tr,
+  .hoja svg {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /* Un encabezado no debe quedarse solo al final de una hoja. */
+  .hoja h2,
+  .hoja h3,
+  .hoja h4 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .saltoPaginaImpreso {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .saltoPagina {
+    display: none;
+  }
+
+  /* Los fondos de las gráficas y las bandas de estado forman parte de la
+     información, no son decoración. Aun así, ninguna lectura depende solo del
+     color: las tablas llevan siempre el valor numérico. */
+  .hoja {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }

@@ -7,6 +7,7 @@ import { ComparacionInteranualPage } from '../pages/ComparacionInteranualPage'
 import { InformesPage } from '../pages/InformesPage'
 import { InformeEditorPage } from '../pages/InformeEditorPage'
 import { InformeVistaPreviaPage } from '../pages/InformeVistaPreviaPage'
+import { InformeImpresionPage } from '../pages/InformeImpresionPage'
 import { DatasetFormPage } from '../pages/DatasetFormPage'
 import { DatasetDetailPage } from '../pages/DatasetDetailPage'
 import { DatasetCamposPage } from '../pages/DatasetCamposPage'
@@ -32,6 +33,10 @@ import { NotFoundPage } from '../pages/NotFoundPage'
 export function AppRoutes() {
   return (
     <Routes>
+      {/* Fuera de MainLayout a propósito: la ruta de impresión no debe tener
+          navegación ni cromo de la aplicación que luego haya que ocultar. */}
+      <Route path="/informes/:informeId/imprimir" element={<InformeImpresionPage />} />
+
       <Route element={<MainLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/crear-dashboard" element={<CrearDashboardPage />} />

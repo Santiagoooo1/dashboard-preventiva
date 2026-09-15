@@ -8,6 +8,8 @@ import styles from './Informe.module.css'
 
 interface BloqueInformeRendererProps {
   bloque: BloqueInformeResponseDto
+  /** En el editor algunos elementos invisibles se representan; al imprimir, no. */
+  enEdicion?: boolean
 }
 
 /**
@@ -21,7 +23,7 @@ interface BloqueInformeRendererProps {
  * <p>El texto se pinta como texto, nunca como HTML: los informes los escriben
  * personas y no hay razón para aceptar marcado arbitrario.
  */
-export function BloqueInformeRenderer({ bloque }: BloqueInformeRendererProps) {
+export function BloqueInformeRenderer({ bloque, enEdicion }: BloqueInformeRendererProps) {
   // Una referencia rota no tumba el documento: se dice qué pasa y se sigue.
   if (!bloque.disponible) {
     return (
@@ -47,7 +49,15 @@ export function BloqueInformeRenderer({ bloque }: BloqueInformeRendererProps) {
       return <hr className={styles.separador} />
 
     case 'SALTO_PAGINA':
-      return <div className={styles.saltoPagina} aria-hidden="true" />
+      // Al imprimir es una ruptura y nada más. En el editor se dibuja: un
+      // hueco enorme sin explicación parece un fallo de maquetado.
+      return enEdicion ? (
+        <div className={styles.saltoPagina}>
+          <span>Salto de página</span>
+        </div>
+      ) : (
+        <div className={styles.saltoPaginaImpreso} aria-hidden="true" />
+      )
 
     case 'COMPARACION_INTERANUAL': {
       const comparacion = bloque.comparacion
@@ -62,16 +72,33 @@ export function BloqueInformeRenderer({ bloque }: BloqueInformeRendererProps) {
           </div>
         )
       }
+      // Bloque compuesto: sus tres partes son las unidades de paginación.
+      // Marcarlo entero como indivisible produciría páginas imposibles —resumen
+      // + matriz de 36 meses + gráfica no caben juntos en un A4—, así que el
+      // navegador puede separarlas, pero nunca partir una por dentro.
+      const anchaDeMas = demasiadasColumnas(comparacion)
       return (
-        <div>
+        <div className={styles.comparacionCompuesta}>
           <h4 className={styles.tituloBloque}>{comparacion.etiquetaConcepto}</h4>
-          <ResumenAnual comparacion={comparacion} />
-          {comparacion.tipoComparacion === 'DISTRIBUCION' ? (
-            <MatrizCategoriasInteranual comparacion={comparacion} />
-          ) : (
-            <MatrizInteranual comparacion={comparacion} />
-          )}
-          <GraficaInteranual comparacion={comparacion} />
+          <div className={styles.unidadImpresion}>
+            <ResumenAnual comparacion={comparacion} />
+          </div>
+          <div className={`${styles.unidadImpresion} ${anchaDeMas ? styles.tablaComprimida : ''}`}>
+            {anchaDeMas && (
+              <p className={styles.avisoAnchura}>
+                Esta tabla tiene {comparacion.categorias.length} categorías y se imprime con letra
+                reducida. Si resulta ilegible, usa una comparación con menos categorías.
+              </p>
+            )}
+            {comparacion.tipoComparacion === 'DISTRIBUCION' ? (
+              <MatrizCategoriasInteranual comparacion={comparacion} />
+            ) : (
+              <MatrizInteranual comparacion={comparacion} />
+            )}
+          </div>
+          <div className={styles.unidadImpresion}>
+            <GraficaInteranual comparacion={comparacion} />
+          </div>
         </div>
       )
     }
@@ -98,6 +125,21 @@ export function BloqueInformeRenderer({ bloque }: BloqueInformeRendererProps) {
  * recibir su cálculo. Ocupa sitio a propósito, para que la hoja no dé un salto
  * cuando el dato entra.
  */
+/**
+ * Umbral de columnas a partir del cual una matriz no cabe en A4 vertical con
+ * tipografía normal.
+ *
+ * <p>Doce columnas a ~15 mm son 180 mm, justo el ancho útil. Por encima se
+ * reduce la letra hasta un suelo legible y se avisa. No se recortan columnas ni
+ * se ocultan categorías: un informe clínico al que le faltan categorías en
+ * silencio es peor que uno con letra pequeña.
+ */
+const MAX_COLUMNAS_A4 = 12
+
+function demasiadasColumnas(comparacion: { categorias: string[] }): boolean {
+  return comparacion.categorias.length > MAX_COLUMNAS_A4
+}
+
 function PendienteDeCalculo() {
   return <div className={styles.esqueleto} aria-label="Calculando…" />
 }

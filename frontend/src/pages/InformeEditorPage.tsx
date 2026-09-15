@@ -56,6 +56,9 @@ export function InformeEditorPage() {
   // Resultados por id de bloque: sobreviven a una recarga de solo estructura.
   const [resultados, setResultados] = useState<Map<number, BloqueInformeResponseDto>>(new Map())
   const [calculando, setCalculando] = useState(false)
+  // Lo comunica la propia hoja, que es quien puede medirse. El editor solo lo
+  // guarda para no reordenar nada por su cuenta mientras el usuario edita.
+  const [desbordaPagina, setDesbordaPagina] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   /**
@@ -273,7 +276,12 @@ export function InformeEditorPage() {
           )}
 
           <div className={styles.cabeceraPagina}>
-            {calculando && <span className={styles.calculando}>Calculando…</span>}
+            <span className={styles.calculando}>
+              {calculando && 'Calculando…'}
+              {!calculando && desbordaPagina && (
+                <span className={styles.avisoInline}>⚠ Esta página no cabe en un A4</span>
+              )}
+            </span>
             <span className={styles.acciones}>
               <button
                 type="button"
@@ -322,6 +330,8 @@ export function InformeEditorPage() {
               pagina={paginaConResultados}
               numero={paginaActiva + 1}
               total={paginas.length}
+              avisarDesbordamiento
+              onDesbordamiento={setDesbordaPagina}
               controlesBloque={(bloqueId, indice, total) => (
                 <>
                   <button

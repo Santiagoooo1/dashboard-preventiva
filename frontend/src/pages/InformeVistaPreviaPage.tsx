@@ -55,9 +55,17 @@ export function InformeVistaPreviaPage() {
           título del informe, que ya encabeza cada hoja y es el que irá al PDF. */}
       <div className={styles.cabeceraPagina} style={{ marginBottom: 'var(--spacing-md)' }}>
         <span className={styles.acciones}>
-          <button type="button" className="btn btnPrimary" onClick={() => window.print()}>
+          {/* Abre la ruta de impresión en lugar de imprimir esta pantalla: allí
+              no hay navegación ni botones que ocultar, así que lo que sale por
+              la impresora es el documento y nada más. */}
+          <Link
+            className="btn btnPrimary"
+            to={`/informes/${informe.id}/imprimir?auto=1`}
+            target="_blank"
+            rel="noopener"
+          >
             Imprimir
-          </button>
+          </Link>
           <Link className="btn btnSecondary" to={`/informes/${informe.id}/editar`}>
             Editar
           </Link>
@@ -75,6 +83,7 @@ export function InformeVistaPreviaPage() {
             pagina={pagina}
             numero={i + 1}
             total={paginas.length}
+            avisarDesbordamiento
           />
         ))}
       </div>
