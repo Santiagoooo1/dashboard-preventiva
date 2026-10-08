@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router'
 import type {
   BloqueInformeRequestDto,
   BloqueInformeResponseDto,
   ComparacionInteranualRequestDto,
   InformeClinicoResponseDto,
+  PaginaInformeResponseDto,
 } from '../api/types'
 import {
   actualizarBloque,
@@ -22,53 +23,61 @@ import { Card } from '../components/Card'
 import { ErrorBanner } from '../components/ErrorBanner'
 import { FormField } from '../components/FormField'
 import { BibliotecaElementos } from '../components/informes/BibliotecaElementos'
+import { descargarPdfDeInforme } from '../components/informes/descargaPdf'
 import { FormularioComparacion } from '../components/informes/FormularioComparacion'
 import { HojaInforme } from '../components/informes/HojaInforme'
+import { MedidorHojas } from '../components/informes/MedidorHojas'
+import { paginar, type Medidas } from '../components/informes/paginacion'
+import { usePersistenciaInforme } from '../components/informes/usePersistenciaInforme'
 import styles from '../components/informes/Informe.module.css'
 
+/** Espera antes de mandar el título. Suficiente para no hacer un PUT por tecla. */
+const RETARDO_TITULO = 600
+
 /**
- * Editor de informes (Fase 6.9Q).
+ * Editor de informes (Fase 6.9Q; WYSIWYG en 6.9Q.3; paginación en 6.9S.0).
  *
- * <p>Desde la 6.9Q.3 el lienzo es WYSIWYG: los bloques enseñan sus cifras
- * reales mientras se editan. Con un «se calculará después» no había forma de
- * saber si un KPI cabía en un cuarto de hoja o si una tabla de doce meses iba a
- * desbordar el A4, que es justo lo que se está decidiendo aquí.
+ * <p>El lienzo enseña las <b>hojas físicas</b> apiladas, como un procesador de
+ * textos. Antes mostraba una página lógica a la vez y avisaba de que «no cabe en
+ * un A4» sin enseñar dónde iba a parar lo que sobraba: para saber cómo quedaría
+ * el documento había que generar el PDF. Ahora el reparto se ve.
  *
- * <p>Los resultados salen de {@code GET /informes/:id/resultados}, el mismo
- * agregado que usa la vista previa: una llamada para todo el documento, nunca
- * una por bloque, y ningún cálculo en el navegador. Reordenar o cambiar el
- * ancho no vuelve a pedir nada —el dato no cambia—, así que esas acciones
- * recargan solo la estructura y reaprovechan los resultados ya recibidos.
+ * <p>Las cifras salen de {@code GET /informes/:id/resultados}, el mismo agregado
+ * que usa la vista previa: una llamada para todo el documento y ningún cálculo
+ * en el navegador.
  *
- * <p>Los bloques se mueven con controles explícitos en vez de arrastrar. No es
- * por comodidad: un drag & drop propio y robusto es bastante código, y la
- * alternativa era una dependencia nueva. Reordenar con flechas funciona con
- * teclado, no se rompe en táctil y hace exactamente lo que dice.
+ * <p>Todo se guarda solo. El título con un pequeño retardo, el resto en el acto,
+ * pero pasando todos por la misma cola, así que el documento tiene un único
+ * estado: guardando, guardado o error.
  */
 export function InformeEditorPage() {
   const { informeId } = useParams()
+  const navegar = useNavigate()
   const [informe, setInforme] = useState<InformeClinicoResponseDto | null>(null)
-  const [paginaActiva, setPaginaActiva] = useState(0)
   const [titulo, setTitulo] = useState('')
-  const [sinGuardar, setSinGuardar] = useState(false)
-  const [guardando, setGuardando] = useState(false)
   const [comparacionAbierta, setComparacionAbierta] = useState(false)
+  const [generandoPdf, setGenerandoPdf] = useState(false)
+  const [errorCarga, setErrorCarga] = useState<string | null>(null)
+  const [errorPdf, setErrorPdf] = useState<string | null>(null)
+
   // Resultados por id de bloque: sobreviven a una recarga de solo estructura.
   const [resultados, setResultados] = useState<Map<number, BloqueInformeResponseDto>>(new Map())
   const [calculando, setCalculando] = useState(false)
-  // Lo comunica la propia hoja, que es quien puede medirse. El editor solo lo
-  // guarda para no reordenar nada por su cuenta mientras el usuario edita.
-  const [desbordaPagina, setDesbordaPagina] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [medidas, setMedidas] = useState<Medidas | null>(null)
+  /** Hoja física sobre la que se está trabajando; decide dónde se añade. */
+  const [hojaActiva, setHojaActiva] = useState(1)
 
-  /**
-   * Recarga el informe.
-   *
-   * <p>`conResultados` decide si se piden también las cifras. Añadir o quitar
-   * un bloque cambia lo que hay que calcular; moverlo o estrecharlo, no. Los
-   * resultados que ya tenemos se guardan por id de bloque y se reaprovechan,
-   * así que una recarga de estructura no deja la hoja en blanco.
-   */
+  const persistencia = usePersistenciaInforme()
+  const { mutar, esperarInactividad } = persistencia
+
+  // Lo último que el usuario ha escrito. La mutación encolada lee de aquí, no
+  // del valor que hubiera cuando se programó: así tres pulsaciones seguidas
+  // mandan el texto final, no un estado intermedio.
+  const tituloRef = useRef('')
+  tituloRef.current = titulo
+  const tituloServidor = useRef('')
+  const temporizadorTitulo = useRef<number>(0)
+
   const recargar = useCallback(
     async (conResultados: boolean) => {
       if (!informeId) return
@@ -78,15 +87,19 @@ export function InformeEditorPage() {
           ? await obtenerInformeConResultados(informeId)
           : await obtenerInforme(informeId)
         setInforme(datos)
-        setTitulo(datos.tituloVisible)
-        setPaginaActiva((actual) => Math.min(actual, Math.max(0, (datos.paginas?.length ?? 1) - 1)))
+        tituloServidor.current = datos.tituloVisible
+        // No se pisa lo que el usuario está escribiendo: añadir un bloque
+        // recarga la estructura, y eso borraba el título a medio teclear.
+        if (tituloRef.current === '' || tituloRef.current === datos.tituloVisible) {
+          setTitulo(datos.tituloVisible)
+        }
         if (conResultados) {
           const mapa = new Map<number, BloqueInformeResponseDto>()
           datos.paginas?.forEach((p) => p.bloques.forEach((b) => mapa.set(b.id, b)))
           setResultados(mapa)
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'No se pudo cargar el informe.')
+        setErrorCarga(e instanceof Error ? e.message : 'No se pudo cargar el informe.')
       } finally {
         if (conResultados) setCalculando(false)
       }
@@ -98,82 +111,102 @@ export function InformeEditorPage() {
     recargar(true)
   }, [recargar])
 
-  // Guardado explícito: el autosave sobre una estructura que el usuario está
-  // moviendo invita a carreras entre peticiones, y perder un informe a medias
-  // es peor que pulsar un botón.
-  const guardar = async () => {
+  // ------------------------------------------------------------------
+  // Autoguardado
+  // ------------------------------------------------------------------
+
+  /** Encola una mutación estructural. Recarga después para reflejar el servidor. */
+  const mutarEstructura = useCallback(
+    (accion: () => Promise<unknown>, conResultados = true) =>
+      mutar(accion, () => recargar(conResultados)),
+    [mutar, recargar],
+  )
+
+  const guardarTitulo = useCallback(() => {
     if (!informeId) return
-    setGuardando(true)
-    setError(null)
-    try {
-      // Las dos columnas van con el mismo texto; el backend lo vuelve a
-      // asegurar por si la petición llega de otro sitio.
-      await actualizarInforme(informeId, { nombre: titulo, titulo })
-      setSinGuardar(false)
-      await recargar(false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo guardar.')
-    } finally {
-      setGuardando(false)
-    }
+    window.clearTimeout(temporizadorTitulo.current)
+    if (tituloRef.current.trim() === tituloServidor.current.trim()) return
+    mutar(
+      () => {
+        // Se lee el texto en el momento de ejecutar, no al encolar: si el
+        // usuario ha seguido escribiendo, se manda lo último.
+        const texto = tituloRef.current
+        tituloServidor.current = texto
+        return actualizarInforme(informeId, { nombre: texto, titulo: texto })
+      },
+      () => recargar(false),
+    )
+  }, [informeId, mutar, recargar])
+
+  const escribirTitulo = (texto: string) => {
+    setTitulo(texto)
+    window.clearTimeout(temporizadorTitulo.current)
+    temporizadorTitulo.current = window.setTimeout(guardarTitulo, RETARDO_TITULO)
   }
 
-  const paginas = informe?.paginas ?? []
-  const pagina = paginas[paginaActiva]
+  useEffect(() => () => window.clearTimeout(temporizadorTitulo.current), [])
 
-  /**
-   * La página que se pinta: la estructura que se está editando, con el
-   * resultado ya calculado de cada bloque encima. Así el lienzo del editor y la
-   * vista previa reciben exactamente la misma forma de datos y los pinta el
-   * mismo renderizador.
-   */
-  const paginaConResultados = useMemo(() => {
-    if (!pagina) return pagina
-    return {
-      ...pagina,
-      bloques: pagina.bloques.map((b) => {
+  // ------------------------------------------------------------------
+  // Paginación física
+  // ------------------------------------------------------------------
+
+  const paginas: PaginaInformeResponseDto[] = useMemo(() => {
+    const crudas = informe?.paginas ?? []
+    // Cada bloque se pinta con su resultado ya calculado encima, así que el
+    // medidor y el lienzo ven exactamente lo mismo que la vista previa.
+    return crudas.map((p) => ({
+      ...p,
+      bloques: p.bloques.map((b) => {
         const calculado = resultados.get(b.id)
-        if (!calculado) return b
-        return {
-          ...b,
-          widget: calculado.widget,
-          comparacion: calculado.comparacion,
-          disponible: calculado.disponible,
-          motivoNoDisponible: calculado.motivoNoDisponible,
-          datasetNombre: calculado.datasetNombre,
-        }
+        return calculado
+          ? {
+              ...b,
+              widget: calculado.widget,
+              comparacion: calculado.comparacion,
+              disponible: calculado.disponible,
+              motivoNoDisponible: calculado.motivoNoDisponible,
+              datasetNombre: calculado.datasetNombre,
+            }
+          : b
       }),
-    }
-  }, [pagina, resultados])
+    }))
+  }, [informe, resultados])
 
-  /**
-   * `recalcular` distingue lo que cambia los datos de lo que solo cambia el
-   * maquetado. Estrechar un bloque o subirlo una posición no altera ninguna
-   * cifra: volver a pedirlas sería trabajo tirado en cada clic.
-   */
-  const conError = async (accion: () => Promise<unknown>, recalcular = true) => {
-    setError(null)
-    try {
-      await accion()
-      await recargar(recalcular)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'No se pudo completar la acción.')
-    }
-  }
+  const hojas = useMemo(() => paginar(paginas, medidas), [paginas, medidas])
+
+  // La hoja activa puede desaparecer al borrar contenido.
+  useEffect(() => {
+    setHojaActiva((actual) => Math.min(Math.max(1, actual), Math.max(1, hojas.length)))
+  }, [hojas.length])
+
+  /** Página lógica sobre la que actúan «añadir» y las acciones de sección. */
+  const paginaLogicaActiva = useMemo(() => {
+    const hoja = hojas.find((h) => h.numero === hojaActiva) ?? hojas[hojas.length - 1]
+    return paginas.find((p) => p.id === hoja?.paginaLogicaId) ?? paginas[paginas.length - 1]
+  }, [hojas, hojaActiva, paginas])
+
+  const bloquesNoCaben = useMemo(
+    () => hojas.flatMap((h) => h.fragmentos).filter((f) => f.noCabe).length,
+    [hojas],
+  )
+
+  // ------------------------------------------------------------------
+  // Acciones
+  // ------------------------------------------------------------------
 
   const anadir = (bloque: BloqueInformeRequestDto) => {
-    if (!informeId || !pagina) return
-    conError(() => anadirBloque(informeId, pagina.id, bloque))
+    if (!informeId || !paginaLogicaActiva) return
+    mutarEstructura(() => anadirBloque(informeId, paginaLogicaActiva.id, bloque))
   }
 
   // En secuencia, no en paralelo: el orden de los bloques lo asigna el backend
   // al insertar, y lanzar varias peticiones a la vez dejaría el resultado a
   // merced de cuál conteste antes.
   const anadirVarios = (bloques: BloqueInformeRequestDto[]) => {
-    if (!informeId || !pagina) return
-    conError(async () => {
+    if (!informeId || !paginaLogicaActiva) return
+    mutarEstructura(async () => {
       for (const bloque of bloques) {
-        await anadirBloque(informeId, pagina.id, bloque)
+        await anadirBloque(informeId, paginaLogicaActiva.id, bloque)
       }
     })
   }
@@ -184,76 +217,150 @@ export function InformeEditorPage() {
     anadir({ tipoBloque: 'COMPARACION_INTERANUAL', configuracionComparacion: config, ancho: 12 })
   }
 
+  const bloqueDe = (bloqueId: number) =>
+    paginas
+      .flatMap((p) => p.bloques.map((b) => ({ b, paginaId: p.id })))
+      .find((x) => x.b.id === bloqueId)
+
   const cambiarAncho = (bloqueId: number, ancho: number) => {
-    if (!informeId || !pagina) return
-    const bloque = pagina.bloques.find((b) => b.id === bloqueId)
-    if (!bloque) return
-    conError(() =>
-      actualizarBloque(informeId, pagina.id, bloqueId, {
-        tipoBloque: bloque.tipoBloque,
-        ancho,
-        metricaId: bloque.metricaId,
-        tipoVisualizacion: bloque.tipoVisualizacion,
-        tipoResultadoWidget: bloque.tipoResultadoWidget,
-        configuracionWidget: bloque.configuracionWidget,
-        configuracionComparacion: bloque.configuracionComparacion,
-        contenidoTexto: bloque.contenidoTexto,
-        tituloPersonalizado: bloque.tituloPersonalizado,
-      }),
+    const encontrado = bloqueDe(bloqueId)
+    if (!informeId || !encontrado) return
+    const { b, paginaId } = encontrado
+    // El ancho no altera ninguna cifra, pero sí la paginación: se recarga la
+    // estructura y se reaprovechan los resultados ya recibidos.
+    mutarEstructura(
+      () =>
+        actualizarBloque(informeId, paginaId, bloqueId, {
+          tipoBloque: b.tipoBloque,
+          ancho,
+          metricaId: b.metricaId,
+          tipoVisualizacion: b.tipoVisualizacion,
+          tipoResultadoWidget: b.tipoResultadoWidget,
+          configuracionWidget: b.configuracionWidget,
+          configuracionComparacion: b.configuracionComparacion,
+          contenidoTexto: b.contenidoTexto,
+          tituloPersonalizado: b.tituloPersonalizado,
+        }),
       false,
     )
   }
 
+  const mover = (bloqueId: number, destino: number) => {
+    const encontrado = bloqueDe(bloqueId)
+    if (!informeId || !encontrado) return
+    mutarEstructura(() => moverBloque(informeId, encontrado.paginaId, bloqueId, destino), false)
+  }
+
+  const borrarBloque = (bloqueId: number) => {
+    const encontrado = bloqueDe(bloqueId)
+    if (!informeId || !encontrado) return
+    mutarEstructura(() => eliminarBloque(informeId, encontrado.paginaId, bloqueId))
+  }
+
   const editarTexto = (bloqueId: number) => {
-    if (!informeId || !pagina) return
-    const bloque = pagina.bloques.find((b) => b.id === bloqueId)
-    if (!bloque) return
-    const nuevo = window.prompt('Texto del bloque:', bloque.contenidoTexto ?? '')
+    const encontrado = bloqueDe(bloqueId)
+    if (!informeId || !encontrado) return
+    const nuevo = window.prompt('Texto del bloque:', encontrado.b.contenidoTexto ?? '')
     if (nuevo === null || nuevo.trim() === '') return
-    conError(() =>
-      actualizarBloque(informeId, pagina.id, bloqueId, {
-        tipoBloque: bloque.tipoBloque,
-        ancho: bloque.ancho,
+    mutarEstructura(() =>
+      actualizarBloque(informeId, encontrado.paginaId, bloqueId, {
+        tipoBloque: encontrado.b.tipoBloque,
+        ancho: encontrado.b.ancho,
         contenidoTexto: nuevo,
       }),
     )
   }
 
+  // ------------------------------------------------------------------
+  // Vista previa y PDF
+  // ------------------------------------------------------------------
+
+  /**
+   * Deja el documento a salvo antes de leerlo desde el servidor.
+   *
+   * <p>No hay esperas fijas: se vacía el retardo del título, se encola su
+   * guardado y se espera a que la cola quede libre. Si algo quedó en error no se
+   * continúa: abrir la vista previa o generar un PDF de una versión incierta es
+   * peor que no abrirla.
+   */
+  const asegurarPersistido = async (): Promise<boolean> => {
+    guardarTitulo()
+    await esperarInactividad()
+    return persistencia.estado !== 'error'
+  }
+
+  const irAVistaPrevia = async () => {
+    if (!informeId || generandoPdf) return
+    if (await asegurarPersistido()) {
+      navegar(`/informes/${informeId}/vista-previa`)
+    }
+  }
+
+  const descargarPdf = async () => {
+    if (!informeId || generandoPdf) return
+    setErrorPdf(null)
+    if (!(await asegurarPersistido())) return
+
+    setGenerandoPdf(true)
+    try {
+      await descargarPdfDeInforme(informeId)
+    } catch (e) {
+      setErrorPdf(e instanceof Error && e.message ? e.message : 'No se pudo generar el PDF.')
+    } finally {
+      setGenerandoPdf(false)
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // Render
+  // ------------------------------------------------------------------
+
   if (!informe) {
     return (
       <Card title="Informe">
-        <ErrorBanner mensaje={error} />
-        {!error && <p className="stateLoading">Cargando…</p>}
+        <ErrorBanner mensaje={errorCarga} />
+        {!errorCarga && <p className="stateLoading">Cargando…</p>}
       </Card>
     )
   }
 
+  const bloqueando = persistencia.estado === 'guardando' || generandoPdf
+
   return (
     <div>
       <Card title="Informe">
-        <ErrorBanner mensaje={error} />
+        <ErrorBanner mensaje={errorCarga} />
+        <ErrorBanner mensaje={errorPdf} />
         <FormField
           label="Título del informe"
-          help="Identifica el informe en la lista y encabeza cada hoja."
+          help="Identifica el informe en la lista y encabeza cada hoja. Se guarda solo."
         >
           <input
             value={titulo}
-            onChange={(e) => {
-              setTitulo(e.target.value)
-              setSinGuardar(true)
-            }}
+            onChange={(e) => escribirTitulo(e.target.value)}
+            onBlur={guardarTitulo}
           />
         </FormField>
+
         <div className={styles.acciones}>
-          <button type="button" className="btn btnPrimary" disabled={guardando} onClick={guardar}>
-            {guardando ? 'Guardando…' : 'Guardar'}
-          </button>
-          <span className={sinGuardar ? styles.sinGuardar : styles.estadoGuardado}>
-            {sinGuardar ? 'Cambios sin guardar' : 'Guardado'}
-          </span>
-          <Link className="btn btnSecondary" to={`/informes/${informe.id}/vista-previa`}>
+          <EstadoGuardado persistencia={persistencia} />
+
+          <button
+            type="button"
+            className="btn btnSecondary"
+            disabled={bloqueando}
+            onClick={irAVistaPrevia}
+          >
             Vista previa
-          </Link>
+          </button>
+          <button
+            type="button"
+            className="btn btnSecondary"
+            disabled={bloqueando}
+            onClick={descargarPdf}
+          >
+            {generandoPdf ? 'Generando PDF…' : 'Descargar PDF'}
+          </button>
           <Link className="btn btnSecondary" to="/informes">
             Volver
           </Link>
@@ -267,7 +374,9 @@ export function InformeEditorPage() {
           onAbrirComparacion={() => setComparacionAbierta(true)}
         />
 
-        <div className={styles.lienzo}>
+        {/* `data-lienzo` distingue las hojas visibles de las del medidor, que
+            están fuera de pantalla pero siguen en el layout. */}
+        <div className={styles.lienzo} data-lienzo="1">
           {comparacionAbierta && (
             <FormularioComparacion
               onAceptar={anadirComparacion}
@@ -278,115 +387,226 @@ export function InformeEditorPage() {
           <div className={styles.cabeceraPagina}>
             <span className={styles.calculando}>
               {calculando && 'Calculando…'}
-              {!calculando && desbordaPagina && (
-                <span className={styles.avisoInline}>⚠ Esta página no cabe en un A4</span>
+              {!calculando && bloquesNoCaben > 0 && (
+                <span className={styles.avisoInline}>
+                  ⚠ {bloquesNoCaben} bloque{bloquesNoCaben > 1 ? 's' : ''} no cabe
+                  {bloquesNoCaben > 1 ? 'n' : ''} en un A4
+                </span>
               )}
             </span>
             <span className={styles.acciones}>
+              {/* Añadir página crea un salto manual, una sección nueva. Ya no
+                  hace falta pulsarlo para arreglar un desbordamiento: eso se
+                  pagina solo. */}
               <button
                 type="button"
                 className="btn btnSecondary"
-                disabled={paginaActiva === 0}
-                onClick={() => setPaginaActiva((p) => p - 1)}
+                disabled={bloqueando}
+                onClick={() => informeId && mutarEstructura(() => anadirPagina(informeId), false)}
               >
-                ← Anterior
+                + Añadir sección
               </button>
               <button
                 type="button"
                 className="btn btnSecondary"
-                disabled={paginaActiva >= paginas.length - 1}
-                onClick={() => setPaginaActiva((p) => p + 1)}
+                disabled={bloqueando || !paginaLogicaActiva}
+                onClick={() =>
+                  informeId &&
+                  paginaLogicaActiva &&
+                  mutarEstructura(() => duplicarPagina(informeId, paginaLogicaActiva.id))
+                }
               >
-                Siguiente →
-              </button>
-              <button
-                type="button"
-                className="btn btnSecondary"
-                onClick={() => informeId && conError(() => anadirPagina(informeId))}
-              >
-                + Añadir página
-              </button>
-              <button
-                type="button"
-                className="btn btnSecondary"
-                onClick={() => informeId && pagina && conError(() => duplicarPagina(informeId, pagina.id))}
-              >
-                Duplicar
+                Duplicar sección
               </button>
               <button
                 type="button"
                 className="btn btnDanger"
-                disabled={paginas.length <= 1}
-                onClick={() => informeId && pagina && conError(() => eliminarPagina(informeId, pagina.id))}
+                disabled={bloqueando || paginas.length <= 1 || !paginaLogicaActiva}
+                onClick={() =>
+                  informeId &&
+                  paginaLogicaActiva &&
+                  mutarEstructura(() => eliminarPagina(informeId, paginaLogicaActiva.id))
+                }
               >
-                Eliminar página
+                Eliminar sección
               </button>
             </span>
           </div>
 
-          {pagina && (
+          {/* Hojas físicas apiladas: se ve el documento completo y dónde cae
+              cada cosa, en vez de navegar página a página a ciegas. */}
+          {hojas.map((hoja) => (
             <HojaInforme
+              key={`${hoja.paginaLogicaId}-${hoja.numero}`}
               informe={informe}
-              pagina={paginaConResultados}
-              numero={paginaActiva + 1}
-              total={paginas.length}
-              avisarDesbordamiento
-              onDesbordamiento={setDesbordaPagina}
-              controlesBloque={(bloqueId, indice, total) => (
-                <>
-                  <button
-                    type="button"
-                    disabled={indice === 0}
-                    title="Subir"
-                    onClick={() =>
-                      informeId &&
-                      conError(() => moverBloque(informeId, pagina.id, bloqueId, indice - 1), false)
-                    }
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    disabled={indice >= total - 1}
-                    title="Bajar"
-                    onClick={() =>
-                      informeId &&
-                      conError(() => moverBloque(informeId, pagina.id, bloqueId, indice + 1), false)
-                    }
-                  >
-                    ↓
-                  </button>
-                  <button type="button" title="Un cuarto de ancho" onClick={() => cambiarAncho(bloqueId, 3)}>
-                    ¼
-                  </button>
-                  <button type="button" title="Media página" onClick={() => cambiarAncho(bloqueId, 6)}>
-                    ½
-                  </button>
-                  <button type="button" title="Ancho completo" onClick={() => cambiarAncho(bloqueId, 12)}>
-                    1/1
-                  </button>
-                  {esTexto(pagina.bloques.find((b) => b.id === bloqueId)?.tipoBloque) && (
-                    <button type="button" title="Editar texto" onClick={() => editarTexto(bloqueId)}>
-                      Editar
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    title="Eliminar bloque"
-                    onClick={() =>
-                      informeId && conError(() => eliminarBloque(informeId, pagina.id, bloqueId))
-                    }
-                  >
-                    ✕
-                  </button>
-                </>
+              elementos={hoja.fragmentos}
+              orientacion={hoja.orientacion}
+              numero={hoja.numero}
+              total={hojas.length}
+              activa={hoja.numero === hojaActiva}
+              onActivar={() => setHojaActiva(hoja.numero)}
+              controlesBloque={(bloqueId) => (
+                <ControlesBloque
+                  bloqueId={bloqueId}
+                  posicion={posicionEnPagina(paginas, hoja.paginaLogicaId, bloqueId)}
+                  totalEnPagina={paginas.find((p) => p.id === hoja.paginaLogicaId)?.bloques.length ?? 0}
+                  esTexto={esTexto(bloqueDe(bloqueId)?.b.tipoBloque)}
+                  deshabilitado={bloqueando}
+                  onMover={mover}
+                  onAncho={cambiarAncho}
+                  onTexto={editarTexto}
+                  onBorrar={borrarBloque}
+                />
               )}
             />
-          )}
+          ))}
         </div>
       </div>
+
+      {/* Mide sobre una hoja A4 real pero fuera de la vista. Nunca se miden las
+          hojas visibles: repaginar cambiaría lo medido y el cálculo no pararía. */}
+      <MedidorHojas informe={informe} paginas={paginas} onMedidas={setMedidas} />
     </div>
   )
+}
+
+/** Posición del bloque dentro de su página lógica, no dentro de la hoja física. */
+function posicionEnPagina(
+  paginas: PaginaInformeResponseDto[],
+  paginaId: number,
+  bloqueId: number,
+): number {
+  const pagina = paginas.find((p) => p.id === paginaId)
+  return pagina ? pagina.bloques.findIndex((b) => b.id === bloqueId) : -1
+}
+
+interface ControlesBloqueProps {
+  bloqueId: number
+  posicion: number
+  totalEnPagina: number
+  esTexto: boolean
+  deshabilitado: boolean
+  onMover: (bloqueId: number, destino: number) => void
+  onAncho: (bloqueId: number, ancho: number) => void
+  onTexto: (bloqueId: number) => void
+  onBorrar: (bloqueId: number) => void
+}
+
+/**
+ * Controles de un bloque.
+ *
+ * <p>Mueven y redimensionan dentro de la <b>página lógica</b>: las hojas físicas
+ * son un reparto derivado, así que subir un bloque significa subirlo en su
+ * sección, no dentro de la hoja donde ha caído. Si se ordenara por la hoja
+ * física, mover el primer bloque de una continuación haría cosas
+ * imprevisibles.
+ */
+function ControlesBloque({
+  bloqueId,
+  posicion,
+  totalEnPagina,
+  esTexto,
+  deshabilitado,
+  onMover,
+  onAncho,
+  onTexto,
+  onBorrar,
+}: ControlesBloqueProps) {
+  return (
+    <>
+      <button
+        type="button"
+        disabled={deshabilitado || posicion <= 0}
+        title="Subir"
+        onClick={() => onMover(bloqueId, posicion - 1)}
+      >
+        ↑
+      </button>
+      <button
+        type="button"
+        disabled={deshabilitado || posicion < 0 || posicion >= totalEnPagina - 1}
+        title="Bajar"
+        onClick={() => onMover(bloqueId, posicion + 1)}
+      >
+        ↓
+      </button>
+      <button
+        type="button"
+        disabled={deshabilitado}
+        title="Un cuarto de ancho"
+        onClick={() => onAncho(bloqueId, 3)}
+      >
+        ¼
+      </button>
+      <button
+        type="button"
+        disabled={deshabilitado}
+        title="Media página"
+        onClick={() => onAncho(bloqueId, 6)}
+      >
+        ½
+      </button>
+      <button
+        type="button"
+        disabled={deshabilitado}
+        title="Ancho completo"
+        onClick={() => onAncho(bloqueId, 12)}
+      >
+        1/1
+      </button>
+      {esTexto && (
+        <button
+          type="button"
+          disabled={deshabilitado}
+          title="Editar texto"
+          onClick={() => onTexto(bloqueId)}
+        >
+          Editar
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={deshabilitado}
+        title="Eliminar bloque"
+        onClick={() => onBorrar(bloqueId)}
+      >
+        ✕
+      </button>
+    </>
+  )
+}
+
+/**
+ * Estado del documento: uno solo para el título y para la estructura.
+ *
+ * <p>Nunca dice «✓ Guardado» con una mutación en vuelo, que era justo la
+ * incoherencia anterior: se movía un widget y el indicador seguía tranquilo.
+ */
+function EstadoGuardado({
+  persistencia,
+}: {
+  persistencia: ReturnType<typeof usePersistenciaInforme>
+}) {
+  if (persistencia.estado === 'guardando') {
+    return <span className={styles.estadoGuardado}>Guardando…</span>
+  }
+  if (persistencia.estado === 'error') {
+    return (
+      <span
+        className={styles.estadoError}
+        data-persistencia="error"
+        data-reintentable={String(persistencia.puedeReintentar)}
+      >
+        ⚠ No se pudo guardar
+        {persistencia.puedeReintentar && (
+          <button type="button" className="btn btnSecondary" onClick={persistencia.reintentar}>
+            Reintentar
+          </button>
+        )}
+      </span>
+    )
+  }
+  return <span className={styles.estadoGuardado}>✓ Guardado</span>
 }
 
 function esTexto(tipo?: string): boolean {

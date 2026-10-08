@@ -4,7 +4,9 @@ import type { InformeClinicoResponseDto } from '../api/types'
 import { obtenerInformeConResultados } from '../api/informesApi'
 import { Card } from '../components/Card'
 import { ErrorBanner } from '../components/ErrorBanner'
+import { descargarPdfDeInforme } from '../components/informes/descargaPdf'
 import { HojaInforme } from '../components/informes/HojaInforme'
+import { elementosDe } from '../components/informes/paginacion'
 import styles from '../components/informes/Informe.module.css'
 
 /**
@@ -17,6 +19,10 @@ import styles from '../components/informes/Informe.module.css'
 export function InformeVistaPreviaPage() {
   const { informeId } = useParams()
   const [informe, setInforme] = useState<InformeClinicoResponseDto | null>(null)
+  const [generando, setGenerando] = useState(false)
+  // Separado del error de carga: que falle una descarga no puede hacer
+  // desaparecer el informe que el usuario está mirando.
+  const [errorPdf, setErrorPdf] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -27,6 +33,21 @@ export function InformeVistaPreviaPage() {
         setError(e instanceof Error ? e.message : 'No se pudo cargar la vista previa del informe.'),
       )
   }, [informeId])
+
+  const descargarPdf = async () => {
+    if (!informeId || generando) return
+    setGenerando(true)
+    setErrorPdf(null)
+    try {
+      await descargarPdfDeInforme(informeId)
+    } catch (e) {
+      // El backend manda un mensaje ya saneado (por ejemplo, que falta
+      // configurar la ruta de Chrome); si no lo hay, una frase genérica.
+      setErrorPdf(e instanceof Error && e.message ? e.message : 'No se pudo generar el PDF.')
+    } finally {
+      setGenerando(false)
+    }
+  }
 
   if (error) {
     return (
@@ -55,11 +76,19 @@ export function InformeVistaPreviaPage() {
           título del informe, que ya encabeza cada hoja y es el que irá al PDF. */}
       <div className={styles.cabeceraPagina} style={{ marginBottom: 'var(--spacing-md)' }}>
         <span className={styles.acciones}>
-          {/* Abre la ruta de impresión en lugar de imprimir esta pantalla: allí
-              no hay navegación ni botones que ocultar, así que lo que sale por
-              la impresora es el documento y nada más. */}
-          <Link
+          <button
+            type="button"
             className="btn btnPrimary"
+            disabled={generando}
+            onClick={descargarPdf}
+          >
+            {generando ? 'Generando PDF…' : 'Descargar PDF'}
+          </button>
+          {/* Se conserva la impresión manual: sirve para tirar a papel o para
+              elegir impresora, cosas que la descarga no cubre. Abre la misma
+              ruta que usa el backend para el PDF, no esta pantalla. */}
+          <Link
+            className="btn btnSecondary"
             to={`/informes/${informe.id}/imprimir?auto=1`}
             target="_blank"
             rel="noopener"
@@ -75,15 +104,17 @@ export function InformeVistaPreviaPage() {
         </span>
       </div>
 
+      <ErrorBanner mensaje={errorPdf} />
+
       <div className={styles.lienzo}>
         {paginas.map((pagina, i) => (
           <HojaInforme
             key={pagina.id}
             informe={informe}
-            pagina={pagina}
+            elementos={elementosDe(pagina.bloques)}
+            orientacion={pagina.orientacion}
             numero={i + 1}
             total={paginas.length}
-            avisarDesbordamiento
           />
         ))}
       </div>

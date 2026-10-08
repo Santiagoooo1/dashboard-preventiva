@@ -1,28 +1,25 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type {
-  BloqueInformeResponseDto,
-  InformeClinicoResponseDto,
-  PaginaInformeResponseDto,
-  TipoBloqueInforme,
-} from '../../api/types'
+import type { ReactNode } from 'react'
+import type { BloqueInformeResponseDto, InformeClinicoResponseDto, TipoBloqueInforme } from '../../api/types'
 import { BloqueInformeRenderer } from './BloqueInformeRenderer'
+import { agruparConsecutivos, type FragmentoBloque } from './paginacion'
+import { formatearFecha, resumirDatasets } from './textoInforme'
 import styles from './Informe.module.css'
 
 interface HojaInformeProps {
   informe: InformeClinicoResponseDto
-  pagina: PaginaInformeResponseDto
+  /** Contenido de ESTA hoja. Lo decide quien la usa: la página lógica completa
+   *  al imprimir, o el reparto físico calculado en el editor. */
+  elementos: FragmentoBloque[]
+  orientacion?: string | null
   numero: number
   total: number
   /** Controles de edición sobre cada bloque; ausentes en vista previa e impresión. */
   controlesBloque?: (bloqueId: number, indice: number, total: number) => ReactNode
-  /**
-   * Mide la hoja y avisa si la página lógica no cabe en un A4. Se activa en
-   * pantalla (editor y vista previa); al imprimir sobra, porque ahí el
-   * navegador ya reparte el contenido de verdad.
-   */
-  avisarDesbordamiento?: boolean
-  /** Además de pintar el aviso, lo comunica hacia arriba. */
-  onDesbordamiento?: (desborda: boolean) => void
+  /** Se avisa del nodo del cuerpo para poder medirlo desde fuera. */
+  refCuerpo?: (nodo: HTMLDivElement | null) => void
+  /** Marca la hoja donde se está trabajando. */
+  activa?: boolean
+  onActivar?: () => void
 }
 
 /**
@@ -32,13 +29,7 @@ interface HojaInformeProps {
  * ilegibles. Si no cabe en lo que queda de hoja, pasa entera a la siguiente.
  * Las tablas son la excepción deliberada —ver {@link TIPOS_DIVISIBLES}—.
  */
-const TIPOS_ATOMICOS: TipoBloqueInforme[] = [
-  'KPI',
-  'GRAFICA',
-  'TITULO',
-  'SUBTITULO',
-  'SEPARADOR',
-]
+const TIPOS_ATOMICOS: TipoBloqueInforme[] = ['KPI', 'GRAFICA', 'TITULO', 'SUBTITULO', 'SEPARADOR']
 
 /**
  * Bloques que sí pueden continuar en la hoja siguiente.
@@ -50,116 +41,109 @@ const TIPOS_ATOMICOS: TipoBloqueInforme[] = [
  */
 const TIPOS_DIVISIBLES: TipoBloqueInforme[] = ['TABLA', 'COMPARACION_INTERANUAL', 'TEXTO']
 
-/** Alto imprimible aproximado de un A4 vertical, en píxeles CSS (297mm − márgenes). */
-const ALTO_UTIL_A4_PX = ((297 - 14 * 2) / 25.4) * 96
-
 /**
- * Una hoja del informe (Fase 6.9Q; paginación en 6.9R.1).
+ * Una hoja A4 del informe (Fase 6.9Q; paginación en 6.9R.1 y 6.9S.0).
  *
  * <p>Mide 210 × 297 mm de verdad y coloca los bloques sobre una rejilla de 12
  * columnas. Guardar el ancho en columnas y no en píxeles es lo que hace que el
  * documento aguante un cambio de fuente, de navegador o el salto a PDF: una
  * posición absoluta se descuadra en cuanto un título ocupa una línea más.
  *
- * <p>Es una <b>página lógica</b>: la que el usuario creó. Al imprimir puede
- * convertirse en varias <b>páginas físicas</b> si lleva una tabla larga. Por eso
- * en pantalla la hoja tiene alto fijo de A4 y al imprimir ese alto se suelta:
- * forzarlo allí recortaría filas en silencio, que es justo lo que no puede
- * pasar en un documento clínico.
+ * <p>La hoja no sabe nada de páginas lógicas ni físicas: recibe una lista de
+ * elementos y los pinta. Eso es lo que permite que el editor, la vista previa y
+ * la ruta de impresión usen <b>esta misma hoja</b> con el mismo ancho, padding,
+ * tipografía y renderizadores, en vez de una aproximación por cada sitio.
  */
 export function HojaInforme({
   informe,
-  pagina,
+  elementos,
+  orientacion,
   numero,
   total,
   controlesBloque,
-  avisarDesbordamiento,
-  onDesbordamiento,
+  refCuerpo,
+  activa,
+  onActivar,
 }: HojaInformeProps) {
-  const horizontal = pagina.orientacion === 'HORIZONTAL'
+  const horizontal = orientacion === 'HORIZONTAL'
   const fecha = informe.generadoEn ?? informe.actualizadoEn
-  const cuerpoRef = useRef<HTMLDivElement>(null)
-  const [desborda, setDesborda] = useState(false)
-
-  const midiendo = Boolean(avisarDesbordamiento)
-
-  useEffect(() => {
-    const nodo = cuerpoRef.current
-    if (!midiendo || !nodo) return
-
-    const medir = () => {
-      const excede = nodo.scrollHeight > ALTO_UTIL_A4_PX
-      setDesborda(excede)
-      onDesbordamiento?.(excede)
-    }
-
-    medir()
-    // Las gráficas se dibujan después del primer render y las cifras llegan de
-    // la API: medir una sola vez daría un aviso desfasado.
-    const observador = new ResizeObserver(medir)
-    observador.observe(nodo)
-    return () => observador.disconnect()
-  }, [midiendo, onDesbordamiento, pagina])
 
   return (
     <article
-      className={[
-        styles.hoja,
-        horizontal ? styles.hojaHorizontal : '',
-        desborda ? styles.hojaDesbordada : '',
-      ]
+      className={[styles.hoja, horizontal ? styles.hojaHorizontal : '', activa ? styles.hojaActiva : '']
         .filter(Boolean)
         .join(' ')}
+      onFocusCapture={onActivar}
+      onMouseDown={onActivar}
     >
       <header className={styles.cabeceraHoja}>
         <span>{informe.tituloVisible}</span>
-        {/* La numeración lógica no se imprime: con una tabla larga, la hoja 1
-            de 2 lógicas puede ser la física 1 de 3. Ver 6.9R.2. */}
+        {/* La numeración lógica no se imprime: la física la ponen las margin
+            boxes de @page, que son las únicas que saben cuántas hojas salen. */}
         <span className={styles.numeracionLogica}>
           Página {numero} de {total}
         </span>
       </header>
 
-      <div className={styles.cuerpoHoja} ref={cuerpoRef}>
-        {pagina.bloques.length === 0 ? (
-          <p className={styles.hojaVacia}>
-            Empieza añadiendo indicadores, gráficas, tablas o texto.
-          </p>
+      <div className={styles.cuerpoHoja} ref={refCuerpo}>
+        {elementos.length === 0 ? (
+          <p className={styles.hojaVacia}>Empieza añadiendo indicadores, gráficas, tablas o texto.</p>
         ) : (
-          pagina.bloques.map((bloque, indice) => (
+          /* Los años consecutivos de una misma matriz se pintan en UN bloque de
+             la rejilla, no en uno por año: así ocupan el mismo alto que al
+             imprimir, que es lo que el medidor ha medido. */
+          agruparConsecutivos(elementos).map((grupo, indice) => (
             <div
-              key={bloque.id}
-              className={`${styles.bloque} ${claseFragmentacion(bloque)}`}
+              key={grupo[0].clave}
+              className={[
+                styles.bloque,
+                claseFragmentacion(grupo[0].bloque),
+                grupo.some((e) => e.noCabe) ? styles.bloqueNoCabe : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              data-bloque-id={grupo[0].bloque.id}
               // El ancho viaja como número de columnas, no como medida física.
-              style={{ ['--span' as string]: bloque.ancho }}
+              style={{ ['--span' as string]: grupo[0].bloque.ancho }}
             >
-              {controlesBloque && (
+              {/* `conControles` es false en las partes que no deben repetirlos:
+                  una comparación son varios fragmentos pero UN bloque. */}
+              {controlesBloque && grupo[0].conControles !== false && (
                 <div className={styles.controlesBloque}>
-                  {controlesBloque(bloque.id, indice, pagina.bloques.length)}
+                  {controlesBloque(grupo[0].bloque.id, indice, elementos.length)}
                 </div>
               )}
+
+              {grupo.some((e) => e.noCabe) && (
+                <p className={styles.avisoBloqueNoCabe} role="status">
+                  ⚠ Este bloque no cabe en una hoja A4. Redúcelo de ancho o divídelo en varios.
+                </p>
+              )}
+
               <div className={controlesBloque ? styles.marcoEdicion : undefined}>
-                <BloqueInformeRenderer bloque={bloque} enEdicion={Boolean(controlesBloque)} />
+                {grupo.map((elemento) => (
+                  <div key={elemento.clave} data-unidad={elemento.clave}>
+                    <BloqueInformeRenderer
+                      bloque={elemento.bloque}
+                      enEdicion={Boolean(controlesBloque)}
+                      unidad={elemento.unidad}
+                      indiceSerie={elemento.indiceSerie}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           ))
         )}
-
-        {/* Marca dónde termina el A4: mientras se edita se ve cuánto queda. */}
-        {midiendo && <div className={styles.limitePagina} aria-hidden="true" />}
       </div>
-
-      {midiendo && desborda && (
-        <p className={styles.avisoDesbordamiento} role="status">
-          Esta página supera el espacio imprimible A4. Al imprimir continuará en otra hoja.
-        </p>
-      )}
 
       {/* Trazabilidad: cuándo se consultó y de qué datasets sale. Sin ids. */}
       <footer className={styles.pieHoja}>
         <span>Consultado: {formatearFecha(fecha)}</span>
         {informe.datasetsUtilizados && informe.datasetsUtilizados.length > 0 && (
-          <span className={styles.pieDatasets}>Datos de: {resumirDatasets(informe.datasetsUtilizados)}</span>
+          <span className={styles.pieDatasets}>
+            Datos de: {resumirDatasets(informe.datasetsUtilizados)}
+          </span>
         )}
       </footer>
     </article>
@@ -170,29 +154,4 @@ function claseFragmentacion(bloque: BloqueInformeResponseDto): string {
   if (TIPOS_DIVISIBLES.includes(bloque.tipoBloque)) return styles.bloqueDivisible
   if (TIPOS_ATOMICOS.includes(bloque.tipoBloque)) return styles.bloqueAtomico
   return ''
-}
-
-/**
- * Pie legible con muchos datasets.
- *
- * <p>Un hospital puede comparar seis años y seis nombres largos ocupan tres
- * líneas del pie. Se enseñan los primeros y se cuenta el resto en vez de
- * recortar la línea con puntos suspensivos, que escondería cuáles faltan.
- */
-function resumirDatasets(nombres: string[]): string {
-  const MAXIMO = 3
-  if (nombres.length <= MAXIMO) return nombres.join(' · ')
-  const resto = nombres.length - MAXIMO
-  return `${nombres.slice(0, MAXIMO).join(' · ')} y ${resto} más`
-}
-
-function formatearFecha(iso: string | null): string {
-  if (!iso) return '—'
-  const fecha = new Date(iso)
-  if (Number.isNaN(fecha.getTime())) return '—'
-  const dd = String(fecha.getDate()).padStart(2, '0')
-  const mm = String(fecha.getMonth() + 1).padStart(2, '0')
-  const hh = String(fecha.getHours()).padStart(2, '0')
-  const mi = String(fecha.getMinutes()).padStart(2, '0')
-  return `${dd}/${mm}/${fecha.getFullYear()} ${hh}:${mi}`
 }

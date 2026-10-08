@@ -39,6 +39,43 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
   return (await response.json()) as T
 }
 
+/**
+ * Descarga binaria (Fase 6.9R.2).
+ *
+ * <p>Devuelve el blob junto con el nombre que propone el servidor en
+ * `Content-Disposition`. Se lee de ahí y no se inventa en el cliente: el
+ * backend ya lo ha saneado, y construirlo dos veces acabaría dando nombres
+ * distintos según por dónde se descargue.
+ */
+export async function apiGetArchivo(
+  path: string,
+  signal?: AbortSignal,
+): Promise<{ blob: Blob; nombre: string | null }> {
+  const response = await fetchOFallarConMensajeClaro(`${BASE_URL}${path}`, { signal })
+  if (!response.ok) {
+    throw new Error(await leerMensajeError(response))
+  }
+  return {
+    blob: await response.blob(),
+    nombre: nombreDeCabecera(response.headers.get('Content-Disposition')),
+  }
+}
+
+function nombreDeCabecera(cabecera: string | null): string | null {
+  if (!cabecera) return null
+  // `filename*` (RFC 5987) gana: es el que conserva los caracteres no ASCII.
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(cabecera)
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8[1])
+    } catch {
+      // Cabecera mal formada: se sigue con el nombre simple.
+    }
+  }
+  const simple = /filename="?([^";]+)"?/i.exec(cabecera)
+  return simple ? simple[1] : null
+}
+
 export async function apiPost<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetchOFallarConMensajeClaro(`${BASE_URL}${path}`, {
     method: 'POST',

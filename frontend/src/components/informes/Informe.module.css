@@ -29,7 +29,9 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--spacing-lg);
+  /* Separación entre hojas apiladas: se ve dónde acaba una y empieza la
+     siguiente, como en un procesador de textos. */
+  gap: 24px;
 }
 
 /* --- La hoja --- */
@@ -107,6 +109,7 @@
   page-break-inside: avoid;
   margin-bottom: var(--spacing-sm);
 }
+
 
 .comparacionCompuesta {
   min-width: 0;
@@ -231,30 +234,71 @@
   margin: 0;
 }
 
-/* Marca visible de dónde acaba el A4 mientras se edita. Se apoya en el cuerpo,
-   que ya es la banda útil, así que la línea cae donde caerá el corte real. */
-.limitePagina {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: calc(297mm - 28mm - 14mm);
-  border-bottom: 2px dashed #d08b00;
-  pointer-events: none;
+/* Hoja donde se está trabajando: lo que se añada desde la biblioteca va a su
+   sección. Un borde discreto, no un rediseño. */
+.hojaActiva {
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 1px var(--color-primary, #2563eb), 0 2px 12px rgb(0 0 0 / 8%);
 }
 
-.hojaDesbordada {
-  border-color: #d08b00;
+/* Solo para lo que no hay forma de paginar: un bloque más alto que un A4. */
+.bloqueNoCabe {
+  outline: 2px dashed #d08b00;
+  outline-offset: 2px;
 }
 
-.avisoDesbordamiento {
-  flex: 0 0 auto;
-  margin: var(--spacing-xs) 0 0 0;
+.avisoBloqueNoCabe {
+  margin: 0 0 var(--spacing-xs) 0;
   padding: var(--spacing-xs) var(--spacing-sm);
   background: #fff6e5;
   border-left: 3px solid #d08b00;
   color: #8a6100;
   font-size: 0.78rem;
+}
+
+.estadoError {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: 0.82rem;
+  color: var(--color-danger, #b91c1c);
+  font-weight: 600;
+}
+
+/* Medidor de alturas: fuera de la vista, pero con caja. Con `display: none` no
+   tendría dimensiones y todo mediría cero. */
+.medidor {
+  position: absolute;
+  top: 0;
+  left: -10000px;
+  width: 210mm;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* La hoja del medidor replica la CAJA DE IMPRESIÓN, no la de pantalla.
+   Dos motivos:
+   - `height` fija en vez de `min-height`: con min-height la hoja crece con el
+     contenido, y entonces el «alto útil» medido dejaba de ser un A4 y salía
+     mayor cuanto más contenido había. El editor concluía que todo cabía en una
+     hoja mientras el PDF necesitaba dos.
+   - los márgenes y la ausencia de cabecera/pie en el flujo son los de @page,
+     porque allí los pone el navegador en el margen. Así el hueco disponible
+     que se mide es el mismo que tendrá la hoja impresa. */
+.medidor .hoja {
+  height: 297mm;
+  min-height: 297mm;
+  padding: 16mm 12mm 18mm;
+}
+
+.medidor .hojaHorizontal {
+  height: 210mm;
+  min-height: 210mm;
+}
+
+.medidor .cabeceraHoja,
+.medidor .pieHoja {
+  display: none;
 }
 
 .avisoImpresion {
@@ -453,12 +497,9 @@
 .estadoGuardado {
   font-size: 0.82rem;
   color: var(--color-text-muted);
-}
-
-.sinGuardar {
-  font-size: 0.82rem;
-  color: var(--color-warning, #d97706);
-  font-weight: 600;
+  /* Alineado con los botones vecinos: sustituye a uno cuando no hay cambios. */
+  display: inline-flex;
+  align-items: center;
 }
 
 /* --- Impresión (6.9R.1) ---
@@ -492,7 +533,8 @@
   /* La hoja deja de tener alto físico fijo: el que pagina es el navegador.
      Mantener 297mm aquí recortaría en silencio lo que sobrase, y en un informe
      clínico perder filas sin avisar es el peor resultado posible. */
-  .hoja {
+  .hoja,
+  .hojaActiva {
     width: auto;
     min-height: 0;
     padding: 0;
@@ -521,9 +563,9 @@
   .controlesBloque,
   .cabeceraPagina,
   .acciones,
-  .limitePagina,
-  .avisoDesbordamiento,
   .calculando,
+  .avisoBloqueNoCabe,
+  .medidor,
   .marcoEdicion {
     display: none !important;
   }
@@ -538,8 +580,18 @@
 
   /* Numeración lógica oculta: con una tabla larga, la hoja «1 de 2» lógica
      puede ser la física «1 de 3». Imprimir un número que no corresponde es
-     peor que no imprimir ninguno. La numeración física llega en 6.9R.2. */
+     peor que no imprimir ninguno. La numeración física la ponen las margin
+     boxes de @page (6.9R.2). */
   .numeracionLogica {
+    display: none;
+  }
+
+  /* En la ruta de impresión la cabecera y el pie los pone @page, y se repiten
+     en TODAS las hojas físicas. Los del flujo se ocultan ahí para no verlos
+     dos veces; fuera de `.documento` —imprimir la vista previa con Ctrl+P—
+     siguen saliendo, que es mejor que quedarse sin ninguno. */
+  .documento .cabeceraHoja,
+  .documento .pieHoja {
     display: none;
   }
 
@@ -550,6 +602,16 @@
   .hoja * {
     overflow: visible !important;
     max-height: none !important;
+    /* Sombras, transiciones y transformaciones obligan a Chrome a componer la
+       hoja en una capa y la exporta como JPEG de página completa: el PDF pesa
+       más, el texto deja de ser nítido al ampliar y las gráficas pierden su
+       condición de vectores. Son adornos de pantalla; en papel no aportan. */
+    box-shadow: none !important;
+    text-shadow: none !important;
+    transition: none !important;
+    animation: none !important;
+    filter: none !important;
+    transform: none !important;
   }
 
   /* Tablas divisibles: cabecera repetida en cada hoja y filas sin partir. */

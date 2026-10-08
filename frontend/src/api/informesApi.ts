@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPost, apiPut } from './apiClient'
+import { apiDelete, apiGet, apiGetArchivo, apiPost, apiPut } from './apiClient'
 import type {
   BloqueInformeRequestDto,
   CatalogoInformeResponseDto,
@@ -16,6 +16,20 @@ import type {
  */
 export function obtenerCatalogoInforme(signal?: AbortSignal): Promise<CatalogoInformeResponseDto> {
   return apiGet<CatalogoInformeResponseDto>('/informes/catalogo', signal)
+}
+
+/**
+ * PDF del informe, generado por el backend (Fase 6.9R.2).
+ *
+ * <p>El frontend solo manda el id: no pide `/resultados`, no maqueta nada y no
+ * transforma ningún SVG. Es el navegador headless del servidor el que abre la
+ * ruta de impresión canónica.
+ */
+export function descargarInformePdf(
+  id: string | number,
+  signal?: AbortSignal,
+): Promise<{ blob: Blob; nombre: string | null }> {
+  return apiGetArchivo(`/informes/${id}/pdf`, signal)
 }
 
 export function listarInformes(signal?: AbortSignal): Promise<InformeClinicoResponseDto[]> {

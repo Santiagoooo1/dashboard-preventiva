@@ -2,17 +2,24 @@ package com.preventiva.backend.controller;
 
 import com.preventiva.backend.dto.BloqueInformeRequestDto;
 import com.preventiva.backend.dto.CatalogoInformeResponseDto;
+import com.preventiva.backend.dto.DocumentoPdfDto;
 import com.preventiva.backend.dto.BloqueInformeResponseDto;
 import com.preventiva.backend.dto.InformeClinicoRequestDto;
 import com.preventiva.backend.dto.InformeClinicoResponseDto;
 import com.preventiva.backend.dto.PaginaInformeResponseDto;
 import com.preventiva.backend.service.interfaces.CatalogoInformeService;
 import com.preventiva.backend.service.interfaces.InformeClinicoService;
+import com.preventiva.backend.service.interfaces.InformePdfService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController
@@ -22,6 +29,41 @@ public class InformeClinicoController {
 
     private final InformeClinicoService informeClinicoService;
     private final CatalogoInformeService catalogoInformeService;
+    private final InformePdfService informePdfService;
+
+    /**
+     * Descarga el informe en PDF (Fase 6.9R.2).
+     *
+     * <p>El cliente solo manda el id. La URL que se renderiza la compone el
+     * servidor con su propia configuración, así que no se puede usar este
+     * endpoint para que el servidor visite una dirección elegida por el
+     * usuario.
+     *
+     * <p>Se devuelven los bytes tal cual, no un JSON con base64: el navegador
+     * necesita la cabecera {@code Content-Disposition} para lanzar la descarga,
+     * y un base64 obligaría al frontend a reconstruir el archivo a mano.
+     */
+    @GetMapping("/{id}/pdf")
+    public ResponseEntity<byte[]> descargarPdf(@PathVariable("id") Long id) {
+        DocumentoPdfDto documento = informePdfService.generar(id);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, cabeceraDescarga(documento.getNombreArchivo()))
+                .contentLength(documento.getContenido().length)
+                .body(documento.getContenido());
+    }
+
+    /**
+     * Cabecera de descarga con las dos formas del nombre.
+     *
+     * <p>{@code filename} en ASCII para clientes antiguos y {@code filename*}
+     * codificado en UTF-8 (RFC 5987) para los actuales. El nombre ya viene
+     * saneado del servicio; aquí solo se codifica.
+     */
+    private String cabeceraDescarga(String nombre) {
+        String codificado = URLEncoder.encode(nombre, StandardCharsets.UTF_8).replace("+", "%20");
+        return "attachment; filename=\"" + nombre + "\"; filename*=UTF-8''" + codificado;
+    }
 
     /**
      * Qué se puede insertar en un informe: los widgets de los dashboards con su

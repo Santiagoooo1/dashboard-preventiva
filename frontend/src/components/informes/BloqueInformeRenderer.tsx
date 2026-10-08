@@ -1,6 +1,7 @@
 import type { BloqueInformeResponseDto, ComparacionInteranualRequestDto } from '../../api/types'
 import { DashboardWidgetRenderer } from '../dashboard/DashboardWidgetRenderer'
 import { ETIQUETA_COMPARACION } from '../comparacion/conceptosComparables'
+import { claveUnidad, type UnidadComparacion } from './paginacion'
 import { MatrizCategoriasInteranual, MatrizInteranual } from '../comparacion/MatrizInteranual'
 import { ResumenAnual } from '../comparacion/ResumenAnual'
 import { GraficaInteranual } from '../comparacion/GraficaInteranual'
@@ -10,6 +11,16 @@ interface BloqueInformeRendererProps {
   bloque: BloqueInformeResponseDto
   /** En el editor algunos elementos invisibles se representan; al imprimir, no. */
   enEdicion?: boolean
+  /**
+   * Para una comparación, pinta solo esa parte (Fase 6.9S.0.1).
+   *
+   * <p>Sin la prop se pinta completa, que es lo que necesitan la vista previa y
+   * la ruta de impresión. El editor la pasa porque reparte la comparación entre
+   * hojas por sus unidades semánticas.
+   */
+  unidad?: UnidadComparacion
+  /** Año concreto de una matriz de distribución repartida por años. */
+  indiceSerie?: number
 }
 
 /**
@@ -23,7 +34,12 @@ interface BloqueInformeRendererProps {
  * <p>El texto se pinta como texto, nunca como HTML: los informes los escriben
  * personas y no hay razón para aceptar marcado arbitrario.
  */
-export function BloqueInformeRenderer({ bloque, enEdicion }: BloqueInformeRendererProps) {
+export function BloqueInformeRenderer({
+  bloque,
+  enEdicion,
+  unidad,
+  indiceSerie,
+}: BloqueInformeRendererProps) {
   // Una referencia rota no tumba el documento: se dice qué pasa y se sigue.
   if (!bloque.disponible) {
     return (
@@ -77,28 +93,77 @@ export function BloqueInformeRenderer({ bloque, enEdicion }: BloqueInformeRender
       // + matriz de 36 meses + gráfica no caben juntos en un A4—, así que el
       // navegador puede separarlas, pero nunca partir una por dentro.
       const anchaDeMas = demasiadasColumnas(comparacion)
+
+      // En el render COMPLETO cada parte lleva su clave de unidad: así el
+      // medidor toma las alturas dentro de esta misma estructura —la que se
+      // imprime— en vez de sobre bloques separados de la rejilla, que añadían
+      // un hueco y un margen por año. Cuando se pide una parte concreta la
+      // etiqueta la pone la hoja, y repetirla aquí la contaría dos veces.
+      const etiqueta = (u: UnidadComparacion, i?: number) =>
+        unidad === undefined ? claveUnidad(bloque.id, u, i) : undefined
+
+      const resumen = (
+        <div className={styles.unidadImpresion} data-unidad={etiqueta('RESUMEN')}>
+          <ResumenAnual comparacion={comparacion} />
+        </div>
+      )
+      // Si se pide un año concreto se recorta la lista de series. Son los
+      // mismos datos ya calculados, solo filtrados: la tabla la sigue pintando
+      // el componente de siempre.
+      const comparacionMatriz =
+        indiceSerie === undefined
+          ? comparacion
+          : { ...comparacion, series: comparacion.series.slice(indiceSerie, indiceSerie + 1) }
+
+      const aviso = anchaDeMas && (
+        <p className={styles.avisoAnchura}>
+          Esta tabla tiene {comparacion.categorias.length} categorías y se imprime con letra
+          reducida. Si resulta ilegible, usa una comparación con menos categorías.
+        </p>
+      )
+
+      // En el render completo la matriz se despliega año a año, cada uno con su
+      // clave: es la misma descomposición que usa el editor para repartirla, y
+      // deja al medidor leer la altura real de cada año tal como se imprime.
+      const matriz = (
+        <div className={`${styles.unidadImpresion} ${anchaDeMas ? styles.tablaComprimida : ''}`}>
+          {/* El aviso de anchura acompaña al primer año, no a los tres. */}
+          {(indiceSerie === undefined || indiceSerie === 0) && aviso}
+          {comparacion.tipoComparacion !== 'DISTRIBUCION' ? (
+            <div data-unidad={etiqueta('MATRIZ')}>
+              <MatrizInteranual comparacion={comparacion} />
+            </div>
+          ) : indiceSerie !== undefined ? (
+            <MatrizCategoriasInteranual comparacion={comparacionMatriz} />
+          ) : (
+            comparacion.series.map((serie, i) => (
+              <div key={`${serie.datasetId}-${serie.anio}`} data-unidad={etiqueta('MATRIZ', i)}>
+                <MatrizCategoriasInteranual
+                  comparacion={{ ...comparacion, series: comparacion.series.slice(i, i + 1) }}
+                />
+              </div>
+            ))
+          )}
+        </div>
+      )
+      const grafica = (
+        <div className={styles.unidadImpresion} data-unidad={etiqueta('GRAFICA')}>
+          <GraficaInteranual comparacion={comparacion} />
+        </div>
+      )
+
+      // El título acompaña a la primera parte: repetirlo en las tres haría
+      // creer que son tres comparaciones distintas.
+      const encabezado = (!unidad || unidad === 'RESUMEN') && (
+        <h4 className={styles.tituloBloque}>{comparacion.etiquetaConcepto}</h4>
+      )
+
       return (
         <div className={styles.comparacionCompuesta}>
-          <h4 className={styles.tituloBloque}>{comparacion.etiquetaConcepto}</h4>
-          <div className={styles.unidadImpresion}>
-            <ResumenAnual comparacion={comparacion} />
-          </div>
-          <div className={`${styles.unidadImpresion} ${anchaDeMas ? styles.tablaComprimida : ''}`}>
-            {anchaDeMas && (
-              <p className={styles.avisoAnchura}>
-                Esta tabla tiene {comparacion.categorias.length} categorías y se imprime con letra
-                reducida. Si resulta ilegible, usa una comparación con menos categorías.
-              </p>
-            )}
-            {comparacion.tipoComparacion === 'DISTRIBUCION' ? (
-              <MatrizCategoriasInteranual comparacion={comparacion} />
-            ) : (
-              <MatrizInteranual comparacion={comparacion} />
-            )}
-          </div>
-          <div className={styles.unidadImpresion}>
-            <GraficaInteranual comparacion={comparacion} />
-          </div>
+          {encabezado}
+          {(!unidad || unidad === 'RESUMEN') && resumen}
+          {(!unidad || unidad === 'MATRIZ') && matriz}
+          {(!unidad || unidad === 'GRAFICA') && grafica}
         </div>
       )
     }
